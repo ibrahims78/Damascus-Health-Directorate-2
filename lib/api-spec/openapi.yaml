@@ -1,0 +1,3146 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: Ambulance & Emergency Warehouse Management System API — Damascus
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+  - name: auth
+  - name: categories
+  - name: items
+  - name: equipment
+  - name: transactions
+  - name: recipients
+  - name: exit-reasons
+  - name: dashboard
+  - name: alerts
+  - name: reports
+  - name: users
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login with username and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginCredentials"
+      responses:
+        "200":
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUser"
+        "401":
+          description: Invalid credentials
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout
+      responses:
+        "200":
+          description: Logged out
+
+  /auth/setup-status:
+    get:
+      operationId: getSetupStatus
+      tags: [auth]
+      summary: Check if initial admin setup is needed
+      responses:
+        "200":
+          description: Setup status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SetupStatus"
+
+  /auth/setup:
+    post:
+      operationId: setupAdmin
+      tags: [auth]
+      summary: Create the first admin account (only works if no admin exists)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetupAdminInput"
+      responses:
+        "200":
+          description: Admin created and logged in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUser"
+        "409":
+          description: Admin already exists
+
+  /auth/me:
+    get:
+      operationId: getCurrentUser
+      tags: [auth]
+      summary: Get current authenticated user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUser"
+        "401":
+          description: Not authenticated
+
+  /categories:
+    get:
+      operationId: listCategories
+      tags: [categories]
+      summary: List all categories
+      responses:
+        "200":
+          description: List of categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Category"
+
+  /items:
+    get:
+      operationId: listItems
+      tags: [items]
+      summary: List items with optional filters
+      parameters:
+        - name: categoryId
+          in: query
+          schema: { type: integer }
+        - name: search
+          in: query
+          schema: { type: string }
+        - name: belowMin
+          in: query
+          schema: { type: boolean }
+        - name: nearExpiry
+          in: query
+          schema: { type: boolean }
+        - name: page
+          in: query
+          schema: { type: integer }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 5000 }
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [name, currentStock, minStock, expiryDate, createdAt]
+        - name: sortDir
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+      responses:
+        "200":
+          description: Paginated list of items
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ItemListResponse"
+    post:
+      operationId: createItem
+      tags: [items]
+      summary: Create a new item
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ItemInput"
+      responses:
+        "201":
+          description: Created item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Item"
+
+  /items/{id}:
+    get:
+      operationId: getItem
+      tags: [items]
+      summary: Get item by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Item"
+        "404":
+          description: Not found
+    put:
+      operationId: updateItem
+      tags: [items]
+      summary: Update item
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ItemUpdate"
+      responses:
+        "200":
+          description: Updated item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Item"
+    delete:
+      operationId: deleteItem
+      tags: [items]
+      summary: Deactivate item (soft delete)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Deactivated
+
+  /items/history:
+    get:
+      operationId: getItemHistory
+      tags: [items]
+      summary: Get an item card with its paginated chronological movement history
+      parameters:
+        - name: itemId
+          in: query
+          required: true
+          schema: { type: integer }
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [in, init, out, adjust, custody_out, custody_return, damage, central_return]
+        - name: from
+          in: query
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          schema: { type: string, format: date }
+        - name: document
+          in: query
+          schema: { type: string }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200 }
+      responses:
+        "200":
+          description: Item details, batches, and chronological movement history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ItemHistoryResponse"
+        "400":
+          description: Invalid filter
+        "404":
+          description: Item not found
+
+  /equipment:
+    get:
+      operationId: listEquipment
+      tags: [equipment]
+      summary: List equipment with optional filters
+      parameters:
+        - name: condition
+          in: query
+          schema: { type: string }
+        - name: search
+          in: query
+          schema: { type: string }
+        - name: page
+          in: query
+          schema: { type: integer }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 5000 }
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [name, condition, quantity, manufactureYear, createdAt]
+        - name: sortDir
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+      responses:
+        "200":
+          description: Paginated list of equipment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EquipmentListResponse"
+    post:
+      operationId: createEquipment
+      tags: [equipment]
+      summary: Create new equipment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EquipmentInput"
+      responses:
+        "201":
+          description: Created equipment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Equipment"
+
+  /equipment/{id}:
+    get:
+      operationId: getEquipment
+      tags: [equipment]
+      summary: Get equipment by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Equipment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Equipment"
+        "404":
+          description: Not found
+    put:
+      operationId: updateEquipment
+      tags: [equipment]
+      summary: Update equipment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EquipmentUpdate"
+      responses:
+        "200":
+          description: Updated equipment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Equipment"
+    delete:
+      operationId: deleteEquipment
+      tags: [equipment]
+      summary: Delete equipment by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+
+  /equipment/{id}/history:
+    get:
+      operationId: getEquipmentCardHistory
+      tags: [equipment]
+      summary: Get an equipment card with linked custodies and movement history
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [in, init, out, adjust, custody_out, custody_return, damage, central_return]
+        - name: from
+          in: query
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          schema: { type: string, format: date }
+        - name: document
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Equipment card, related custodies, and chronological history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EquipmentHistoryResponse"
+        "404":
+          description: Not found
+
+  /items/fefo-preview:
+    get:
+      operationId: getItemFefoPreview
+      tags: [items]
+      summary: Preview FEFO allocations for a consumable item
+      parameters:
+        - name: itemId
+          in: query
+          required: true
+          schema: { type: integer }
+        - name: quantity
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: FEFO allocation preview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FefoPreview"
+        "400":
+          description: Invalid quantity or non-consumable item
+        "404":
+          description: Item not found
+
+  /transactions:
+    get:
+      operationId: listTransactions
+      tags: [transactions]
+      summary: List transactions with optional filters
+      parameters:
+        - name: type
+          in: query
+          schema: { type: string }
+        - name: itemType
+          in: query
+          schema: { type: string }
+        - name: from
+          in: query
+          schema: { type: string }
+        - name: to
+          in: query
+          schema: { type: string }
+        - name: search
+          in: query
+          schema: { type: string }
+        - name: page
+          in: query
+          schema: { type: integer }
+        - name: limit
+          in: query
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Paginated list of transactions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionListResponse"
+
+  /transactions/in:
+    post:
+      operationId: createInTransaction
+      tags: [transactions]
+      summary: Record an inbound transaction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InTransactionInput"
+      responses:
+        "201":
+          description: Created transaction
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transaction"
+
+  /transactions/out:
+    post:
+      operationId: createOutTransaction
+      tags: [transactions]
+      summary: Record an outbound transaction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OutTransactionInput"
+      responses:
+        "201":
+          description: Created transaction
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transaction"
+
+  /transactions/adjust:
+    post:
+      operationId: createInventoryAdjustment
+      tags: [transactions]
+      summary: Reconcile an item stock balance with an audited adjustment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdjustmentInput"
+      responses:
+        "201":
+          description: Created adjustment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transaction"
+
+  /transactions/custody-out:
+    post:
+      operationId: createCustodyOutTransaction
+      tags: [transactions]
+      summary: Assign equipment to personal custody
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CustodyOutInput"
+      responses:
+        "201":
+          description: Created custody movement
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transaction"
+
+  /transactions/custody-return:
+    post:
+      operationId: createCustodyReturnTransaction
+      tags: [transactions]
+      summary: Return equipment from personal custody
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CustodyReturnInput"
+      responses:
+        "201":
+          description: Created custody return
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transaction"
+
+  /transactions/damage:
+    post:
+      operationId: createDamageTransaction
+      tags: [transactions]
+      summary: Record damaged stock as an audited movement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DamageInput"
+      responses:
+        "201":
+          description: Created damage movement
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transaction"
+
+  /transactions/central-return:
+    post:
+      operationId: createCentralReturnTransaction
+      tags: [transactions]
+      summary: Return stock to the central warehouse
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CentralReturnInput"
+      responses:
+        "201":
+          description: Created central return
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transaction"
+
+  /custodies:
+    get:
+      operationId: listCustodies
+      tags: [transactions]
+      summary: List personal custody records
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [open, partially_returned, returned, damaged, closed]
+        - name: search
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Personal custody records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CustodySummary"
+
+  /custodies/{id}:
+    get:
+      operationId: getCustodyHistory
+      tags: [transactions]
+      summary: Get an independent custody card and lifecycle history
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Custody card with delivery, return, inspection, and damage history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustodyHistoryResponse"
+        "404":
+          description: Not found
+
+  /transactions/{id}:
+    get:
+      operationId: getTransaction
+      tags: [transactions]
+      summary: Get transaction by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Transaction
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transaction"
+        "404":
+          description: Not found
+
+  /transactions/{id}/print:
+    get:
+      operationId: getTransactionPrint
+      tags: [transactions]
+      summary: Get full transaction data for printing
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Print data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionPrint"
+
+  /recipients:
+    get:
+      operationId: listRecipients
+      tags: [recipients]
+      summary: List recipient organizations
+      parameters:
+        - name: includeInactive
+          in: query
+          schema: { type: boolean, default: false }
+      responses:
+        "200":
+          description: List of recipients
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Recipient"
+    post:
+      operationId: createRecipient
+      tags: [recipients]
+      summary: Create a recipient organization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecipientInput"
+      responses:
+        "201":
+          description: Created recipient
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Recipient"
+
+  /exit-reasons:
+    get:
+      operationId: listExitReasons
+      tags: [exit-reasons]
+      summary: List exit reasons
+      parameters:
+        - name: includeInactive
+          in: query
+          schema: { type: boolean, default: false }
+      responses:
+        "200":
+          description: List of exit reasons
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ExitReason"
+    post:
+      operationId: createExitReason
+      tags: [exit-reasons]
+      summary: Create an exit reason
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExitReasonInput"
+      responses:
+        "201":
+          description: Created exit reason
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExitReason"
+
+  /dashboard/stats:
+    get:
+      operationId: getDashboardStats
+      tags: [dashboard]
+      summary: Get dashboard KPI statistics
+      responses:
+        "200":
+          description: Dashboard stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardStats"
+
+  /dashboard/charts:
+    get:
+      operationId: getDashboardCharts
+      tags: [dashboard]
+      summary: Get chart data for dashboard
+      responses:
+        "200":
+          description: Chart data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardCharts"
+
+  /alerts:
+    get:
+      operationId: listAlerts
+      tags: [alerts]
+      summary: Get active alerts (low stock, near expiry, equipment issues)
+      responses:
+        "200":
+          description: Active alerts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Alert"
+
+  /alerts/read-all:
+    post:
+      operationId: markAllAlertsRead
+      tags: [alerts]
+      summary: Mark all unresolved alerts as read for the current user
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+
+  /alerts/refresh:
+    post:
+      operationId: refreshAlerts
+      tags: [alerts]
+      summary: Trigger an immediate alert worker run (admin use)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+
+  /alerts/{id}/read:
+    post:
+      operationId: markAlertRead
+      tags: [alerts]
+      summary: Mark a single alert as read for the current user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+
+  /alerts/{id}/resolve:
+    post:
+      operationId: resolveAlert
+      tags: [alerts]
+      summary: Manually resolve an alert
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "404":
+          description: Alert not found or already resolved
+
+  /reports/stock:
+    get:
+      operationId: getStockReport
+      tags: [reports]
+      summary: Current stock report for all active items
+      responses:
+        "200":
+          description: Stock report
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Item"
+
+  /reports/movements:
+    get:
+      operationId: getMovementsReport
+      tags: [reports]
+      summary: Movements report with date range filter
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string }
+        - name: to
+          in: query
+          schema: { type: string }
+        - name: type
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Movements report
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Transaction"
+
+  /reports/expiry:
+    get:
+      operationId: getExpiryReport
+      tags: [reports]
+      summary: Items near expiry or expired
+      responses:
+        "200":
+          description: Expiry report
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Item"
+
+  /reports/near-expiry:
+    get:
+      operationId: getNearExpiryReport
+      tags: [reports]
+      summary: Active items nearing expiry, excluding expired items
+      responses:
+        "200":
+          description: Near expiry report
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Item"
+
+  /reports/stagnant:
+    get:
+      operationId: getStagnantItemsReport
+      tags: [reports]
+      summary: Active stocked items with no movement for more than seven months
+      responses:
+        "200":
+          description: Stagnant items report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StagnantItemsReport"
+
+  /reports/below-min:
+    get:
+      operationId: getBelowMinReport
+      tags: [reports]
+      summary: Items below minimum stock level
+      responses:
+        "200":
+          description: Below min report
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Item"
+
+  /reports/equipment:
+    get:
+      operationId: getEquipmentReport
+      tags: [reports]
+      summary: Equipment status report
+      responses:
+        "200":
+          description: Equipment report
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Equipment"
+
+  /reports/stock-position:
+    get:
+      operationId: getStockPositionReport
+      tags: [reports]
+      summary: Reconciled stock position by ownership and state
+      responses:
+        "200":
+          description: Reconciled stock position
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockPositionReport"
+
+  /reports/custodies:
+    get:
+      operationId: getCustodiesReport
+      tags: [reports]
+      summary: Open and overdue personal custody report
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [open, partially_returned, damaged]
+        - name: search
+          in: query
+          schema: { type: string }
+        - name: overdueDays
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 3650
+      responses:
+        "200":
+          description: Personal custody report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustodyReport"
+
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: List all users (admin only)
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+    post:
+      operationId: createUser
+      tags: [users]
+      summary: Create a new user (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserInput"
+      responses:
+        "201":
+          description: Created user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /settings:
+    get:
+      operationId: getSettings
+      tags: [settings]
+      summary: Get system settings
+      responses:
+        "200":
+          description: System settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SystemSettings"
+    put:
+      operationId: updateSettings
+      tags: [settings]
+      summary: Update system settings (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SystemSettingsInput"
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SystemSettings"
+
+  /settings/change-password:
+    post:
+      operationId: changePassword
+      tags: [settings]
+      summary: Change current user password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordInput"
+      responses:
+        "200":
+          description: Password changed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+
+  /recipients/{id}:
+    put:
+      operationId: updateRecipient
+      tags: [recipients]
+      summary: Update a recipient
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecipientInput"
+      responses:
+        "200":
+          description: Updated recipient
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Recipient"
+
+  /recipients/{id}/toggle:
+    patch:
+      operationId: toggleRecipient
+      tags: [recipients]
+      summary: Toggle recipient active status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Updated recipient
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Recipient"
+
+  /exit-reasons/{id}/toggle:
+    patch:
+      operationId: toggleExitReason
+      tags: [exit-reasons]
+      summary: Toggle exit reason active status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Updated exit reason
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExitReason"
+
+  /exit-reasons/{id}:
+    put:
+      operationId: updateExitReason
+      tags: [exit-reasons]
+      summary: Update a custom exit reason
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExitReasonInput"
+      responses:
+        "200":
+          description: Updated exit reason
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExitReason"
+
+  /users/{id}:
+    put:
+      operationId: updateUser
+      tags: [users]
+      summary: Update user (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserUpdate"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    delete:
+      operationId: deleteUser
+      tags: [users]
+      summary: Deactivate user (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Deactivated
+
+  /backups:
+    get:
+      operationId: listBackups
+      tags: [backups]
+      summary: List encrypted backup catalog entries
+      responses:
+        "200":
+          description: Backup catalog and retention policy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BackupCatalogResponse"
+    post:
+      operationId: createBackup
+      tags: [backups]
+      summary: Create and catalog a full or delta backup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BackupCreateInput"
+      responses:
+        "201":
+          description: Created backup metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonObject"
+
+  /backups/export:
+    post:
+      operationId: exportBackupPackage
+      tags: [backups]
+      summary: Export a canonical encrypted dme-sync package
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BackupPasswordInput"
+      responses:
+        "200":
+          description: Encrypted package bytes
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+
+  /backups/inspect:
+    post:
+      operationId: inspectBackupPackage
+      tags: [backups]
+      summary: Inspect a package before restore
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BackupPackageInput"
+      responses:
+        "200":
+          description: Package summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonObject"
+
+  /backups/dry-run:
+    post:
+      operationId: previewBackupRestore
+      tags: [backups]
+      summary: Preview a full restore or safe merge without writing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BackupRestoreInput"
+      responses:
+        "200":
+          description: Restore preview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonObject"
+
+  /backups/restore:
+    post:
+      operationId: restoreBackupPackage
+      tags: [backups]
+      summary: Apply a previously previewed restore atomically
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BackupRestoreInput"
+      responses:
+        "200":
+          description: Restore report and rollback point
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonObject"
+
+  /backups/policy:
+    get:
+      operationId: getBackupRetentionPolicy
+      tags: [backups]
+      summary: Read backup retention policy
+      responses:
+        "200":
+          description: Retention policy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonObject"
+    put:
+      operationId: updateBackupRetentionPolicy
+      tags: [backups]
+      summary: Update backup retention policy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JsonObject"
+      responses:
+        "200":
+          description: Updated policy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonObject"
+
+  /backups/retention/enforce:
+    post:
+      operationId: enforceBackupRetention
+      tags: [backups]
+      summary: Enforce configured retention policy
+      responses:
+        "200":
+          description: Retention result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonObject"
+
+  /backups/{backupId}/package:
+    get:
+      operationId: downloadCatalogBackup
+      tags: [backups]
+      summary: Download an encrypted catalog package
+      parameters:
+        - { name: backupId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Encrypted package bytes
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+
+  /backups/{backupId}/verify:
+    post:
+      operationId: verifyCatalogBackup
+      tags: [backups]
+      summary: Verify a catalog package password and fingerprint
+      parameters:
+        - { name: backupId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BackupPasswordInput"
+      responses:
+        "200":
+          description: Verification result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonObject"
+
+  /backups/{restorePointId}/report:
+    get:
+      operationId: getRestorePointReport
+      tags: [backups]
+      summary: Get a restore point report
+      parameters:
+        - { name: restorePointId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Restore point report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonObject"
+
+  /backups/{restorePointId}/rollback:
+    post:
+      operationId: rollbackRestorePoint
+      tags: [backups]
+      summary: Roll back to a saved restore point
+      parameters:
+        - { name: restorePointId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfirmInput"
+      responses:
+        "200":
+          description: Rollback report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonObject"
+
+  /sync/node:
+    get:
+      operationId: getSyncNode
+      tags: [sync]
+      summary: Get node identity and vector clock
+      responses:
+        "200":
+          description: Node identity and vector
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonObject"
+
+  /sync/sessions:
+    post:
+      operationId: createSyncSession
+      tags: [sync]
+      summary: Create a resumable two-node sync session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JsonObject"
+      responses:
+        "201":
+          description: Sync session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonObject"
+
+  /sync/sessions/{sessionId}:
+    get:
+      operationId: getSyncSession
+      tags: [sync]
+      summary: Read a sync session and its package reports
+      parameters:
+        - { name: sessionId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Sync session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonObject"
+
+  /sync/sessions/{sessionId}/handshake:
+    post:
+      operationId: handshakeSyncSession
+      tags: [sync]
+      summary: Exchange vector clocks
+      parameters:
+        - { name: sessionId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JsonObject"
+      responses:
+        "200":
+          description: Handshake result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonObject"
+
+  /sync/sessions/{sessionId}/manifest:
+    post:
+      operationId: prepareSyncManifest
+      tags: [sync]
+      summary: Prepare a delta manifest from a vector clock
+      parameters:
+        - { name: sessionId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JsonObject"
+      responses:
+        "200":
+          description: Delta manifest
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonObject"
+
+  /sync/sessions/{sessionId}/packages:
+    post:
+      operationId: applySyncPackage
+      tags: [sync]
+      summary: Validate and apply a received package atomically
+      parameters:
+        - { name: sessionId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JsonObject"
+      responses:
+        "200":
+          description: Sync application report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonObject"
+
+  /sync/sessions/{sessionId}/packages/{packageId}:
+    get:
+      operationId: getSyncPackage
+      tags: [sync]
+      summary: Read a saved sync package report
+      parameters:
+        - { name: sessionId, in: path, required: true, schema: { type: string } }
+        - { name: packageId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Sync package
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonObject"
+
+  /sync/sessions/{sessionId}/ack:
+    post:
+      operationId: acknowledgeSyncPackage
+      tags: [sync]
+      summary: Acknowledge a received sync package
+      parameters:
+        - { name: sessionId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JsonObject"
+      responses:
+        "200":
+          description: Acknowledgement result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonObject"
+
+  /sync/pairings:
+    post:
+      operationId: createSyncPairing
+      tags: [sync]
+      summary: Create a short-lived single-use pairing code
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JsonObject"
+      responses:
+        "201":
+          description: Pairing code
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonObject"
+
+  /sync/pairings/consume:
+    post:
+      operationId: consumeSyncPairing
+      tags: [sync]
+      summary: Consume a pairing code and trust a peer node
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JsonObject"
+      responses:
+        "201":
+          description: Trusted node
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonObject"
+
+  /sync/trusted-nodes:
+    get:
+      operationId: listTrustedSyncNodes
+      tags: [sync]
+      summary: List trusted and revoked nodes
+      responses:
+        "200":
+          description: Trusted nodes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/JsonObject"
+
+  /sync/trusted-nodes/{nodeId}/revoke:
+    post:
+      operationId: revokeTrustedSyncNode
+      tags: [sync]
+      summary: Revoke a trusted node without deleting audit history
+      parameters:
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Revoked node
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonObject"
+
+  /sync/conflicts:
+    get:
+      operationId: listSyncConflicts
+      tags: [sync]
+      summary: List open, resolved, or deferred sync conflicts
+      parameters:
+        - { name: status, in: query, required: false, schema: { type: string, enum: [open, resolved, deferred, all] } }
+      responses:
+        "200":
+          description: Conflict queue
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/JsonObject"
+
+  /sync/conflicts/{id}/resolve:
+    post:
+      operationId: resolveSyncConflict
+      tags: [sync]
+      summary: Approve, reject, or defer a conflict
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JsonObject"
+      responses:
+        "200":
+          description: Conflict decision
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonObject"
+
+  /sync/relay/packages:
+    get:
+      operationId: listRelayPackages
+      tags: [sync]
+      summary: List opaque encrypted relay packages
+      parameters:
+        - { name: sessionId, in: query, required: false, schema: { type: string } }
+      responses:
+        "200":
+          description: Relay package metadata
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/JsonObject"
+    post:
+      operationId: uploadRelayPackage
+      tags: [sync]
+      summary: Store an opaque encrypted relay package
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JsonObject"
+      responses:
+        "201":
+          description: Relay package metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonObject"
+
+  /sync/relay/packages/{relayId}:
+    get:
+      operationId: downloadRelayPackage
+      tags: [sync]
+      summary: Download opaque relay bytes when requested
+      parameters:
+        - { name: relayId, in: path, required: true, schema: { type: string } }
+        - { name: download, in: query, required: false, schema: { type: boolean } }
+      responses:
+        "200":
+          description: Relay package metadata or encrypted bytes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonObject"
+
+  /sync/relay/expired:
+    delete:
+      operationId: purgeExpiredRelayPackages
+      tags: [sync]
+      summary: Purge expired relay packages
+      responses:
+        "200":
+          description: Purge result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonObject"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+
+    SetupStatus:
+      type: object
+      required: [needsSetup]
+      properties:
+        needsSetup:
+          type: boolean
+
+    SetupAdminInput:
+      type: object
+      required: [username, password, fullName]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        fullName:
+          type: string
+
+    LoginCredentials:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+
+    AuthUser:
+      type: object
+      required: [id, username, fullName, role]
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        fullName:
+          type: string
+        role:
+          type: string
+          enum: [admin, warehouse_manager, viewer]
+        mustChangePassword:
+          type: boolean
+        csrfToken:
+          type: string
+          nullable: true
+
+    ChangePasswordInput:
+      type: object
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword:
+          type: string
+        newPassword:
+          type: string
+
+    User:
+      type: object
+      required: [id, username, fullName, role, isActive, createdAt]
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        fullName:
+          type: string
+        role:
+          type: string
+          enum: [admin, warehouse_manager, viewer]
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+
+    UserInput:
+      type: object
+      required: [username, password, fullName, role]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        fullName:
+          type: string
+        role:
+          type: string
+
+    UserUpdate:
+      type: object
+      properties:
+        fullName:
+          type: ["string", "null"]
+        role:
+          type: ["string", "null"]
+        isActive:
+          type: ["boolean", "null"]
+        password:
+          type: ["string", "null"]
+
+    Category:
+      type: object
+      required: [id, name, type]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        type:
+          type: string
+
+    Item:
+      type: object
+      required: [id, name, unit, itemType, currentStock, minStock, isActive, createdAt]
+      properties:
+        id:
+          type: integer
+        code:
+          type: ["string", "null"]
+        name:
+          type: string
+        categoryId:
+          type: ["integer", "null"]
+        categoryName:
+          type: ["string", "null"]
+        itemType:
+          type: string
+        unit:
+          type: string
+        currentStock:
+          type: integer
+        minStock:
+          type: integer
+        expiryDate:
+          type: ["string", "null"]
+        batchNumber:
+          type: ["string", "null"]
+        location:
+          type: ["string", "null"]
+        supplier:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    StagnantItem:
+      type: object
+      required:
+        - id
+        - name
+        - unit
+        - itemType
+        - currentStock
+        - minStock
+        - createdAt
+        - idleDays
+      properties:
+        id: { type: integer }
+        code: { type: ["string", "null"] }
+        name: { type: string }
+        categoryName: { type: ["string", "null"] }
+        itemType: { type: string }
+        unit: { type: string }
+        currentStock: { type: integer }
+        minStock: { type: integer }
+        location: { type: ["string", "null"] }
+        supplier: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        lastMovementAt: { type: ["string", "null"], format: date-time }
+        idleDays: { type: integer }
+
+    StagnantItemsReport:
+      type: object
+      required: [staleMonths, cutoffDate, items]
+      properties:
+        staleMonths: { type: integer }
+        cutoffDate: { type: string, format: date-time }
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/StagnantItem"
+
+    ItemInput:
+      type: object
+      required: [name, unit, itemType]
+      properties:
+        code:
+          type: ["string", "null"]
+        name:
+          type: string
+        categoryId:
+          type: ["integer", "null"]
+        itemType:
+          type: string
+        unit:
+          type: string
+        currentStock:
+          type: integer
+        minStock:
+          type: integer
+        expiryDate:
+          type: ["string", "null"]
+        batchNumber:
+          type: ["string", "null"]
+        location:
+          type: ["string", "null"]
+        supplier:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+
+    ItemUpdate:
+      type: object
+      properties:
+        code:
+          type: ["string", "null"]
+        name:
+          type: ["string", "null"]
+        categoryId:
+          type: ["integer", "null"]
+        itemType:
+          type: ["string", "null"]
+        unit:
+          type: ["string", "null"]
+        minStock:
+          type: ["integer", "null"]
+        expiryDate:
+          type: ["string", "null"]
+        batchNumber:
+          type: ["string", "null"]
+        location:
+          type: ["string", "null"]
+        supplier:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        isActive:
+          type: ["boolean", "null"]
+
+    ItemListResponse:
+      type: object
+      required: [items, total, page, limit]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Item"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    ItemHistoryBatch:
+      type: object
+      required: [id, receivedQuantity, remainingQuantity]
+      properties:
+        id: { type: integer }
+        batchNumber: { type: ["string", "null"] }
+        receivedQuantity: { type: integer }
+        remainingQuantity: { type: integer }
+        expiryDate: { type: ["string", "null"] }
+        deliveryNoteNumber: { type: ["string", "null"] }
+        deliveryNoteDate: { type: ["string", "null"] }
+        createdAt: { type: string }
+
+    ItemHistoryAllocation:
+      type: object
+      required: [batchId, quantity]
+      properties:
+        batchId: { type: integer }
+        quantity: { type: integer }
+        batchNumber: { type: ["string", "null"] }
+        expiryDate: { type: ["string", "null"] }
+
+    ItemHistoryMovement:
+      type: object
+      required: [id, type, documentNumber, quantity, allocations, isHistoricalIncomplete]
+      properties:
+        id: { type: integer }
+        type:
+          type: string
+          enum: [in, out, adjust, custody_out, custody_return, damage, central_return]
+        quantity: { type: ["integer", "null"] }
+        partyName: { type: ["string", "null"] }
+        documentNumber: { type: string }
+        documentDate: { type: ["string", "null"] }
+        createdAt: { type: string }
+        operatorName: { type: ["string", "null"] }
+        expiryDate: { type: ["string", "null"] }
+        batchNumber: { type: ["string", "null"] }
+        reason: { type: ["string", "null"] }
+        notes: { type: ["string", "null"] }
+        isHistoricalIncomplete: { type: boolean }
+        allocations:
+          type: array
+          items:
+            $ref: "#/components/schemas/ItemHistoryAllocation"
+
+    ItemHistoryResponse:
+      type: object
+      required: [item, batches, movements, total, page, limit]
+      properties:
+        item:
+          $ref: "#/components/schemas/Item"
+        batches:
+          type: array
+          items:
+            $ref: "#/components/schemas/ItemHistoryBatch"
+        movements:
+          type: array
+          items:
+            $ref: "#/components/schemas/ItemHistoryMovement"
+        total: { type: integer }
+        page: { type: integer }
+        limit: { type: integer }
+
+    Equipment:
+      type: object
+      required: [id, name, condition, createdAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        equipmentType:
+          type: ["string", "null"]
+        model:
+          type: ["string", "null"]
+        serialNumber:
+          type: ["string", "null"]
+        condition:
+          type: string
+          enum: [good, maintenance, broken, consumed, needs_inspection]
+        manufactureYear:
+          type: ["integer", "null"]
+        originCountry:
+          type: ["string", "null"]
+        currentHolder:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        quantity:
+          type: integer
+          default: 1
+        minQuantity:
+          type: integer
+          default: 0
+        maintenanceSentAt:
+          type: ["string", "null"]
+        maintenanceReturnedAt:
+          type: ["string", "null"]
+        maintenanceNotes:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    EquipmentMovement:
+      type: object
+      required: [id, type, documentNumber]
+      properties:
+        id: { type: integer }
+        type:
+          type: string
+          enum: [in, out, adjust, custody_out, custody_return, damage, central_return]
+        quantity: { type: ["integer", "null"] }
+        partyName: { type: ["string", "null"] }
+        holderName: { type: ["string", "null"] }
+        documentNumber: { type: string }
+        documentDate: { type: ["string", "null"], format: date }
+        custodyNoteNumber: { type: ["string", "null"] }
+        custodyDate: { type: ["string", "null"], format: date }
+        custodyLocation: { type: ["string", "null"] }
+        reason: { type: ["string", "null"] }
+        notes: { type: ["string", "null"] }
+        createdAt: { type: ["string", "null"], format: date-time }
+        operatorName: { type: ["string", "null"] }
+
+    EquipmentHistoryResponse:
+      type: object
+      required: [equipment, custodies, movements, total]
+      properties:
+        equipment:
+          allOf:
+            - $ref: "#/components/schemas/Equipment"
+            - type: object
+              required: [custodyQuantity, availableQuantity]
+              properties:
+                custodyQuantity: { type: integer }
+                availableQuantity: { type: integer }
+        custodies:
+          type: array
+          items:
+            $ref: "#/components/schemas/CustodySummary"
+        movements:
+          type: array
+          items:
+            $ref: "#/components/schemas/EquipmentMovement"
+        total: { type: integer }
+
+    CustodyEvent:
+      type: object
+      required: [id, kind, label, date, quantity, documentNumber, location]
+      properties:
+        id: { type: string }
+        kind: { type: string, enum: [created, returned, damaged] }
+        label: { type: string }
+        date: { type: string, format: date }
+        quantity: { type: integer }
+        documentNumber: { type: string }
+        location: { type: string }
+        condition: { type: ["string", "null"] }
+        notes: { type: ["string", "null"] }
+        operatorName: { type: ["string", "null"] }
+
+    CustodyHistoryResponse:
+      type: object
+      required: [custody, equipment, returns, events]
+      properties:
+        custody:
+          allOf:
+            - $ref: "#/components/schemas/CustodySummary"
+            - type: object
+              required: [daysHeld, isOverdue]
+              properties:
+                daysHeld: { type: integer }
+                isOverdue: { type: boolean }
+                sourceTransactionId: { type: ["integer", "null"] }
+        equipment:
+          type: object
+          required: [id, name]
+          properties:
+            id: { type: integer }
+            name: { type: string }
+            equipmentType: { type: ["string", "null"] }
+            model: { type: ["string", "null"] }
+            serialNumber: { type: ["string", "null"] }
+        returns:
+          type: array
+          items:
+            type: object
+            required: [id, quantity, returnDate, documentNumber, condition, returnedToLocation]
+            properties:
+              id: { type: integer }
+              quantity: { type: integer }
+              returnDate: { type: string, format: date }
+              documentNumber: { type: string }
+              condition: { type: string }
+              returnedToLocation: { type: string }
+              inspectionNotes: { type: ["string", "null"] }
+              operatorName: { type: ["string", "null"] }
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/CustodyEvent"
+
+    EquipmentInput:
+      type: object
+      required: [name, condition]
+      properties:
+        name:
+          type: string
+        equipmentType:
+          type: ["string", "null"]
+        model:
+          type: ["string", "null"]
+        serialNumber:
+          type: ["string", "null"]
+        condition:
+          type: string
+        manufactureYear:
+          type: ["integer", "null"]
+        originCountry:
+          type: ["string", "null"]
+        currentHolder:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        quantity:
+          type: integer
+        minQuantity:
+          type: integer
+        maintenanceSentAt:
+          type: ["string", "null"]
+        maintenanceReturnedAt:
+          type: ["string", "null"]
+        maintenanceNotes:
+          type: ["string", "null"]
+
+    EquipmentUpdate:
+      type: object
+      properties:
+        name:
+          type: ["string", "null"]
+        equipmentType:
+          type: ["string", "null"]
+        model:
+          type: ["string", "null"]
+        serialNumber:
+          type: ["string", "null"]
+        condition:
+          type: ["string", "null"]
+        manufactureYear:
+          type: ["integer", "null"]
+        originCountry:
+          type: ["string", "null"]
+        currentHolder:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        quantity:
+          type: ["integer", "null"]
+        minQuantity:
+          type: ["integer", "null"]
+        maintenanceSentAt:
+          type: ["string", "null"]
+        maintenanceReturnedAt:
+          type: ["string", "null"]
+        maintenanceNotes:
+          type: ["string", "null"]
+
+    EquipmentListResponse:
+      type: object
+      required: [equipment, total, page, limit]
+      properties:
+        equipment:
+          type: array
+          items:
+            $ref: "#/components/schemas/Equipment"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    Transaction:
+      type: object
+      required: [id, type, itemType, documentNumber, createdAt]
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum: [in, out, init, adjust, custody_out, custody_return, damage, central_return]
+        itemType:
+          type: string
+          enum: [item, equipment]
+        itemId:
+          type: ["integer", "null"]
+        itemName:
+          type: ["string", "null"]
+        itemUnit:
+          type: ["string", "null"]
+        equipmentId:
+          type: ["integer", "null"]
+        equipmentName:
+          type: ["string", "null"]
+        quantity:
+          type: ["integer", "null"]
+        recipientId:
+          type: ["integer", "null"]
+        recipientName:
+          type: ["string", "null"]
+        recipientPerson:
+          type: ["string", "null"]
+        exitReasonId:
+          type: ["integer", "null"]
+        exitReason:
+          type: ["string", "null"]
+        supplier:
+          type: ["string", "null"]
+        batchNumber:
+          type: ["string", "null"]
+        expiryDate:
+          type: ["string", "null"]
+        supplySource:
+          type: ["string", "null"]
+          enum: [central_warehouses, null]
+        documentDate:
+          type: ["string", "null"]
+        deliveryNoteNumber:
+          type: ["string", "null"]
+        deliveryNoteDate:
+          type: ["string", "null"]
+        internalDeliveryNoteNumber:
+          type: ["string", "null"]
+        internalDeliveryNoteDate:
+          type: ["string", "null"]
+        deliveryDestination:
+          type: ["string", "null"]
+          enum: [administrative_building, health_facility, ambulance_point, null]
+        custodyHolderName:
+          type: ["string", "null"]
+        custodyNoteNumber:
+          type: ["string", "null"]
+        custodyDate:
+          type: ["string", "null"]
+        custodyLocation:
+          type: ["string", "null"]
+        returnCondition:
+          type: ["string", "null"]
+        reason:
+          type: ["string", "null"]
+        documentNumber:
+          type: string
+        details:
+          type: ["object", "null"]
+          description: Structured movement details (stock before/after, delta, equipment snapshots) — used by adjustment vouchers
+        notes:
+          type: ["string", "null"]
+        createdByName:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    TransactionListResponse:
+      type: object
+      required: [transactions, total, page, limit]
+      properties:
+        transactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Transaction"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    TransactionPrint:
+      type: object
+      required: [transaction, organizationName, orgSubtitle, printedAt]
+      properties:
+        transaction:
+          $ref: "#/components/schemas/Transaction"
+        organizationName:
+          type: string
+        orgSubtitle:
+          type: ["string", "null"]
+        printedAt:
+          type: string
+
+    FefoAllocation:
+      type: object
+      required: [batchId, quantity]
+      properties:
+        batchId:
+          type: integer
+        quantity:
+          type: integer
+        batchNumber:
+          type: ["string", "null"]
+        expiryDate:
+          type: ["string", "null"]
+
+    FefoExpiredBatch:
+      type: object
+      required: [batchId, remainingQuantity]
+      properties:
+        batchId:
+          type: integer
+        remainingQuantity:
+          type: integer
+        batchNumber:
+          type: ["string", "null"]
+        expiryDate:
+          type: ["string", "null"]
+
+    FefoPreview:
+      type: object
+      required: [itemId, itemStock, requestedQuantity, availableQuantity, canFulfill, allocations, expiredBatches]
+      properties:
+        itemId:
+          type: integer
+        itemStock:
+          type: integer
+        requestedQuantity:
+          type: integer
+        availableQuantity:
+          type: integer
+        canFulfill:
+          type: boolean
+        allocations:
+          type: array
+          items:
+            $ref: "#/components/schemas/FefoAllocation"
+        expiredBatches:
+          type: array
+          items:
+            $ref: "#/components/schemas/FefoExpiredBatch"
+
+    InTransactionInput:
+      type: object
+      required: [itemType, deliveryNoteNumber, deliveryNoteDate]
+      properties:
+        itemType:
+          type: string
+          enum: [item, equipment]
+        itemId:
+          type: ["integer", "null"]
+        equipmentId:
+          type: ["integer", "null"]
+        quantity:
+          type: ["integer", "null"]
+        deliveryNoteNumber:
+          type: string
+          minLength: 1
+        deliveryNoteDate:
+          type: string
+          format: date
+        documentDate:
+          type: ["string", "null"]
+        supplySource:
+          type: string
+          enum: [central_warehouses]
+        expiryDate:
+          type: ["string", "null"]
+        batchNumber:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+
+    OutTransactionInput:
+      type: object
+      required: [itemType, itemId, quantity, recipientId, exitReasonId, internalDeliveryNoteNumber, internalDeliveryNoteDate, deliveryDestination]
+      properties:
+        itemType:
+          type: string
+          enum: [item]
+        itemId:
+          type: integer
+        equipmentId:
+          type: ["integer", "null"]
+        quantity:
+          type: integer
+          minimum: 1
+        recipientId:
+          type: integer
+        recipientPerson:
+          type: ["string", "null"]
+        exitReasonId:
+          type: ["integer", "null"]
+        internalDeliveryNoteNumber:
+          type: string
+          minLength: 1
+        internalDeliveryNoteDate:
+          type: string
+          format: date
+        deliveryDestination:
+          type: string
+          enum: [administrative_building, health_facility, ambulance_point]
+        notes:
+          type: ["string", "null"]
+
+    AdjustmentInput:
+      type: object
+      required: [itemType, newStock, reason]
+      properties:
+        itemType:
+          type: string
+          enum: [item, equipment]
+        itemId:
+          type: ["integer", "null"]
+          description: Required when itemType is item
+        equipmentId:
+          type: ["integer", "null"]
+          description: Required when itemType is equipment
+        newStock:
+          type: integer
+          minimum: 0
+        documentDate:
+          type: string
+          format: date
+        reason:
+          type: string
+          minLength: 5
+        notes:
+          type: ["string", "null"]
+
+    CustodyOutInput:
+      type: object
+      required: [itemType, equipmentId, quantity, holderName, custodyNoteNumber, custodyDate, custodyLocation]
+      properties:
+        itemType:
+          type: string
+          enum: [equipment]
+        equipmentId:
+          type: integer
+        quantity:
+          type: integer
+          minimum: 1
+        recipientId:
+          type: ["integer", "null"]
+        holderName:
+          type: string
+        custodyNoteNumber:
+          type: string
+        custodyDate:
+          type: string
+          format: date
+        custodyLocation:
+          type: string
+        notes:
+          type: ["string", "null"]
+
+    CustodyReturnInput:
+      type: object
+      required: [custodyId, quantity, returnCondition, returnedToLocation]
+      properties:
+        custodyId:
+          type: integer
+        quantity:
+          type: integer
+          minimum: 1
+        returnCondition:
+          type: string
+          enum: [good, damaged, needs_maintenance, missing]
+        returnedToLocation:
+          type: string
+        documentDate:
+          type: string
+          format: date
+        inspectionNotes:
+          type: ["string", "null"]
+
+    DamageInput:
+      type: object
+      required: [itemType, quantity, reason]
+      properties:
+        itemType:
+          type: string
+          enum: [item, equipment]
+        itemId:
+          type: ["integer", "null"]
+        equipmentId:
+          type: ["integer", "null"]
+        quantity:
+          type: integer
+          minimum: 1
+        reason:
+          type: string
+        damageDate:
+          type: string
+          format: date
+        notes:
+          type: ["string", "null"]
+
+    CentralReturnInput:
+      type: object
+      required: [itemType, quantity, returnCondition, reason]
+      properties:
+        itemType:
+          type: string
+          enum: [item, equipment]
+        itemId:
+          type: ["integer", "null"]
+        equipmentId:
+          type: ["integer", "null"]
+        quantity:
+          type: integer
+          minimum: 1
+        returnCondition:
+          type: string
+          enum: [good, damaged, needs_maintenance, missing]
+        reason:
+          type: string
+        documentDate:
+          type: string
+          format: date
+        notes:
+          type: ["string", "null"]
+
+    CustodySummary:
+      type: object
+      required:
+        - id
+        - equipmentId
+        - equipmentName
+        - quantity
+        - returnedQuantity
+        - outstandingQuantity
+        - holderName
+        - deliveryNoteNumber
+        - deliveryDate
+        - location
+        - status
+      properties:
+        id:
+          type: integer
+        equipmentId:
+          type: integer
+        equipmentName:
+          type: string
+        serialNumber:
+          type: ["string", "null"]
+        quantity:
+          type: integer
+        returnedQuantity:
+          type: integer
+        outstandingQuantity:
+          type: integer
+        recipientId:
+          type: ["integer", "null"]
+        holderName:
+          type: string
+        deliveryNoteNumber:
+          type: string
+        deliveryDate:
+          type: string
+          format: date
+        location:
+          type: string
+        status:
+          type: string
+          enum: [open, partially_returned, returned, damaged, closed]
+
+    StockPositionBatch:
+      type: object
+      required: [id, itemId, remainingQuantity]
+      properties:
+        id: { type: integer }
+        itemId: { type: integer }
+        batchNumber: { type: ["string", "null"] }
+        expiryDate: { type: ["string", "null"], format: date }
+        remainingQuantity: { type: integer }
+
+    StockPositionItem:
+      type: object
+      required:
+        - id
+        - name
+        - unit
+        - itemType
+        - currentStock
+        - availableQuantity
+        - custodyQuantity
+        - damagedQuantity
+        - batches
+      properties:
+        id: { type: integer }
+        code: { type: ["string", "null"] }
+        name: { type: string }
+        unit: { type: string }
+        itemType: { type: string, enum: [item, equipment] }
+        currentStock: { type: integer }
+        availableQuantity: { type: integer }
+        custodyQuantity: { type: integer }
+        damagedQuantity: { type: integer }
+        batches:
+          type: array
+          items:
+            $ref: "#/components/schemas/StockPositionBatch"
+
+    StockPositionEquipment:
+      type: object
+      required:
+        - id
+        - name
+        - serialNumber
+        - condition
+        - quantity
+        - availableQuantity
+        - custodyQuantity
+        - damagedQuantity
+        - damagedLedgerQuantity
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        serialNumber: { type: ["string", "null"] }
+        condition: { type: string }
+        quantity: { type: integer }
+        currentHolder: { type: ["string", "null"] }
+        availableQuantity: { type: integer }
+        custodyQuantity: { type: integer }
+        damagedQuantity: { type: integer }
+        damagedLedgerQuantity: { type: integer }
+
+    StockPositionReport:
+      type: object
+      required: [generatedAt, items, equipment]
+      properties:
+        generatedAt: { type: string, format: date-time }
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/StockPositionItem"
+        equipment:
+          type: array
+          items:
+            $ref: "#/components/schemas/StockPositionEquipment"
+
+    CustodyReportRecord:
+      allOf:
+        - $ref: "#/components/schemas/CustodySummary"
+        - type: object
+          required: [overdue]
+          properties:
+            overdue: { type: boolean }
+
+    CustodyReport:
+      type: object
+      required: [overdueDays, generatedAt, records, totals]
+      properties:
+        overdueDays: { type: integer }
+        generatedAt: { type: string, format: date-time }
+        records:
+          type: array
+          items:
+            $ref: "#/components/schemas/CustodyReportRecord"
+        totals:
+          type: object
+          required: [open, partial, overdue, outstandingQuantity]
+          properties:
+            open: { type: integer }
+            partial: { type: integer }
+            overdue: { type: integer }
+            outstandingQuantity: { type: integer }
+
+    Recipient:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        notes:
+          type: ["string", "null"]
+        isActive:
+          type: boolean
+
+    RecipientInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        notes:
+          type: ["string", "null"]
+
+    ExitReason:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        isSystem:
+          type: boolean
+        isActive:
+          type: boolean
+
+    ExitReasonInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+
+    RecentTransaction:
+      type: object
+      required: [id, type, itemType, documentNumber, name, createdAt, createdByName]
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum: [in, out, init, adjust]
+        itemType:
+          type: string
+          enum: [item, equipment]
+        quantity:
+          type: ["integer", "null"]
+        documentNumber:
+          type: string
+        name:
+          type: string
+          description: Item or equipment name (resolved server-side)
+        createdAt:
+          type: string
+          format: date-time
+        createdByName:
+          type: string
+
+    DashboardStats:
+      type: object
+      required:
+        - totalItems
+        - belowMinCount
+        - nearExpiryCount
+        - expiredCount
+        - zeroStockCount
+        - stagnantItemsCount
+        - totalEquipment
+        - equipmentAlertCount
+        - monthlyIn
+        - monthlyOut
+        - expiryAlertDays
+        - recentTransactions
+      properties:
+        totalItems:
+          type: integer
+          description: Active items in the warehouse
+        belowMinCount:
+          type: integer
+          description: Active items with currentStock < minStock (minStock > 0, excludes zero-stock items counted separately)
+        nearExpiryCount:
+          type: integer
+          description: Active items expiring within expiryAlertDays, not yet expired
+        expiredCount:
+          type: integer
+          description: Active items whose expiryDate <= today
+        zeroStockCount:
+          type: integer
+          description: Active items with currentStock = 0
+        stagnantItemsCount:
+          type: integer
+          description: Active stocked items with no movement for more than seven months
+        totalEquipment:
+          type: integer
+          description: Equipment count excluding consumed/scrapped units
+        equipmentAlertCount:
+          type: integer
+          description: Equipment in maintenance, needs_inspection, or broken state
+        monthlyIn:
+          type: integer
+          description: IN transactions this calendar month
+        monthlyOut:
+          type: integer
+          description: OUT transactions this calendar month
+        prevMonthIn:
+          type: integer
+          description: IN transactions previous calendar month
+        prevMonthOut:
+          type: integer
+          description: OUT transactions previous calendar month
+        expiryAlertDays:
+          type: integer
+          description: Alert window in days (from system settings, default 30)
+        recentTransactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/RecentTransaction"
+
+    TopItem:
+      type: object
+      required: [name, outQty, inQty]
+      properties:
+        name:
+          type: string
+        outQty:
+          type: integer
+        inQty:
+          type: integer
+
+    CategoryStock:
+      type: object
+      required: [category, totalStock, itemCount]
+      properties:
+        category:
+          type: string
+        totalStock:
+          type: integer
+        itemCount:
+          type: integer
+
+    DailyMovement:
+      type: object
+      required: [day, inQty, outQty, txCount]
+      properties:
+        day:
+          type: string
+          description: Formatted date label (DD/MM)
+        inQty:
+          type: integer
+        outQty:
+          type: integer
+        txCount:
+          type: integer
+
+    DashboardCharts:
+      type: object
+      required: [topItems, stockByCategory, dailyMovement]
+      properties:
+        topItems:
+          type: array
+          description: Top 8 most-active items in the last 30 days (by total quantity)
+          items:
+            $ref: "#/components/schemas/TopItem"
+        stockByCategory:
+          type: array
+          description: Stock distribution by category (quantity-based, excludes zero-stock)
+          items:
+            $ref: "#/components/schemas/CategoryStock"
+        dailyMovement:
+          type: array
+          description: Daily IN/OUT quantities for the last 30 days (all days present via generate_series)
+          items:
+            $ref: "#/components/schemas/DailyMovement"
+
+    Alert:
+      type: object
+      required: [id, dbId, type, message, severity, entityId, entityType, isRead, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          description: Legacy string id (type-entityId) for backward-compat
+        dbId:
+          type: integer
+          description: Numeric DB primary key — use this for read/resolve operations
+        type:
+          type: string
+          enum: [below_min, near_expiry, equipment_maintenance, equipment_below_min]
+        message:
+          type: string
+        severity:
+          type: string
+          enum: [critical, warning, info]
+        entityId:
+          type: integer
+        entityType:
+          type: string
+          enum: [item, equipment]
+        entityName:
+          type: ["string", "null"]
+        isRead:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        itemId:
+          type: ["integer", "null"]
+          description: Legacy — same as entityId when entityType=item
+        itemName:
+          type: ["string", "null"]
+          description: Legacy — same as entityName when entityType=item
+
+    OkResponse:
+      type: object
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+
+    SystemSettings:
+      type: object
+      required: [id, orgName, expiryAlertDays, setupCompleted]
+      properties:
+        id:
+          type: integer
+        setupCompleted:
+          type: boolean
+        setupAt:
+          type: ["string", "null"]
+        orgName:
+          type: string
+          minLength: 2
+        orgSubtitle:
+          type: ["string", "null"]
+        expiryAlertDays:
+          type: integer
+          minimum: 1
+          maximum: 365
+        unitsList:
+          type: ["string", "null"]
+        updatedAt:
+          type: string
+
+    SystemSettingsInput:
+      type: object
+      properties:
+        orgName:
+          type: string
+        orgSubtitle:
+          type: ["string", "null"]
+        expiryAlertDays:
+          type: integer
+        unitsList:
+          type: ["string", "null"]
+
+    JsonObject:
+      type: object
+      additionalProperties: true
+
+    ConfirmInput:
+      type: object
+      required: [confirm]
+      properties:
+        confirm:
+          type: boolean
+
+    BackupPasswordInput:
+      type: object
+      required: [password]
+      properties:
+        password:
+          type: string
+          minLength: 8
+
+    BackupPackageInput:
+      type: object
+      required: [packageBase64, password]
+      properties:
+        packageBase64:
+          type: string
+        password:
+          type: string
+
+    BackupRestoreInput:
+      allOf:
+        - $ref: "#/components/schemas/BackupPackageInput"
+        - type: object
+          required: [mode]
+          properties:
+            mode:
+              type: string
+              enum: [full, merge]
+            previewToken:
+              type: string
+            confirm:
+              type: boolean
+
+    BackupCreateInput:
+      allOf:
+        - $ref: "#/components/schemas/BackupPasswordInput"
+        - type: object
+          properties:
+            packageType:
+              type: string
+              enum: [full-backup, delta-sync]
+            baseVector:
+              type: object
+              additionalProperties:
+                type: integer
+            retentionClass:
+              type: string
+              enum: [manual, daily, weekly, monthly]
+
+    BackupCatalogResponse:
+      type: object
+      required: [backups, policy]
+      properties:
+        backups:
+          type: array
+          items:
+            $ref: "#/components/schemas/JsonObject"
+        policy:
+          $ref: "#/components/schemas/JsonObject"

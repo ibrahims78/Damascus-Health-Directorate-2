@@ -1,0 +1,86 @@
+# See https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
+
+# compiled output
+dist
+tmp
+out-tsc
+*.tsbuildinfo
+.expo
+.expo-shared
+
+# dependencies
+node_modules
+
+# IDEs and editors
+/.idea
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# IDE - VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# misc
+/.sass-cache
+/connect.lock
+/coverage
+/libpeerconnection.log
+npm-debug.log
+yarn-error.log
+testem.log
+/typings
+
+# System Files
+.DS_Store
+Thumbs.db
+
+.cursor/rules/nx-rules.mdc
+.github/instructions/nx.instructions.md
+
+# Replit
+.cache/
+.local/
+
+# Release credentials and signing material
+.env
+.env.*
+!.env.example
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.key
+*private*key*
+release-secrets-v*/**/*credentials*.txt
+release-secrets-v*.zip
+release-secrets/
+release-staging/
+
+# Workspace-only attachments and agent-generated previews
+attached_assets/
+/.agents/outputs/
+
+# local PGlite data directory (created at runtime)
+.damascus-data/
+.damascus-artifact-api-data/
+
+
+# Release binaries stay local (checksums + notes are tracked)
+release-artifacts/v*/windows/*.zip
+release-artifacts/v*/android/*.apk
+release-artifacts/v*/android/*WebBundle*.zip
+release-artifacts/v*/Damascus-Health-Directorate-v*-Activation-Kit.zip
+
+# runtime logs from the license generators
+issued-licenses-*.log
+release-artifacts/v*/windows/Damascus-Emergency-Inventory-*-RUN/
+
+release-artifacts/v*/scripts/*.class

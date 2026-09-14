@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>دراسة نقدية — مقترح إعادة هيكلة الكتالوج والمخزون</title>
+<style>
+  :root{
+    --ink:#14181c; --ink-soft:#4a545e; --paper:#ffffff; --tint:#f6f7f6;
+    --rule:#d9dcda; --rule-strong:#b9bebc; --accent:#0f5f57; --accent-soft:#e7f0ee;
+    --warn:#8a4b12; --warn-soft:#fbf2e6;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"Segoe UI","Tahoma","Helvetica Neue",Arial,sans-serif;
+    font-size:16px; line-height:1.9;
+  }
+  .sheet{max-width:960px; margin:0 auto; padding:56px 40px 96px;}
+  header.doc{border-bottom:2px solid var(--ink); padding-bottom:22px; margin-bottom:8px;}
+  .eyebrow{font-size:12.5px; letter-spacing:.14em; color:var(--accent); font-weight:700; margin:0 0 14px;}
+  h1{font-size:33px; line-height:1.35; margin:0 0 14px; font-weight:700; letter-spacing:-.01em;}
+  .sub{margin:0; color:var(--ink-soft); font-size:15.5px; max-width:70ch;}
+  .meta{display:flex; flex-wrap:wrap; gap:6px 26px; margin-top:20px; font-size:13px; color:var(--ink-soft);}
+  .meta b{color:var(--ink); font-weight:600;}
+  h2{font-size:21px; margin:52px 0 14px; padding-bottom:8px; border-bottom:1px solid var(--rule-strong); font-weight:700;}
+  h3{font-size:16.5px; margin:26px 0 8px; font-weight:700;}
+  p{margin:0 0 14px;}
+  ul,ol{margin:0 0 16px; padding-inline-start:22px;}
+  li{margin:0 0 7px;}
+  code{font-family:Consolas,"Courier New",monospace; font-size:13px; background:var(--tint); padding:1px 5px; border:1px solid var(--rule); border-radius:3px; direction:ltr; display:inline-block;}
+  table{width:100%; border-collapse:collapse; margin:16px 0 22px; font-size:14px;}
+  caption{caption-side:top; text-align:right; font-size:12.5px; color:var(--ink-soft); padding-bottom:7px;}
+  th,td{border:1px solid var(--rule); padding:9px 11px; vertical-align:top; text-align:right;}
+  thead th{background:var(--tint); font-weight:700; font-size:13px;}
+  tbody tr:nth-child(even){background:#fbfcfb;}
+  .verdict{border:1px solid var(--accent); background:var(--accent-soft); padding:20px 22px; margin:0 0 26px; border-inline-start:4px solid var(--accent);}
+  .verdict p:last-child{margin-bottom:0}
+  .note{border:1px solid var(--rule); background:var(--tint); padding:16px 18px; margin:18px 0;}
+  .note.warn{background:var(--warn-soft); border-color:#e3c9a6;}
+  .tag{display:inline-block; font-size:11.5px; font-weight:700; letter-spacing:.02em; padding:2px 8px; border:1px solid var(--rule-strong); border-radius:3px; background:#fff; white-space:nowrap;}
+  .tag.ok{color:var(--accent); border-color:var(--accent);}
+  .tag.mid{color:var(--warn); border-color:#d8b58a;}
+  .tag.no{color:#842029; border-color:#c9a0a4;}
+  .kpi{display:flex; flex-wrap:wrap; gap:0; border:1px solid var(--rule); margin:18px 0 26px;}
+  .kpi div{flex:1 1 160px; padding:14px 16px; border-inline-start:1px solid var(--rule);}
+  .kpi div:first-child{border-inline-start:0}
+  .kpi b{display:block; font-size:24px; font-weight:700; line-height:1.2}
+  .kpi span{font-size:12.5px; color:var(--ink-soft)}
+  figure{margin:24px 0; border:1px solid var(--rule); padding:16px; background:#fcfdfc;}
+  figcaption{font-size:12.5px; color:var(--ink-soft); margin-top:10px; text-align:center}
+  .two{display:grid; grid-template-columns:1fr 1fr; gap:22px;}
+  @media (max-width:760px){ .two{grid-template-columns:1fr} .sheet{padding:34px 18px 60px} h1{font-size:26px} }
+  .lead{font-size:16.5px; color:var(--ink)}
+  hr.soft{border:0; border-top:1px solid var(--rule); margin:34px 0}
+  .small{font-size:13px; color:var(--ink-soft)}
+  footer.doc{margin-top:60px; padding-top:16px; border-top:1px solid var(--rule); font-size:12.5px; color:var(--ink-soft);}
+</style>
+</head>
+<body>
+<div class="sheet">
+
+<header class="doc">
+  <p class="eyebrow">مراجعة فنية معمارية</p>
+  <h1>دراسة نقدية لمقترح إعادة هيكلة الكتالوج والمخزون<br>تطبيق «مديرية صحة دمشق» — الإصدار 4.0.3</h1>
+  <p class="sub">تقييم مدى ملاءمة المقترح للبنية القائمة، وما هو منفَّذ فعلاً، وما يستحق التنفيذ، وما يُنصح بتأجيله أو استبداله بحلّ أبسط.</p>
+  <div class="meta">
+    <span><b>المُدقَّق:</b> البنية الفعلية للكود (المخطط + المسارات + الواجهة)</span>
+    <span><b>النطاق:</b> الكتالوج · الصلاحيات · Excel · المخزون · التشفير · المستودعات</span>
+    <span><b>التاريخ:</b> 2026-09-14</span>
+  </div>
+</header>
+
+<h2>1 · الملخّص التنفيذي</h2>
+<div class="verdict">
+  <p class="lead"><b>الحكم المختصر:</b> المقترح <b>سليم مهنياً وصحيح الاتجاه</b>، لكن أهم ملاحظة تقنية هي أن <b>نحو 70–80٪ منه مُنفَّذ فعلاً</b> في التطبيق الحالي. لذلك الفائدة الحقيقية ليست في «إضافة» المفهوم، بل في <b>إحكام الحاكمية (Governance)</b>: مصفوفة صلاحيات صريحة، فصل التعريف عن الحركة، وضبط الاستيراد والاعتماد.</p>
+  <p>التعديلات الأعلى قيمة وأقل خطراً هي: <b>منع أمين المستودع من تعريف الأصناف</b>، و<b>فصل شاشة الكتالوج عن شاشة العمليات</b>، و<b>فصل قالبَي Excel (كتالوج / رصيد افتتاحي)</b> مع اعتماد وتراجع. أما <b>التشفير</b> فقيمته منخفضة (التوقيع + الصلاحيات أهم)، و<b>تعدّد المستودعات</b> تغيير كبير لا يُبرَّر إلا عند وجود أكثر من موقع فعلي.</p>
+</div>
+
+<div class="kpi">
+  <div><b>3</b><span>أدوار قائمة فعلاً (مدير / أمين مستودع / مراقب)</span></div>
+  <div><b>33</b><span>جدولاً في قاعدة البيانات المحلية</span></div>
+  <div><b>~75٪</b><span>من بنود المقترح منفَّذة جزئياً أو كلياً</span></div>
+  <div><b>4</b><span>فجوات حقيقية تستحق العمل</span></div>
+</div>
+
+<h2>2 · ما هو موجود فعلاً في التطبيق (دليل من الكود)</h2>
+<p>قبل تقييم المقترح، هذه الحقيقة هي التي تحكم الحكم: كثير من العناصر التي يقترحها المقترح قائمة في البنية الحالية.</p>
+
+<table>
+  <caption>الجدول 1 — مقارنة «ما يقترحه المقترح» بـ«ما هو موجود فعلاً»</caption>
+  <thead>
+    <tr><th style="width:31%">عنصر المقترح</th><th style="width:41%">الواقع في الكود</th><th style="width:28%">التقييم</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>كتالوج مركزي للمواد والتجهيزات</td><td>جدول <code>items</code> يحوي <code>code</code> و<code>unit</code> و<code>min_stock</code> و<code>is_active</code> و<code>requires_batch_tracking</code> و<code>requires_expiry_tracking</code>؛ وجدول <code>equipment</code> منفصل.</td><td><span class="tag mid">موجود جزئياً</span> ناقص: رمز التجهيز + أرشفته + شاشة كتالوج مستقلة.</td></tr>
+    <tr><td>الدفعات والصلاحية</td><td><code>inventory_batches</code> + <code>transaction_batch_allocations</code> + تخصيص FEFO، ومؤشر <code>inventory_batches_item_fefo_idx</code>، ونقطة <code>/api/items/fefo-preview</code>.</td><td><span class="tag ok">موجود</span></td></tr>
+    <tr><td>التلف والمرتجعات والعهد</td><td><code>damage_records</code> · <code>personal_custodies</code> · <code>central_returns</code> · <code>custody_returns</code> + مسار <code>/api/custodies</code> وخدمات سجل العهدة.</td><td><span class="tag ok">موجود</span></td></tr>
+    <tr><td>استيراد Excel مع معاينة واعتماد</td><td><code>POST /api/items/bulk-import/preview</code> ثم <code>/bulk-import?mode=insert|upsert</code>، ومثله للتجهيزات؛ مع تحليل أخطاء وتكرارات.</td><td><span class="tag ok">موجود</span> يحتاج ضبطاً لا بناءً.</td></tr>
+    <tr><td>الأدوار الثلاثة</td><td><code>admin | warehouse_manager | viewer</code> في <code>users</code>، مع حارس <code>requireRole</code> على المسارات.</td><td><span class="tag ok">موجود</span></td></tr>
+    <tr><td>قائمة اختيار موحّدة</td><td>مكوّن <code>catalog-combobox.tsx</code> مستخدَم في نماذج الإدخال/الإخراج/التسليم/العهد.</td><td><span class="tag ok">موجود</span> يحتاج إثراء بالمعلومات.</td></tr>
+    <tr><td>سجل تدقيق</td><td><code>audit_log</code> + مسار <code>/api/audit</code> (للمدير)، والتسجيل تلقائي في العمليات والاستيراد.</td><td><span class="tag ok">موجود</span></td></tr>
+    <tr><td>تنبيهات نقص المخزون والصلاحية</td><td>جدول <code>alerts</code> + عامل دوري <code>alert-worker</code> + مسار <code>/api/alerts</code> وبثّ SSE.</td><td><span class="tag ok">موجود</span></td></tr>
+    <tr><td>العمل دون اتصال والمزامنة</td><td>قاعدة PGlite محلية + منظومة مزامنة كاملة (outbox/inbox/cursors/conflicts/tombstones/trusted-nodes).</td><td><span class="tag ok">موجود</span></td></tr>
+    <tr><td>الأرشفة بدل الحذف</td><td>حذف المادة = <b>حذف منطقي</b> (<code>is_active=false</code>) + تدقيق، وللمدير فقط.</td><td><span class="tag mid">موجود للمواد فقط</span> التجهيزات بلا أرشفة.</td></tr>
+    <tr><td>المستودعات المتعددة</td><td>لا يوجد جدول مستودعات/مواقع؛ الموقع نصّ حر في <code>items.location</code> وحركات العهدة.</td><td><span class="tag no">غير موجود</span></td></tr>
+    <tr><td>ملف كتالوج مشفّر وموقّع</td><td>لا يوجد؛ لكن بنية توقيع <b>Ed25519</b> جاهزة في <code>lib/license-core</code> (مفاتيح الإصدار).</td><td><span class="tag no">غير موجود</span></td></tr>
+  </tbody>
+</table>
+
+<h2>3 · تقييم مفردات المقترح: احترافية؟ مناسبة؟ أكثر احترافية؟</h2>
+<p>لكل بند: هل هو صحيح معمارياً، وهل يناسب هذا التطبيق تحديداً، وما قيمته مقابل جهده ومخاطره.</p>
+
+<table>
+  <caption>الجدول 2 — تقييم البنود (القيمة/الجهد/الخطر: منخفض · متوسط · مرتفع)</caption>
+  <thead>
+    <tr><th style="width:24%">البند</th><th style="width:34%">رأيي المهني</th><th>القيمة</th><th>الجهد</th><th>الخطر</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>فصل «تعريف الصنف» عن «رصيده وحركته»</td>
+      <td><b>صحيح ومهم.</b> لكن انتبه: الرصيد الحالي مكرّر بين <code>items.current_stock</code> وبين <code>inventory_batches.remaining_quantity</code> — الفصل يجب أن يحدّد <b>مصدراً واحداً للحقيقة</b> لكل نوع صنف، وإلا زاد التنافر.</td>
+      <td>مرتفعة</td><td>متوسط</td><td>متوسط</td>
+    </tr>
+    <tr>
+      <td>تقييد أمين المستودع من تعديل التعريفات</td>
+      <td><b>أعلى بند قيمةً وأقلّها خطراً.</b> حالياً مسارات إضافة/تعديل المواد والتجهيزات تسمح لأمين المستودع؛ الاقتراح يقلّص ذلك للمدير فقط. تعديل صغير في الحرّاس، لا يكسر البيانات.</td>
+      <td>مرتفعة</td><td>منخفض</td><td>منخفض</td>
+    </tr>
+    <tr>
+      <td>قالب Excel للكتالوج + قالب للرصيد الافتتاحي</td>
+      <td><b>مناسب.</b> الاستيراد الحالي موحّد لكل كيان؛ فصله يمنع خلط «التعريف» بـ«الرصيد». يجب تعريف قيود الرصيد الافتتاحي (متى يُسمح، ولمن، وكيف يُعالج بعد أول حركة).</td>
+      <td>مرتفعة</td><td>متوسط</td><td>متوسط</td>
+    </tr>
+    <tr>
+      <td>المعاينة قبل الاعتماد + سجل التدقيق</td>
+      <td><b>مُحقَّق فعلاً.</b> لا حاجة لبناء جديد، بل لتحسين: عرض أثر كل صف (إضافة/تحديث/تخطّي)، منع الاعتماد الجزئي، وإمكانية <b>التراجع</b> عن دفعة استيراد.</td>
+      <td>متوسطة</td><td>منخفض</td><td>منخفض</td>
+    </tr>
+    <tr>
+      <td>قائمة منسدلة موحّدة تعرض الرمز/الوحدة/الرصيد/الحد الأدنى</td>
+      <td><b>جيد.</b> المكوّن موجود؛ الإثراء تحسين UX حقيقي. الأهم: منع اختيار صنف مؤرشف، ومنع الإخراج بما يتجاوز المتاح (منعٌ على الخادم لا الواجهة فقط).</td>
+      <td>متوسطة</td><td>منخفض</td><td>منخفض</td>
+    </tr>
+    <tr>
+      <td>قسم مخزون مستقل</td>
+      <td><b>مفيد للمستخدم.</b> المعلومات موزّعة حالياً بين لوحة المعلومات والتقارير؛ توحيدها في «مركز مخزون» يرفع الإدراك التشغيلي دون تغيير في البيانات.</td>
+      <td>مرتفعة</td><td>متوسط</td><td>منخفض</td>
+    </tr>
+    <tr>
+      <td>ملف كتالوج مشفّر (.dme)</td>
+      <td><b>غير موصى به كأولوية.</b> الكتالوج بيانات تشغيلية لا أسرار؛ الأهم توقيع + صلاحيات + تدقيق. والتشفير الإلزامي يضيف عبئاً في الدعم وإدارة المفاتيح بلا مقابل حقيقي.</td>
+      <td>منخفضة</td><td>متوسط</td><td>متوسط</td>
+    </tr>
+    <tr>
+      <td>تعدّد المستودعات (المرحلة الثانية)</td>
+      <td><b>تغيير جوهري، لا يُبرّر إلا بوجود مواقع فعلية متعددة.</b> يضيف: جدول مستودعات، رصيد لكل مستودع، تحويلات، ونطاق صلاحيات مكاني — تعقيد كبير في المخزون والمزامنة والتقارير.</td>
+      <td>مرتفعة (شرطياً)</td><td>مرتفع</td><td>مرتفع</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>4 · الفجوات التي لم يذكرها المقترح (وهي مهمة)</h2>
+<ul>
+  <li><b>التجهيزات بلا رمز وبلا أرشفة:</b> جدول <code>equipment</code> لا يحوي <code>code</code> ولا <code>is_active</code>، وحذفه فعلي. «كتالوج التجهيزات» يتطلّب إضافتهما وربطهما بسجل الحركات القائم.</li>
+  <li><b>جدول وحدات القياس:</b> الوحدة نصّ حر في <code>items.unit</code>، ما يعني فوضى محتملة («قطعة/حبة/علبة»). أي كتالوج جدي يحتاج جدول وحدات معياري و<b>خطة توحيد</b> للبيانات القديمة.</li>
+  <li><b>ترصيد الرصيد المكرّر:</b> لا توجد حالياً آلية تحقّق دوري بين <code>current_stock</code> ومجموع الدفعات. الفصل المقترح يجب أن يرافقه فحص اتساق وتقرير فروقات.</li>
+  <li><b>حاكمية الاستيراد:</b> لا يوجد «قفل بعد الاعتماد» ولا «تراجع عن دفعة استيراد»؛ الاقتراح يذكر الاعتماد دون آلية التصحيح بعده.</li>
+  <li><b>سجل تدقيق بمستوى الحقل:</b> يلزم تسجيل «قبل/بعد» عند تعديل تعريف صنف (سعر، حد أدنى، وحدة) — لا يكفي «تم التعديل».</li>
+  <li><b>الموافقة (Approval):</b> المقترح يذكر «إرساله للاعتماد حسب سياسة المؤسسة» لكن لا يوجد كيان موافقة/حالة (مسودّة → معتمد) ولا مُعتمِد.</li>
+</ul>
+
+<h2>5 · مخاطر وملاحظات تنفيذية</h2>
+<ul>
+  <li><b>ازدواج مصدر الحقيقة</b> بين الأرصدة المجمّعة والدفعات هو الخطر الأول، وقد يتفاقم مع أي إعادة هيكلة. يُعالج بتحديد مصدر واحد + ترصيد دوري.</li>
+  <li><b>الهجرة (Migration):</b> توحيد الوحدات والمواقع سيلمس بيانات قائمة؛ يلزم نصّ هجرة + تقرير تحقق قبل/بعد.</li>
+  <li><b>المزامنة دون اتصال:</b> أي تغيير في الحقول يُلزم تحديث مخطط المزامنة و<code>sync-contract</code>، وإلا ظهرت تعارضات على الأجهزة المعزولة.</li>
+  <li><b>النسخ المحمي/التفعيل:</b> لا يتأثر؛ لكن يجب إعادة بناء النسخ بعد أي تغيير في الواجهة أو الخادم.</li>
+  <li><b>خطر التعقيد المبكر:</b> تنفيذ التشفير وتعدّد المستودعات معاً في مرحلة واحدة يضاعف المخاطر بلا عائد فوري.</li>
+</ul>
+
+<h2>6 · توصيتي: خطة مُعاد ترتيبها بالأولويات</h2>
+<p>بدل «مرحلتين» عامّتين، أقترح تقسيمًا تنفيذيًا أدق، مرتّباً بالقيمة/الخطر:</p>
+
+<table>
+  <caption>الجدول 3 — خارطة الطريق المقترحة</caption>
+  <thead><tr><th style="width:12%">الأولوية</th><th>النطاق</th><th style="width:20%">الأثر</th></tr></thead>
+  <tbody>
+    <tr><td><b>P0</b><br><span class="small">أسرع عائد</span></td><td>مصفوفة صلاحيات صريحة على الخادم والواجهة · منع أمين المستودع من التعريفات · إضافة <code>code</code> و<code>is_active</code> للتجهيزات · إثراء القائمة الموحّدة (رصيد/وحدة/منع المؤرشف).</td><td>حاكمية فورية بتغيير محدود.</td></tr>
+    <tr><td><b>P1</b></td><td>شاشة كتالوج مستقلة · مركز مخزون موحّد · فصل قالبَي Excel (كتالوج / رصيد افتتاحي) مع اعتماد وتراجع · جدول وحدات معياري + توحيد البيانات.</td><td>وضوح تشغيلي وضبط إدخال.</td></tr>
+    <tr><td><b>P2</b></td><td>ترصيد <code>current_stock</code> مع الدفعات + تقرير فروقات · تدقيق بمستوى الحقل · تقارير صلاحية/حد أدنى متقدمة · دعم الباركود (اختياري).</td><td>دقّة بيانات وقابلية تتبّع.</td></tr>
+    <tr><td><b>P3</b></td><td>تعدّد المستودعات + التحويلات + نطاق الصلاحية المكاني (يُنفَّذ فقط عند الحاجة الفعلية).</td><td>توسّع مؤسسي.</td></tr>
+    <tr><td><b>اختياري</b></td><td>ملف كتالوج <b>موقّع</b> (Ed25519 بإعادة استخدام بنية الترخيص) — دون تشفير إلزامي.</td><td>أصالة الملف بلا تعقيد دعم.</td></tr>
+  </tbody>
+</table>
+
+<h2>7 · قرار بشأن «ملف الكتالوج المشفّر»</h2>
+<p>المقترح محقّ في التمييز بين التشفير والتوقيع والصلاحيات، وأنا أشدّد على:</p>
+<ul>
+  <li><b>التوقيع الرقمي هو الأهم</b>: يثبت مصدر الملف وعدم تعديله. يمكن إعادة استخدام <b>Ed25519</b> الموجود أصلاً في منظومة الترخيص (مفاتيح الإصدار على الجهاز والتحقق داخل التطبيق) بدل بناء منظومة جديدة.</li>
+  <li><b>الصلاحيات والتدقيق</b> هما خط الدفاع الفعلي: الاستيراد للمدير فقط + سجل تدقيق كامل.</li>
+  <li><b>التشفير اختياري</b> وفقط إن كان جزء من محتوى الكتالوج حسّاساً فعلاً — وإلا فهو تعقيد بلا عائد.</li>
+</ul>
+
+<h2>8 · خلاصة الإجابة على أسئلتك</h2>
+<ul>
+  <li><b>هل التعديلات احترافية؟</b> نعم، الاتجاه المعماري سليم ومطابق لأفضل الممارسات (فصل التعريف عن الحركة، RBAC، حاكمية الاستيراد).</li>
+  <li><b>هل هي مناسبة للتطبيق؟</b> نعم، ومعظمها <b>لا يحتاج إعادة بناء</b> — لكن جزءاً كبيراً منها موجود بالفعل، فالمكسب الحقيقي في <b>الإحكام لا الإضافة</b>.</li>
+  <li><b>هل سيصبح التطبيق أكثر احترافية؟</b> نعم — عبر الصلاحيات وفصل الكتالوج وضبط الاستيراد. أما التشفير فتأثيره ضعيف، وتعدّد المستودعات يزيد الاحترافية فقط إذا وُجدت مواقع متعددة فعلاً.</li>
+  <li><b>أهم ما يجب اعتماده قبل البدء:</b> مصفوفة الصلاحيات (P0)، ثم الشكل النهائي لقالبَي Excel، و<b>قرار مصدر الحقيقة للرصيد</b> قبل أي فصل.</li>
+</ul>
+
+<div class="note warn">
+  <p style="margin:0"><b>قيد مهم قبل التنفيذ:</b> اعتماد «الشكل النهائي لملف Excel» وحده لا يكفي؛ يجب أولاً حسم <b>مصدر الحقيقة للأرصدة</b> (الرصيد المجمّع مقابل مجموع الدفعات) و<b>معنى الرصيد الافتتاحي</b> بعد أول حركة — وإلا انتقل الالتباس من التعريف إلى الأرقام.</p>
+</div>
+
+<footer class="doc">
+  أُعدّت هذه المراجعة استناداً إلى البنية الفعلية للكود: المخطط (<code>lib/db/desktop-schema.sql</code>)، مسارات الخادم (<code>artifacts/api-server/src/routes</code>)، الواجهة (<code>artifacts/web/src</code>)، ووثائق الاستيراد في <code>docs/</code>.
+</footer>
+
+</div>
+</body>
+</html>

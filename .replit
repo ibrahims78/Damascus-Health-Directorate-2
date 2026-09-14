@@ -1,0 +1,81 @@
+modules = ["nodejs-20", "python-3.12", "web"]
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start application"
+
+[[workflows.workflow]]
+name = "Start application"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "export DAMASCUS_DESKTOP=1 DAMASCUS_SCHEMA_PATH=$PWD/lib/db/desktop-schema.sql DAMASCUS_DATA_DIR=$PWD/.damascus-data NODE_ENV=development; pnpm --filter @workspace/api-server run build && PORT=8080 node --enable-source-maps artifacts/api-server/dist/index.mjs & api_pid=$!; trap 'kill $api_pid 2>/dev/null || true' EXIT INT TERM; PORT=5000 pnpm --filter @workspace/web run dev"
+waitForPort = 5000
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[[ports]]
+localPort = 8000
+externalPort = 8000
+
+[[ports]]
+localPort = 8080
+externalPort = 8080
+
+[[ports]]
+localPort = 8081
+externalPort = 8081
+
+[[ports]]
+localPort = 8082
+externalPort = 3002
+
+[[ports]]
+localPort = 8083
+externalPort = 3003
+
+[[ports]]
+localPort = 8091
+externalPort = 3000
+
+[[ports]]
+localPort = 8181
+externalPort = 5000
+
+[[ports]]
+localPort = 8182
+externalPort = 5173
+
+[[ports]]
+localPort = 8183
+externalPort = 6000
+
+[[ports]]
+localPort = 8184
+externalPort = 6800
+
+[[ports]]
+localPort = 22333
+externalPort = 3001
+
+[nix]
+channel = "stable-25_05"
+packages = ["libreoffice", "jdk21"]
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 180000

@@ -1,0 +1,29 @@
+kind = "web"
+    previewPath = "/"
+    title = "نظام مستودع الإسعاف"
+    description = "نظام إدارة مستودع منظومة الاحالة و الاسعاف و الطوارئ - دمشق. تطبيق ويب داخلي عربي RTL لإدارة المواد والمستهلكات والتجهيزات مع سندات إدخال وإخراج، لوحة تحكم، تقارير، وصلاحيات متعددة."
+    version = "1.0.0"
+    id = "artifacts/web"
+    router = "path"
+
+    [[services]]
+    name = "web"
+    paths = [ "/" ]
+    localPort = 22333
+
+    [services.development]
+    run = "pnpm --filter @workspace/web run dev"
+
+    [services.production]
+    build = [ "pnpm", "--filter", "@workspace/web", "run", "build" ]
+    serve = "static"
+    publicDir = "artifacts/web/dist/public"
+
+    [[services.production.rewrites]]
+    from = "/*"
+    to = "/index.html"
+
+    [services.env]
+    PORT = "22333"
+    BASE_PATH = "/"
+    

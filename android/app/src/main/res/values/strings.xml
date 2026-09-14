@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Damascus Health Directorate</string>
+    <string name="title_activity_main">Damascus Health Directorate</string>
+    <string name="package_name">syrian.emergency.inventory</string>
+    <string name="custom_url_scheme">syrian.emergency.inventory</string>
+</resources>

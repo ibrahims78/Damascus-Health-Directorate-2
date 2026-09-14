@@ -1,0 +1,27 @@
+{
+  "generatedAt": "2026-09-09",
+  "purpose": "phase-0-baseline",
+  "dataPolicy": "synthetic-only",
+  "files": {
+    "01-empty-template.xlsx": {
+      "sha256": "85ea3babacc90cfb154bdf4b26af3d56fa65ed5f0f58de7bd177b66b7cf2ed78",
+      "bytes": 16228
+    },
+    "02-export-baseline.xlsx": {
+      "sha256": "9bc6449544c2dd82f8340eea6cc08f67303fb132283667b56b6f9b3979c7067a",
+      "bytes": 16710
+    },
+    "03-new-item.xlsx": {
+      "sha256": "f38a61d5dcf6e1a2354c007a99f23e5f872bd73c5e601532a60c32f37da6684b",
+      "bytes": 16675
+    },
+    "04-batch-input.xlsx": {
+      "sha256": "ff72ddd662b100dc0f2e65aaab9892600660f2aee62356747daaa5ebd0503707",
+      "bytes": 16711
+    },
+    "05-intentional-errors.xlsx": {
+      "sha256": "aba7885bd638ad08159960c0ef9ad67fba962f0e51e7ad2828544c8a88ebd737",
+      "bytes": 17498
+    }
+  }
+}
