@@ -269,6 +269,9 @@ export function InventoryPage() {
               <Button variant="outline" onClick={() => setLocation('/equipment')}>التجهيزات</Button>
               <Button variant="outline" onClick={() => setLocation('/transactions')}>الحركات</Button>
               <Button variant="outline" onClick={() => setLocation('/reports')}>التقارير</Button>
+              <Button variant="outline" onClick={() => setLocation('/print/report/stock')}>طباعة كشف الأرصدة</Button>
+              <Button variant="outline" onClick={() => setLocation('/print/report/below-min')}>طباعة كشف النواقص</Button>
+              <Button variant="outline" onClick={() => setLocation('/print/report/expiry')}>طباعة كشف الصلاحية</Button>
             </CardContent>
           </Card>
         </>

@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+﻿#!/usr/bin/env node
 /**
  * Navigation & permission guardrails (static invariants).
  *
@@ -55,7 +55,12 @@ const catalog = fs.readFileSync(path.join(root, "artifacts/web/src/pages/catalog
 check("catalog can create a material", catalog.includes("setLocation('/items/new')"));
 check("catalog can create equipment", catalog.includes("setLocation('/equipment/new')"));
 
+
+// ---- batch printable reports must also stay behind auth ---------------------
+check("printable report route is protected", /<Route path="\/print\/report\/:kind">\s*<ProtectedRoute/.test(app));
+check("inventory hub links to the printable sheets", /print\/report\/stock/.test(fs.readFileSync(path.join(root, "artifacts/web/src/pages/inventory.tsx"), "utf8")));
 const failed = results.filter((r) => !r.ok);
 console.log(`\n${results.length - failed.length}/${results.length} checks passed`);
 process.exit(failed.length === 0 ? 0 : 1);
+
 

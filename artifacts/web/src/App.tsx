@@ -31,6 +31,7 @@ const CatalogPage = lazy(() => import('@/pages/catalog').then(({ CatalogPage }) 
 const InventoryPage = lazy(() => import('@/pages/inventory').then(({ InventoryPage }) => ({ default: InventoryPage })));
 const TransfersPage = lazy(() => import('@/pages/transfers').then(({ TransfersPage }) => ({ default: TransfersPage })));
 const TransferPrintPage = lazy(() => import('@/pages/transfer-print').then(({ TransferPrintPage }) => ({ default: TransferPrintPage })));
+const PrintReportPage = lazy(() => import('@/pages/print-report').then(({ PrintReportPage }) => ({ default: PrintReportPage })));
 const TransactionsPage = lazy(() => import('@/pages/transactions').then(({ TransactionsPage }) => ({ default: TransactionsPage })));
 const ReportsPage = lazy(() => import('@/pages/reports').then(({ ReportsPage }) => ({ default: ReportsPage })));
 const UsersPage = lazy(() => import('@/pages/users').then(({ UsersPage }) => ({ default: UsersPage })));
@@ -162,6 +163,7 @@ function Router() {
       <Route path="/inventory"><ProtectedRoute component={InventoryPage} /></Route>
       <Route path="/transfers"><ProtectedRoute component={TransfersPage} /></Route>
       <Route path="/transfers/:id/print"><ProtectedRoute component={TransferPrintPage} /></Route>
+      <Route path="/print/report/:kind"><ProtectedRoute component={PrintReportPage} /></Route>
       <Route path="/custodies/:id"><ProtectedRoute component={CustodyDetailsPage} /></Route>
 
       <Route path="/transactions"><ProtectedRoute component={TransactionsPage} /></Route>
