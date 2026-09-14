@@ -180,6 +180,12 @@ export function CatalogPage() {
             <Button className="gap-2" onClick={() => setLocation('/items/new')}>
               <Plus className="w-4 h-4" /> مادة جديدة
             </Button>
+            <Button variant="outline" className="gap-2" onClick={() => setLocation('/equipment/new')}>
+              <Plus className="w-4 h-4" /> تجهيز جديد
+            </Button>
+            <Button variant="ghost" className="gap-2" onClick={() => setLocation('/items')}>
+              <Sparkles className="w-4 h-4" /> استيراد Excel
+            </Button>
           </div>
         )}
       </div>

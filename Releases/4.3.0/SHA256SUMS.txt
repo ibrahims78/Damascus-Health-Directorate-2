@@ -1,2 +1,2 @@
-68726523c136f59b44953178f945345b74139487eb3b53d0a35169d6faad4f27  Damascus-Health-Directorate-v4.3.0-Android-Offline.apk
-4e51c459ca46652f07bfe20a0d4cc54809a7bd957d1bfbf69b51ab1ea95a7798  Damascus-Health-Directorate-v4.3.0-Android-Protected.apk
+1e26d192eea75099d882350744cae155064c950b40d417f079a40662f66e46a2  Damascus-Health-Directorate-v4.3.0-Android-Offline.apk
+614e14273d610dde9ce70a1f1f82339a13bb2429f934fe28f8495a29f6ed0a41  Damascus-Health-Directorate-v4.3.0-Android-Protected.apk

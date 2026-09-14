@@ -4,8 +4,8 @@
 
 ### Damascus Health Directorate Warehouses — v4.3.0
 
-[![Release](https://img.shields.io/github/v/release/ibrahims78/Damascus-Health-Directorate-2?label=%D8%A7%D9%84%D8%A5%D8%B5%D8%AF%D8%A7%D8%B1&logo=github)](https://github.com/ibrahims78/Damascus-Health-Directorate-2/releases/latest)
-[![CI](https://github.com/ibrahims78/Damascus-Health-Directorate-2/actions/workflows/ci.yml/badge.svg)](https://github.com/ibrahims78/Damascus-Health-Directorate-2/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/ibrahims78/Damascus-Health-Directorate?label=%D8%A7%D9%84%D8%A5%D8%B5%D8%AF%D8%A7%D8%B1&logo=github)](https://github.com/ibrahims78/Damascus-Health-Directorate/releases/latest)
+[![CI](https://github.com/ibrahims78/Damascus-Health-Directorate/actions/workflows/ci.yml/badge.svg)](https://github.com/ibrahims78/Damascus-Health-Directorate/actions/workflows/ci.yml)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Android-blue)](#-التنزيلات)
 [![License](https://img.shields.io/badge/license-Proprietary-red)](LICENSE)
 
@@ -17,7 +17,7 @@
 
 ## 📥 التنزيلات
 
-كل الإصدارات الجاهزة من صفحة [**Releases → Packages v4.3.0**](https://github.com/ibrahims78/Damascus-Health-Directorate-2/releases/tag/v4.3.0):
+كل الإصدارات الجاهزة من صفحة [**Releases → Packages v4.3.0**](https://github.com/ibrahims78/Damascus-Health-Directorate/releases/tag/v4.3.0):
 
 | الحزمة | المنصة | الوصف |
 |---|---|---|

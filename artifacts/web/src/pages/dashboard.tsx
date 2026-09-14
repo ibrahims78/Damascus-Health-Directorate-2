@@ -24,6 +24,9 @@ import {
   TrendingDown,
   TrendingUp,
   Archive,
+  Boxes,
+  BookOpen,
+  Truck,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -458,6 +461,30 @@ export function DashboardPage() {
               </Button>
             </Link>
           </div>
+        )}
+      </div>
+
+      {/* Shortcuts to the 4.3.0 sections (visible to every role: read-only pages) */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Link href="/inventory">
+          <Button size="sm" variant="outline" className="gap-1.5">
+            <Boxes className="h-3.5 w-3.5" aria-hidden="true" />
+            مركز المخزون
+          </Button>
+        </Link>
+        <Link href="/catalog">
+          <Button size="sm" variant="outline" className="gap-1.5">
+            <BookOpen className="h-3.5 w-3.5" aria-hidden="true" />
+            الكتالوج
+          </Button>
+        </Link>
+        {isWarehouse && (
+          <Link href="/transfers">
+            <Button size="sm" variant="outline" className="gap-1.5">
+              <Truck className="h-3.5 w-3.5" aria-hidden="true" />
+              التحويلات
+            </Button>
+          </Link>
         )}
       </div>
 

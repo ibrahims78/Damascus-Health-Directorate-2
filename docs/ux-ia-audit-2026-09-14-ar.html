@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>تدقيق الواجهة وإعادة التنظيم — دمشق 4.3.0</title>
+<style>
+  :root{--ink:#14181c;--soft:#4a545e;--paper:#fff;--tint:#f6f7f6;--rule:#d9dcda;--rule2:#b9bebc;--acc:#0f5f57;--accs:#e7f0ee;--warn:#8a4b12;--warns:#fbf2e6;--bad:#842029;--bads:#fbeaea;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:"Segoe UI","Tahoma",Arial,sans-serif;font-size:15.5px;line-height:1.9}
+  .sheet{max-width:1000px;margin:0 auto;padding:52px 38px 90px}
+  header.doc{border-bottom:2px solid var(--ink);padding-bottom:20px}
+  .eyebrow{font-size:12.5px;letter-spacing:.14em;color:var(--acc);font-weight:700;margin:0 0 12px}
+  h1{font-size:31px;line-height:1.35;margin:0 0 12px}
+  .sub{color:var(--soft);margin:0;max-width:72ch}
+  .meta{display:flex;flex-wrap:wrap;gap:6px 24px;margin-top:18px;font-size:13px;color:var(--soft)}
+  h2{font-size:20px;margin:48px 0 12px;padding-bottom:7px;border-bottom:1px solid var(--rule2)}
+  h3{font-size:16.5px;margin:26px 0 8px}
+  table{width:100%;border-collapse:collapse;margin:14px 0 20px;font-size:13.5px}
+  th,td{border:1px solid var(--rule);padding:8px 10px;vertical-align:top;text-align:right}
+  thead th{background:var(--tint);font-size:13px}
+  tbody tr:nth-child(even){background:#fbfcfb}
+  code{font-family:Consolas,monospace;font-size:12.5px;background:var(--tint);border:1px solid var(--rule);padding:1px 5px;direction:ltr;display:inline-block}
+  .box{border:1px solid var(--rule);background:var(--tint);padding:14px 16px;margin:16px 0}
+  .box.bad{background:var(--bads);border-color:#e3b7bb}
+  .box.warn{background:var(--warns);border-color:#e3c9a6}
+  .box.ok{background:var(--accs);border-color:#b9d6d0}
+  .tag{display:inline-block;font-size:11.5px;font-weight:700;padding:1px 7px;border:1px solid var(--rule2);border-radius:3px;background:#fff}
+  .tag.p0{color:var(--bad);border-color:#c9a0a4}
+  .tag.p1{color:var(--warn);border-color:#d8b58a}
+  .tag.ok{color:var(--acc);border-color:var(--acc)}
+  ul{margin:0 0 14px;padding-inline-start:20px}
+  li{margin-bottom:6px}
+  .small{font-size:12.5px;color:var(--soft)}
+  footer.doc{margin-top:56px;padding-top:14px;border-top:1px solid var(--rule);font-size:12.5px;color:var(--soft)}
+</style>
+</head>
+<body>
+<div class="sheet">
+
+<header class="doc">
+  <p class="eyebrow">تدقيق واجهة المستخدم — إعادة تنظيم</p>
+  <h1>تدقيق الصفحات والأزرار والحقول والصلاحيات<br>وتنظيم تقارير الطباعة — الإصدار 4.3.0</h1>
+  <p class="sub">مبني على فحص فعلي للكود: 27 مسارًا · 26 صفحة · القائمة الجانبية والترويسة · مصفوفة الصلاحيات · صفحات الطباعة.</p>
+  <div class="meta"><span><b>النطاق:</b> بنية المعلومات · الأزرار · الحقول · الصلاحيات · الطباعة</span><span><b>التاريخ:</b> 2026-09-14</span></div>
+</header>
+
+<h2>1 · ملخّص تنفيذي</h2>
+<div class="box bad">
+  <p style="margin:0"><b>الخلاصة:</b> المشكلة ليست في «شكل» الصفحات بل في <b>تنظيم المعلومات والصلاحيات</b>. التنقّل يعمل، لكن هناك <b>3 أخطاء صلاحيات</b>، <b>ازدواج مسار تعريف</b> (المواد والتجهيزات/الكتالوج)، و<b>عمليات تُعرض كأقسام</b> في القائمة الجانبية. إضافة صفحات 4.3.0 (الكتالوج · مركز المخزون · التحويلات) لم تُدمج في التنقّل ولوحة المعلومات، فظهر إحساس «الفوضى».</p>
+</div>
+
+<h2>2 · النتائج الفعلية من الكود</h2>
+
+<h3>2.1 أخطاء وظيفية وثغرات صلاحيات <span class="tag p0">P0</span></h3>
+<table>
+  <thead><tr><th style="width:34%">الملاحظة</th><th style="width:33%">الدليل في الكود</th><th>الأثر على المستخدم</th></tr></thead>
+  <tbody>
+    <tr><td><b>أزرار «العمليات» تظهر للمراقب</b> رغم أنه لا يملك تنفيذها</td><td><code>sidebar.tsx</code>: قائمة <code>movementItems</code> تُعرض بلا شرط دور، والمسارات مثل <code>/custody/out/new</code> ليست <code>adminOnly</code></td><td>المراقب يفتح نماذج تسليم/تلف ثم يُرفض عند الحفظ ⇒ زر «لا يعمل»</td></tr>
+    <tr><td><b>صفحة الطباعة مكشوفة</b></td><td><code>App.tsx</code>: <code>/print/:id</code> مضاف <b>بدون</b> <code>ProtectedRoute</code></td><td>يمكن فتح مستند حركة دون تسجيل دخول</td></tr>
+    <tr><td><b>«الإعدادات» متضاربة</b></td><td>مرئية للمدير فقط في القائمة، لكن مسارها <code>/settings</code> غير محدود بالدور</td><td>عدم اتساق: إخفاء في الواجهة وسماح في المسار</td></tr>
+    <tr><td><b>المراقب يرى أزرار الإضافة/الاستيراد؟</b></td><td>المواد/التجهيزات: مخفية بـ<code>canDefine</code> ✓ — لكن لوحة المعلومات تعرض اختصارات تنفيذية</td><td>اختصارات تُظهر للمراقب ما لا يستطيع فعله</td></tr>
+  </tbody>
+</table>
+
+<h3>2.2 مشاكل تنظيم المعلومات <span class="tag p1">P1</span></h3>
+<table>
+  <thead><tr><th style="width:30%">المشكلة</th><th style="width:36%">التفصيل</th><th>الأثر</th></tr></thead>
+  <tbody>
+    <tr><td><b>عمليات مُدرجة كأقسام</b></td><td>القائمة الجانبية تخلط أقسامًا (لوحة المعلومات · المواد · التجهيزات · التقارير) بعمليات فردية (تسليم عهدة · إعادة عهدة · تسجيل تلف · مرتجع مركزي)</td><td>القائمة تطول، والمستخدم لا يعرف «أين أبدأ العملية اليومية»</td></tr>
+    <tr><td><b>ازدواج التعريف</b></td><td><code>/items</code> و<code>/equipment</code> ما زالتا تحتويان إضافة/تعديل/استيراد (تعريف)، بينما <code>/catalog</code> هو المرجع الجديد للتعريف</td><td>مساران لنفس المهمة ⇒ التباس واختلاف صلاحيات</td></tr>
+    <tr><td><b>الكتالوج غير متماثل</b></td><td>زر «مادة جديدة» موجود، ولا يوجد «تجهيز جديد»</td><td>مهمة ناقصة من مكان واحد</td></tr>
+    <tr><td><b>التجهيز بلا صفحة تفاصيل</b></td><td><code>/equipment/:id</code> يُعيد صفحة القائمة، بينما المواد لها <code>/items/:id</code> (تفاصيل) </td><td>عدم اتساق في تجربة «فتح السجل»</td></tr>
+    <tr><td><b>الصفحات الجديدة غير مكتشفة</b></td><td>لوحة المعلومات لا تشير إلى <code>/catalog</code> · <code>/inventory</code> · <code>/transfers</code></td><td>المستخدم لا يجد ما أُضيف</td></tr>
+    <tr><td><b>فصل غير طبيعي للحركات</b></td><td><code>/transactions</code> تربط بالإدخال/الإخراج فقط، والعهد/التلف/المرتجع في القائمة الجانبية</td><td>الحركات موزّعة على مكانين</td></tr>
+    <tr><td><b>ازدواج عرض النواقص</b></td><td>لوحة المعلومات تربط إلى تبويبات التقارير، ومركز المخزون يعرض النواقص أيضًا</td><td>ازدواج مصدر للمعلومة نفسها</td></tr>
+  </tbody>
+</table>
+
+<h3>2.3 الحقول (الخانات)</h3>
+<table>
+  <thead><tr><th style="width:26%">الصفحة</th><th>الملاحظة والحقل المطلوب</th></tr></thead>
+  <tbody>
+    <tr><td>المواد</td><td>جدول العرض يحتاج <b>عمود المستودع</b> (بعد تعدد المستودعات) وإبراز التاريخ؛ والحد الأدنى أصبح <b>عامًا</b> فيُعرض مرة واحدة بلا لبس.</td></tr>
+    <tr><td>التجهيزات</td><td>يُضاف عمود <b>الرمز</b> (code) الذي أُضيف في 4.3.0 لكنه غير ظاهر في القائمة.</td></tr>
+    <tr><td>التحويلات</td><td>يحتاج <b>عمود الجهة</b> (من/إلى) بأسماء المستودعات لا الأرقام، و<b>الكمية الإجمالية</b> و<b>تاريخ الإنشاء</b>.</td></tr>
+    <tr><td>مركز المخزون</td><td>يُضاف فلتر <b>المستودع</b> ونطاق تاريخي للأرصدة.</td></tr>
+    <tr><td>التقارير</td><td>معظم التقارير بلا <b>تصفية بالمستودع</b> ولا <b>تصدير</b> — الأهم لدى الإدارة.</td></tr>
+  </tbody>
+</table>
+
+<h3>2.4 الأزرار ودلالاتها</h3>
+<ul>
+  <li><span class="tag ok">سليم</span> أزرار المواد/التجهيزات تُخفي «التعريف» عن أمين المستودع (<code>canDefine</code>).</li>
+  <li><span class="tag p1">يحتاج توحيدًا</span> تسميات الأفعال غير موحّدة (إضافة/جديد/تسجيل/تصدير/طباعة) وبعضها بلا أيقونة.</li>
+  <li><span class="tag p1">يحتاج نقلًا</span> أزرار «طلب تحويل/إرسال/استلام» مخفية داخل جدول التحويلات؛ الأنسب شريط أفعال أعلى الصفحة + أفعال على مستوى الصف.</li>
+  <li><span class="tag p1">مفقود</span> زر «طباعة» عام في صفحة الحركات وبطاقات التقارير، وزر «تصدير Excel» في كل تقرير.</li>
+</ul>
+
+<h2>3 · الصلاحيات: ما يظهر لمن <span class="tag p0">P0</span></h2>
+<p>المبدأ: <b>للمراقب لا يظهر أي زر تنفيذي</b>؛ ولأمين المستودع لا تظهر التعريفات ولا الإدارة.</p>
+<table>
+  <thead><tr><th style="width:30%">العنصر</th><th>المدير</th><th>أمين المستودع</th><th>المراقب</th></tr></thead>
+  <tbody>
+    <tr><td>لوحة المعلومات</td><td>✔ (مع اختصارات الإدارة)</td><td>✔ (اختصارات العمليات)</td><td>✔ (قراءة فقط)</td></tr>
+    <tr><td>الكتالوج (وحدات/مستودعات/تعريفات)</td><td>✔ كامل</td><td>قراءة</td><td>قراءة</td></tr>
+    <tr><td>المواد · التجهيزات</td><td>✔ كامل</td><td>قراءة + عمليات</td><td>قراءة</td></tr>
+    <tr><td>العمليات (إدخال/إخراج/عهد/تلف/مرتجع)</td><td>✔</td><td>✔</td><td><b>مخفية</b></td></tr>
+    <tr><td>التحويلات</td><td>✔</td><td>✔ (طلب/استلام)</td><td>قراءة</td></tr>
+    <tr><td>مركز المخزون · الترصيد</td><td>✔ كامل</td><td>بلا لوحة الترصيد</td><td>قراءة محدودة</td></tr>
+    <tr><td>التقارير الموحّدة</td><td>✔</td><td><b>مخفية</b></td><td>مخفية</td></tr>
+    <tr><td>الإدارة (مستخدمون · تدقيق · مزامنة · إعدادات)</td><td>✔</td><td><b>مخفية</b></td><td>مخفية</td></tr>
+  </tbody>
+</table>
+
+<h2>4 · إعادة التنظيم المقترحة (بنية المعلومات)</h2>
+<p>أقترح قائمة جانبية <b>بمجموعات قابلة للطي</b>، بحيث يصبح لكل مجموعة مهمة واضحة:</p>
+<table>
+  <thead><tr><th style="width:22%">المجموعة</th><th style="width:34%">العناصر</th><th>المهمة (لماذا هنا)</th></tr></thead>
+  <tbody>
+    <tr><td><b>الرئيسية</b></td><td>لوحة المعلومات · مركز المخزون</td><td>«ماذا يحدث الآن؟» و«ما حالة المخزون؟»</td></tr>
+    <tr><td><b>العمليات اليومية</b></td><td>إدخال · إخراج · تسليم عهدة · إعادة عهدة · تلف · مرتجع مركزي</td><td>كل ما ينفّذه أمين المستودع يوميًا في مكان واحد</td></tr>
+    <tr><td><b>المخزون والتحويلات</b></td><td>المواد · التجهيزات · التحويلات · سجل الحركات</td><td>الأرصدة والتتبع والنقل بين المواقع</td></tr>
+    <tr><td><b>الكتالوج والبيانات</b></td><td>الكتالوج (وحدات · مستودعات · مواد · تجهيزات)</td><td>تعريف مركزي واحد (لا ازدواج)</td></tr>
+    <tr><td><b>التقارير</b></td><td>التقارير التفصيلية · التقارير الموحّدة · سجل التدقيق</td><td>التحليل والرقابة</td></tr>
+    <tr><td><b>الإدارة</b> (مدير)</td><td>المستخدمون · المزامنة · الإعدادات · النسخ الاحتياطي</td><td>إدارة النظام والبيانات</td></tr>
+  </tbody>
+</table>
+
+<div class="box ok">
+  <p style="margin:0"><b>مكسب مباشر:</b> تقليص طول القائمة الجانبية من 16 عنصرًا مبعثرًا إلى <b>6 مجموعات</b>، مع <b>تسوية المسارات</b>: أي عنصر يظهر لمستخدم يجب أن يملكه فعلًا (وإلا لا يظهر).</p>
+</div>
+
+<h3>4.1 تعديلات الصفحات (توزيع المهام)</h3>
+<table>
+  <thead><tr><th style="width:22%">الصفحة</th><th style="width:34%">مهمتها</th><th>ما يجب تعديله</th></tr></thead>
+  <tbody>
+    <tr><td>المواد</td><td>أرصدة/تتبع + إجراءات صف</td><td>نقل «إضافة/استيراد» إلى الكتالوج؛ الإبقاء على عرض/تعديل جرد/طباعة</td></tr>
+    <tr><td>التجهيزات</td><td>أرصدة/حالة + إجراءات</td><td>إضافة عمود الرمز؛ إضافة صفحة تفاصيل موحّدة</td></tr>
+    <tr><td>الكتالوج</td><td>التعريف الوحيد</td><td>إضافة تبويب/زر «تجهيز جديد» بجانب «مادة جديدة»؛ إبراز أداة توحيد الوحدات</td></tr>
+    <tr><td>مركز المخزون</td><td>لوحة مراقبة</td><td>إضافة فلتر مستودع + روابط مباشرة للعمليات</td></tr>
+    <tr><td>التحويلات</td><td>دورة التحويل</td><td>شريط أفعال أعلى الصفحة + أعمدة أوضح + طباعة من الصف</td></tr>
+    <tr><td>الحركات</td><td>كل الحركات</td><td>تبويبات (الكل · إدخال · إخراج · عهد · تلف · مرتجع) وأزرار إنشاء موحّدة</td></tr>
+  </tbody>
+</table>
+
+<h2>5 · تقارير الطباعة: التقييم والتحديث المقترح</h2>
+<p><b>الحالي:</b> مستند حركة (<code>print-transaction.tsx</code>) يحتوي فعليًا: المادة/الجهاز · رقم السند · الكمية · الجهة المستلمة · اسم المستلم · سبب الخروج · رقم الدفعة — جيد. ومستند التحويل (<code>transfer-print.tsx</code>) أخف، وفيه خانات توقيع.</p>
+<table>
+  <thead><tr><th style="width:30%">التحسين المقترح</th><th>الفائدة</th></tr></thead>
+  <tbody>
+    <tr><td><b>حماية مسار الطباعة</b> بـ<code>ProtectedRoute</code> + تسجيل من طبع ومتى</td><td>سدّ ثغرة الوصول غير المصرّح</td></tr>
+    <tr><td><b>ترويسة موحّدة</b>: شعار المديرية · اسم المؤسسة · رقم المستند · التاريخ</td><td>مستند رسمي موحّد</td></tr>
+    <tr><td><b>المستودع والموقع</b> في كل مستند (نظرًا لتعدد المستودعات)</td><td>تحديد الجهة المخزنية بوضوح</td></tr>
+    <tr><td><b>الرصيد قبل/بعد</b> لكل حركة</td><td>تتبّع محاسبي كامل</td></tr>
+    <tr><td><b>خانات توقيع</b> موحّدة (أمين المستودع · المستلم · المدير) في كل مستند</td><td>قيمة إثباتية</td></tr>
+    <tr><td><b>رمز QR/باركود</b> لرقم المستند + رابط تحقق</td><td>تحقّق سريع ومنع التزوير</td></tr>
+    <tr><td><b>طباعة جماعية</b>: كشف جرد · كشف حركات فترة · كشف نواقص · كشف جردي للتجهيزات</td><td>احتياجات الجرد والمراجعة</td></tr>
+    <tr><td><b>تنصيف/نسخ</b>: «أصل/صورة» وحاشية بـ«الوثيقة غير صالحة بدون توقيع»</td><td>ممارسات المستندات الرسمية</td></tr>
+  </tbody>
+</table>
+
+<h2>6 · خطة التنفيذ المقترحة</h2>
+<table>
+  <thead><tr><th style="width:12%">الأولوية</th><th>النطاق</th><th style="width:18%">الأثر</th></tr></thead>
+  <tbody>
+    <tr><td><span class="tag p0">P0</span></td><td>سدّ ثغرة مسار الطباعة · إخفاء «العمليات» عن المراقب · توحيد حماية <code>/settings</code> · مزامنة الظهور مع الصلاحيات</td><td>أمان واتساق فوري</td></tr>
+    <tr><td><span class="tag p1">P1</span></td><td>إعادة بناء القائمة الجانبية إلى 6 مجموعات · نقل التعريف إلى الكتالوج بالكامل · إضافة «تجهيز جديد» · توحيد التنقّل من لوحة المعلومات</td><td>تنظيم واضح</td></tr>
+    <tr><td><span class="tag p1">P1</span></td><td>تحسين أعمدة المواد/التجهيزات/التحويلات · تبويبات صفحة الحركات · أزرار موحّدة</td><td>سهولة استخدام</td></tr>
+    <tr><td><span class="tag ok">P2</span></td><td>ترقية مستندات الطباعة (ترويسة · رصيد قبل/بعد · توقيعات · QR · تقارير جماعية)</td><td>قيمة إثباتية واحترافية</td></tr>
+  </tbody>
+</table>
+
+<footer class="doc">
+  أُعدّ التدقيق من الكود الفعلي: <code>App.tsx</code> · <code>components/layout/sidebar.tsx</code> و<code>header.tsx</code> · صفحات <code>pages/*</code> · مسارات الخادم <code>routes/*</code>.
+</footer>
+
+</div>
+</body>
+</html>

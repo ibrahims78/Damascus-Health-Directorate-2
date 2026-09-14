@@ -58,9 +58,12 @@ const queryClient = new QueryClient({
 function ProtectedRoute({
   component: Component,
   adminOnly = false,
+  roles,
 }: {
   component: ElementType;
   adminOnly?: boolean;
+  /** When set, only these roles may open the page. */
+  roles?: string[];
 }) {
   const [location, setLocation] = useLocation();
   const queryClient = useQueryClient();
@@ -123,6 +126,12 @@ function ProtectedRoute({
     return <AccessDeniedState onBack={() => setLocation('/')} />;
   }
 
+  // Operational screens (custody, damage, returns) are limited to the roles
+  // that can actually execute them - a viewer must never reach the form.
+  if (roles && roles.length > 0 && !roles.includes(user.role)) {
+    return <AccessDeniedState onBack={() => setLocation('/')} />;
+  }
+
   return (
     <Shell>
       <Component />
@@ -158,10 +167,10 @@ function Router() {
       <Route path="/transactions"><ProtectedRoute component={TransactionsPage} /></Route>
       <Route path="/transactions/in/new"><ProtectedRoute component={TransactionsPage} /></Route>
       <Route path="/transactions/out/new"><ProtectedRoute component={TransactionsPage} /></Route>
-      <Route path="/custody/out/new"><ProtectedRoute component={CustodyOutForm} /></Route>
-      <Route path="/custody/return/new"><ProtectedRoute component={CustodyReturnForm} /></Route>
-      <Route path="/damage/new"><ProtectedRoute component={DamageForm} /></Route>
-      <Route path="/central-return/new"><ProtectedRoute component={CentralReturnForm} /></Route>
+      <Route path="/custody/out/new"><ProtectedRoute component={CustodyOutForm} roles={["admin","warehouse_manager"]} /></Route>
+      <Route path="/custody/return/new"><ProtectedRoute component={CustodyReturnForm} roles={["admin","warehouse_manager"]} /></Route>
+      <Route path="/damage/new"><ProtectedRoute component={DamageForm} roles={["admin","warehouse_manager"]} /></Route>
+      <Route path="/central-return/new"><ProtectedRoute component={CentralReturnForm} roles={["admin","warehouse_manager"]} /></Route>
 
       <Route path="/reports"><ProtectedRoute component={ReportsPage} /></Route>
       <Route path="/help"><ProtectedRoute component={HelpPage} /></Route>
@@ -171,10 +180,10 @@ function Router() {
       <Route path="/audit"><ProtectedRoute component={AuditPage} adminOnly /></Route>
       <Route path="/sync"><ProtectedRoute component={SyncPage} adminOnly /></Route>
       <Route path="/change-password"><ProtectedRoute component={ChangePasswordPage} /></Route>
-      <Route path="/settings"><ProtectedRoute component={SettingsPage} /></Route>
+      <Route path="/settings"><ProtectedRoute component={SettingsPage} adminOnly /></Route>
 
       {/* Print Route (No shell) */}
-      <Route path="/print/:id" component={PrintTransactionPage} />
+      <Route path="/print/:id"><ProtectedRoute component={PrintTransactionPage} /></Route>
 
       <Route component={NotFound} />
     </Switch>

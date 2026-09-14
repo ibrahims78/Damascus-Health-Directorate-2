@@ -23,6 +23,9 @@ import {
   UserRoundCheck,
   Network,
   ChevronDown,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  ClipboardList,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEffect, useRef, useState } from 'react';
@@ -36,33 +39,83 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 
-const APP_VERSION = import.meta.env.VITE_APP_VERSION ?? "v4.0.3";
+const APP_VERSION = import.meta.env.VITE_APP_VERSION ?? "v4.3.0";
 const DESIGNER_NAME = 'إبراهيم الصيداوي';
 const DESIGNER_PHONE = '0933706403';
 
 const navItems = [
-  { href: '/',             label: 'لوحة التحكم',        icon: LayoutDashboard },
-  { href: '/items',        label: 'المواد والمستهلكات',  icon: Package },
-  { href: '/equipment',    label: 'التجهيزات الطبية',    icon: Stethoscope },
-  { href: '/catalog', label: 'الكتالوج', icon: BookOpen },
-  { href: '/inventory', label: 'مركز المخزون', icon: Boxes },
-  { href: '/transfers', label: 'التحويلات', icon: Truck },
-  { href: '/transactions', label: 'سجل العمليات',        icon: ArrowRightLeft },
-  { href: '/reports',      label: 'التقارير',             icon: FileText },
+  { href: '/',               label: 'لوحة المعلومات',  icon: LayoutDashboard },
+  { href: '/inventory',      label: 'مركز المخزون',     icon: Boxes },
 ];
 
-const movementItems = [
-  { href: '/custody/out/new',    label: 'تسليم عهدة شخصية', icon: UserRoundCheck },
-  { href: '/custody/return/new', label: 'إعادة عهدة',       icon: RotateCcw },
-  { href: '/damage/new',         label: 'تسجيل تلف',        icon: FileWarning },
-  { href: '/central-return/new', label: 'مرتجع مركزي',      icon: ArchiveRestore },
-];
+type NavGroup = {
+  id: string;
+  title: string;
+  icon: typeof LayoutDashboard;
+  roles?: string[];
+  items: { href: string; label: string; icon: typeof LayoutDashboard }[];
+};
 
-const adminItems = [
-  { href: '/users',    label: 'المستخدمين',  icon: Users },
-  { href: '/audit',    label: 'سجل التدقيق', icon: ShieldCheck },
-  { href: '/sync',     label: 'المزامنة والعقد', icon: Network },
-  { href: '/settings', label: 'الإعدادات',   icon: Settings },
+/**
+ * Sidebar information architecture: the sections are grouped by the task the
+ * user is trying to accomplish, and each group declares which roles may see it
+ * (an entry that a user cannot use must not be shown at all).
+ */
+const navGroups: NavGroup[] = [
+  {
+    id: 'stock',
+    title: 'المخزون والتحويلات',
+    icon: Package,
+    items: [
+      { href: '/items',        label: 'المواد',         icon: Package },
+      { href: '/equipment',    label: 'التجهيزات',      icon: Stethoscope },
+      { href: '/transfers',    label: 'التحويلات',      icon: Truck },
+      { href: '/transactions', label: 'سجل الحركات',    icon: ArrowRightLeft },
+    ],
+  },
+  {
+    id: 'ops',
+    title: 'العمليات اليومية',
+    icon: ClipboardList,
+    roles: ['admin', 'warehouse_manager'],
+    items: [
+      { href: '/transactions/in/new',   label: 'إدخال مواد',    icon: ArrowDownToLine },
+      { href: '/transactions/out/new',  label: 'إخراج مواد',    icon: ArrowUpFromLine },
+      { href: '/custody/out/new',       label: 'تسليم عهدة',    icon: UserRoundCheck },
+      { href: '/custody/return/new',    label: 'إعادة عهدة',    icon: RotateCcw },
+      { href: '/damage/new',            label: 'تسجيل تلف',     icon: FileWarning },
+      { href: '/central-return/new',    label: 'مرتجع مركزي',   icon: ArchiveRestore },
+    ],
+  },
+  {
+    id: 'catalog',
+    title: 'الكتالوج والبيانات',
+    icon: BookOpen,
+    roles: ['admin', 'warehouse_manager'],
+    items: [
+      { href: '/catalog', label: 'الكتالوج والوحدات', icon: BookOpen },
+    ],
+  },
+  {
+    id: 'reports',
+    title: 'التقارير',
+    icon: FileText,
+    items: [
+      { href: '/reports', label: 'التقارير التفصيلية', icon: FileText },
+    ],
+  },
+  {
+    id: 'admin',
+    title: 'الإدارة',
+    icon: Settings,
+    roles: ['admin'],
+    items: [
+      { href: '/users',    label: 'المستخدمون',    icon: Users },
+      { href: '/audit',    label: 'سجل التدقيق',   icon: ShieldCheck },
+      { href: '/sync',     label: 'المزامنة والربط', icon: Network },
+      { href: '/settings', label: 'الإعدادات',      icon: Settings },
+    ],
+  },
 ];
 
 export function Sidebar() {
@@ -70,15 +123,13 @@ export function Sidebar() {
   const { data: user } = useGetCurrentUser();
   const { collapsed, toggle } = useSidebar();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const [movementOpen, setMovementOpen] = useState(false);
-  const [adminOpen, setAdminOpen] = useState(false);
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const mobileToggleRef = useRef<HTMLButtonElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
 
   const isRouteActive = (href: string) =>
     href === '/' ? location === '/' : location.startsWith(href);
-  const movementActive = movementItems.some(item => isRouteActive(item.href));
-  const adminActive = adminItems.some(item => isRouteActive(item.href));
+  const groupActive = (items: { href: string }[]) => items.some((item) => isRouteActive(item.href));
 
   useEffect(() => {
     if (!isMobileOpen) return;
@@ -194,12 +245,9 @@ export function Sidebar() {
               <Link
                 href={item.href}
                 aria-label={item.label}
-                data-sidebar-first-link={item.href === navItems[0].href ? 'true' : undefined}
                 className={cn(
                   'flex items-center rounded-md text-sm font-medium transition-colors',
-                  collapsed
-                    ? 'justify-center p-2.5'
-                    : 'gap-3 px-3 py-2.5',
+                  collapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2',
                   isActive
                     ? 'bg-primary text-primary-foreground shadow-sm'
                     : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
@@ -211,135 +259,79 @@ export function Sidebar() {
               </Link>
             );
 
-            return (
-              <div key={item.href}>
-                {collapsed ? (
-                  <Tooltip>
-                    <TooltipTrigger asChild>{linkEl}</TooltipTrigger>
-                    <TooltipContent side="left" className="font-medium">
-                      {item.label}
-                    </TooltipContent>
-                  </Tooltip>
-                ) : linkEl}
-              </div>
-            );
+            return collapsed ? (
+              <Tooltip key={item.href}>
+                <TooltipTrigger asChild>{linkEl}</TooltipTrigger>
+                <TooltipContent side="left" className="font-medium">{item.label}</TooltipContent>
+              </Tooltip>
+            ) : <div key={item.href}>{linkEl}</div>;
           })}
 
-          {/* Secondary actions stay available, but do not compete with the
-              daily navigation until the user needs them. */}
-          <Collapsible
-            open={collapsed || movementOpen || movementActive}
-            onOpenChange={setMovementOpen}
-            className="pt-2"
-          >
-            {collapsed ? (
-              <div className="border-t mx-1 mb-2" />
-            ) : (
-              <CollapsibleTrigger asChild>
-                <button
-                  type="button"
-                  className={cn(
-                    'w-full flex items-center justify-between rounded-md px-3 py-2 text-[11px] font-semibold',
-                    'text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors',
-                    movementActive && 'text-foreground bg-secondary/60',
-                  )}
-                  aria-label="فتح عمليات العهد والأحداث"
-                >
-                  <span className="flex items-center gap-2">
-                    <RotateCcw className="w-4 h-4" />
-                    عمليات العهد والأحداث
-                  </span>
-                  <ChevronDown className={cn('w-4 h-4 transition-transform', (movementOpen || movementActive) && 'rotate-180')} />
-                </button>
-              </CollapsibleTrigger>
-            )}
-            <CollapsibleContent className="space-y-0.5 pt-1">
-              {movementItems.map(item => {
-                const Icon = item.icon;
-                const linkEl = (
-                  <Link
-                    href={item.href}
-                    aria-label={item.label}
-                    className={cn(
-                      'flex items-center rounded-md text-sm font-medium transition-colors',
-                      collapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2',
-                      isRouteActive(item.href)
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
-                    )}
-                    onClick={closeMobileMenu}
-                  >
-                    <Icon className="w-[18px] h-[18px] flex-shrink-0" aria-hidden="true" />
-                    {!collapsed && <span>{item.label}</span>}
-                  </Link>
-                );
-                return collapsed ? (
-                  <Tooltip key={item.href}>
-                    <TooltipTrigger asChild>{linkEl}</TooltipTrigger>
-                    <TooltipContent side="left" className="font-medium">{item.label}</TooltipContent>
-                  </Tooltip>
-                ) : <div key={item.href}>{linkEl}</div>;
-              })}
-            </CollapsibleContent>
-          </Collapsible>
+          {navGroups.map((group) => {
+            if (group.roles && !group.roles.includes(user?.role ?? '')) return null;
+            const Icon = group.icon;
+            const active = groupActive(group.items);
+            const open = collapsed || openGroups[group.id] === true || active;
 
-          {user?.role === 'admin' && (
-            <Collapsible
-              open={collapsed || adminOpen || adminActive}
-              onOpenChange={setAdminOpen}
-              className="pt-1"
-            >
-              {collapsed ? (
-                <div className="border-t mx-1 mb-2" />
-              ) : (
-                <CollapsibleTrigger asChild>
-                  <button
-                    type="button"
-                    className={cn(
-                      'w-full flex items-center justify-between rounded-md px-3 py-2 text-[11px] font-semibold',
-                      'text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors',
-                      adminActive && 'text-foreground bg-secondary/60',
-                    )}
-                    aria-label="فتح إدارة النظام"
-                  >
-                    <span className="flex items-center gap-2">
-                      <Settings className="w-4 h-4" />
-                      إدارة النظام
-                    </span>
-                    <ChevronDown className={cn('w-4 h-4 transition-transform', (adminOpen || adminActive) && 'rotate-180')} />
-                  </button>
-                </CollapsibleTrigger>
-              )}
-              <CollapsibleContent className="space-y-0.5 pt-1">
-                {adminItems.map(item => {
-                  const Icon = item.icon;
-                  const linkEl = (
-                    <Link
-                      href={item.href}
-                      aria-label={item.label}
+            return (
+              <Collapsible
+                key={group.id}
+                open={open}
+                onOpenChange={(value) => setOpenGroups((prev) => ({ ...prev, [group.id]: value }))}
+                className="pt-1"
+              >
+                {collapsed ? (
+                  <div className="border-t mx-1 mb-2" />
+                ) : (
+                  <CollapsibleTrigger asChild>
+                    <button
+                      type="button"
                       className={cn(
-                        'flex items-center rounded-md text-sm font-medium transition-colors',
-                        collapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2',
-                        isRouteActive(item.href)
-                          ? 'bg-primary text-primary-foreground shadow-sm'
-                          : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
+                        'w-full flex items-center justify-between rounded-md px-3 py-2 text-[11px] font-semibold',
+                        'text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors',
+                        active && 'text-foreground bg-secondary/60',
                       )}
-                      onClick={closeMobileMenu}
+                      aria-label={group.title}
                     >
-                      <Icon className="w-[18px] h-[18px] flex-shrink-0" aria-hidden="true" />
-                      {!collapsed && <span>{item.label}</span>}
-                    </Link>
-                  );
-                  return collapsed ? (
-                    <Tooltip key={item.href}>
-                      <TooltipTrigger asChild>{linkEl}</TooltipTrigger>
-                      <TooltipContent side="left" className="font-medium">{item.label}</TooltipContent>
-                    </Tooltip>
-                  ) : <div key={item.href}>{linkEl}</div>;
-                })}
-              </CollapsibleContent>
-            </Collapsible>
-          )}
+                      <span className="flex items-center gap-2">
+                        <Icon className="w-4 h-4" />
+                        {group.title}
+                      </span>
+                      <ChevronDown className={cn('w-4 h-4 transition-transform', open && 'rotate-180')} />
+                    </button>
+                  </CollapsibleTrigger>
+                )}
+                <CollapsibleContent className="space-y-0.5 pt-1">
+                  {group.items.map((item) => {
+                    const ItemIcon = item.icon;
+                    const linkEl = (
+                      <Link
+                        href={item.href}
+                        aria-label={item.label}
+                        className={cn(
+                          'flex items-center rounded-md text-sm font-medium transition-colors',
+                          collapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2',
+                          isRouteActive(item.href)
+                            ? 'bg-primary text-primary-foreground shadow-sm'
+                            : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
+                        )}
+                        onClick={closeMobileMenu}
+                      >
+                        <ItemIcon className="w-[18px] h-[18px] flex-shrink-0" aria-hidden="true" />
+                        {!collapsed && <span>{item.label}</span>}
+                      </Link>
+                    );
+                    return collapsed ? (
+                      <Tooltip key={item.href}>
+                        <TooltipTrigger asChild>{linkEl}</TooltipTrigger>
+                        <TooltipContent side="left" className="font-medium">{item.label}</TooltipContent>
+                      </Tooltip>
+                    ) : <div key={item.href}>{linkEl}</div>;
+                  })}
+                </CollapsibleContent>
+              </Collapsible>
+            );
+          })}
         </nav>
 
         {/* Footer: version + designer signature */}
