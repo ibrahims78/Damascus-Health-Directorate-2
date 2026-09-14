@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useRoute, useLocation } from 'wouter';
+﻿import { useState, useEffect } from 'react';
+import { useRoute, useLocation, Link } from 'wouter';
 import { useListTransactions, type Transaction } from '@workspace/api-client-react';
 import {
   ChevronRight,
@@ -55,7 +55,7 @@ type TypeFilter =
   | 'central_return';
 type ItemTypeFilter = 'all' | 'item' | 'equipment';
 
-/** Debounce a value by `delay` ms — avoids a new API call on every keystroke */
+/** Debounce a value by `delay` ms â€” avoids a new API call on every keystroke */
 function useDebounce<T>(value: T, delay = 400): T {
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
@@ -69,19 +69,19 @@ function typeBadge(type: string) {
   if (type === 'in')
     return (
       <Badge className="bg-success/15 text-success border-success/30 border text-xs font-medium">
-        إدخال
+        Ø¥Ø¯Ø®Ø§Ù„
       </Badge>
     );
   if (type === 'out')
     return (
       <Badge variant="destructive" className="text-xs font-medium">
-        إخراج
+        Ø¥Ø®Ø±Ø§Ø¬
       </Badge>
     );
   if (type === 'adjust')
     return (
       <Badge className="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700 border text-xs font-medium">
-        تسوية جرد
+        ØªØ³ÙˆÙŠØ© Ø¬Ø±Ø¯
       </Badge>
     );
   return (
@@ -90,14 +90,14 @@ function typeBadge(type: string) {
       className={`text-xs font-medium ${type === 'custody_out' || type === 'custody_return' ? 'border-blue-300 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : type === 'damage' ? 'border-red-300 bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' : type === 'central_return' ? 'border-purple-300 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' : ''}`}
     >
       {type === 'custody_out'
-        ? 'تسليم عهدة'
+        ? 'ØªØ³Ù„ÙŠÙ… Ø¹Ù‡Ø¯Ø©'
         : type === 'custody_return'
-          ? 'إعادة عهدة'
+          ? 'Ø¥Ø¹Ø§Ø¯Ø© Ø¹Ù‡Ø¯Ø©'
           : type === 'damage'
-            ? 'تلف'
+            ? 'ØªÙ„Ù'
             : type === 'central_return'
-              ? 'مرتجع مركزي'
-              : 'رصيد افتتاحي'}
+              ? 'Ù…Ø±ØªØ¬Ø¹ Ù…Ø±ÙƒØ²ÙŠ'
+              : 'Ø±ØµÙŠØ¯ Ø§ÙØªØªØ§Ø­ÙŠ'}
     </Badge>
   );
 }
@@ -123,7 +123,7 @@ function TransactionsList() {
   });
   const search = useDebounce(searchInput, 400);
   const dateRangeError = fromDate && toDate && fromDate > toDate
-    ? 'تاريخ البداية لا يمكن أن يتجاوز تاريخ النهاية'
+    ? 'ØªØ§Ø±ÙŠØ® Ø§Ù„Ø¨Ø¯Ø§ÙŠØ© Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø£Ù† ÙŠØªØ¬Ø§ÙˆØ² ØªØ§Ø±ÙŠØ® Ø§Ù„Ù†Ù‡Ø§ÙŠØ©'
     : '';
 
   useEffect(() => {
@@ -172,14 +172,14 @@ function TransactionsList() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-2xl font-bold tracking-tight">سجل العمليات</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Ø³Ø¬Ù„ Ø§Ù„Ø¹Ù…Ù„ÙŠØ§Øª</h1>
         <div className="flex gap-2">
           <Button
             onClick={() => setLocation('/transactions/in/new')}
             className="gap-2 bg-success hover:bg-success/90 text-white"
           >
             <PackagePlus className="w-4 h-4" />
-            إدخال مادة
+            Ø¥Ø¯Ø®Ø§Ù„ Ù…Ø§Ø¯Ø©
           </Button>
           <Button
             onClick={() => setLocation('/transactions/out/new')}
@@ -187,7 +187,7 @@ function TransactionsList() {
             className="gap-2"
           >
             <PackageMinus className="w-4 h-4" />
-            إخراج مادة
+            Ø¥Ø®Ø±Ø§Ø¬ Ù…Ø§Ø¯Ø©
           </Button>
         </div>
       </div>
@@ -198,7 +198,7 @@ function TransactionsList() {
         <div className="relative">
           <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           <Input
-            placeholder="بحث برقم السند أو اسم المادة أو الجهة المستلمة..."
+            placeholder="Ø¨Ø­Ø« Ø¨Ø±Ù‚Ù… Ø§Ù„Ø³Ù†Ø¯ Ø£Ùˆ Ø§Ø³Ù… Ø§Ù„Ù…Ø§Ø¯Ø© Ø£Ùˆ Ø§Ù„Ø¬Ù‡Ø© Ø§Ù„Ù…Ø³ØªÙ„Ù…Ø©..."
             value={searchInput}
             onChange={(e) => {
               setSearchInput(e.target.value);
@@ -210,7 +210,7 @@ function TransactionsList() {
             <button
               onClick={() => { setSearchInput(''); setPage(1); }}
               className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              aria-label="مسح البحث"
+              aria-label="Ù…Ø³Ø­ Ø§Ù„Ø¨Ø­Ø«"
             >
               <X className="h-4 w-4" />
             </button>
@@ -219,7 +219,7 @@ function TransactionsList() {
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-foreground/80">نوع العملية</label>
+            <label className="text-sm font-medium text-foreground/80">Ù†ÙˆØ¹ Ø§Ù„Ø¹Ù…Ù„ÙŠØ©</label>
             <Select
               value={typeFilter}
               onValueChange={(v) => {
@@ -231,20 +231,20 @@ function TransactionsList() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">الكل</SelectItem>
-                <SelectItem value="in">إدخال فقط</SelectItem>
-                <SelectItem value="out">إخراج فقط</SelectItem>
-                <SelectItem value="adjust">تسوية جرد فقط</SelectItem>
-                <SelectItem value="custody_out">تسليم عهدة فقط</SelectItem>
-                <SelectItem value="custody_return">إعادة عهدة فقط</SelectItem>
-                <SelectItem value="damage">تلف فقط</SelectItem>
-                <SelectItem value="central_return">مرتجع مركزي فقط</SelectItem>
+                <SelectItem value="all">Ø§Ù„ÙƒÙ„</SelectItem>
+                <SelectItem value="in">Ø¥Ø¯Ø®Ø§Ù„ ÙÙ‚Ø·</SelectItem>
+                <SelectItem value="out">Ø¥Ø®Ø±Ø§Ø¬ ÙÙ‚Ø·</SelectItem>
+                <SelectItem value="adjust">ØªØ³ÙˆÙŠØ© Ø¬Ø±Ø¯ ÙÙ‚Ø·</SelectItem>
+                <SelectItem value="custody_out">ØªØ³Ù„ÙŠÙ… Ø¹Ù‡Ø¯Ø© ÙÙ‚Ø·</SelectItem>
+                <SelectItem value="custody_return">Ø¥Ø¹Ø§Ø¯Ø© Ø¹Ù‡Ø¯Ø© ÙÙ‚Ø·</SelectItem>
+                <SelectItem value="damage">ØªÙ„Ù ÙÙ‚Ø·</SelectItem>
+                <SelectItem value="central_return">Ù…Ø±ØªØ¬Ø¹ Ù…Ø±ÙƒØ²ÙŠ ÙÙ‚Ø·</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-foreground/80">نوع الصنف</label>
+            <label className="text-sm font-medium text-foreground/80">Ù†ÙˆØ¹ Ø§Ù„ØµÙ†Ù</label>
             <Select
               value={itemTypeFilter}
               onValueChange={(v) => {
@@ -256,15 +256,15 @@ function TransactionsList() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">الكل</SelectItem>
-                <SelectItem value="item">مادة / مستهلك</SelectItem>
-                <SelectItem value="equipment">تجهيز / معدة</SelectItem>
+                <SelectItem value="all">Ø§Ù„ÙƒÙ„</SelectItem>
+                <SelectItem value="item">Ù…Ø§Ø¯Ø© / Ù…Ø³ØªÙ‡Ù„Ùƒ</SelectItem>
+                <SelectItem value="equipment">ØªØ¬Ù‡ÙŠØ² / Ù…Ø¹Ø¯Ø©</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-foreground/80">من تاريخ</label>
+            <label className="text-sm font-medium text-foreground/80">Ù…Ù† ØªØ§Ø±ÙŠØ®</label>
             <Input
               type="date"
               value={fromDate}
@@ -276,7 +276,7 @@ function TransactionsList() {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-foreground/80">إلى تاريخ</label>
+            <label className="text-sm font-medium text-foreground/80">Ø¥Ù„Ù‰ ØªØ§Ø±ÙŠØ®</label>
             <Input
               type="date"
               value={toDate}
@@ -296,7 +296,7 @@ function TransactionsList() {
               onClick={resetFilters}
               className="text-muted-foreground h-7 text-xs"
             >
-              إعادة ضبط الفلاتر
+              Ø¥Ø¹Ø§Ø¯Ø© Ø¶Ø¨Ø· Ø§Ù„ÙÙ„Ø§ØªØ±
             </Button>
           </div>
         )}
@@ -313,13 +313,13 @@ function TransactionsList() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>رقم السند</TableHead>
-                <TableHead>التاريخ</TableHead>
-                <TableHead>النوع</TableHead>
-                <TableHead>الصنف</TableHead>
-                <TableHead className="text-center">الكمية</TableHead>
-                <TableHead>الجهة المستلمة</TableHead>
-                <TableHead>المستخدم</TableHead>
+                <TableHead>Ø±Ù‚Ù… Ø§Ù„Ø³Ù†Ø¯</TableHead>
+                <TableHead>Ø§Ù„ØªØ§Ø±ÙŠØ®</TableHead>
+                <TableHead>Ø§Ù„Ù†ÙˆØ¹</TableHead>
+                <TableHead>Ø§Ù„ØµÙ†Ù</TableHead>
+                <TableHead className="text-center">Ø§Ù„ÙƒÙ…ÙŠØ©</TableHead>
+                <TableHead>Ø§Ù„Ø¬Ù‡Ø© Ø§Ù„Ù…Ø³ØªÙ„Ù…Ø©</TableHead>
+                <TableHead>Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
@@ -329,7 +329,7 @@ function TransactionsList() {
                   <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
                     <div className="flex flex-col items-center gap-2">
                       <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
-                      <span>جاري التحميل...</span>
+                      <span>Ø¬Ø§Ø±ÙŠ Ø§Ù„ØªØ­Ù…ÙŠÙ„...</span>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -337,8 +337,8 @@ function TransactionsList() {
                 <TableRow>
                   <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
                     {hasFilters
-                      ? 'لا توجد عمليات تطابق الفلاتر المحددة'
-                      : 'لا توجد عمليات مسجلة بعد — ابدأ بتسجيل إدخال أو إخراج'}
+                      ? 'Ù„Ø§ ØªÙˆØ¬Ø¯ Ø¹Ù…Ù„ÙŠØ§Øª ØªØ·Ø§Ø¨Ù‚ Ø§Ù„ÙÙ„Ø§ØªØ± Ø§Ù„Ù…Ø­Ø¯Ø¯Ø©'
+                      : 'Ù„Ø§ ØªÙˆØ¬Ø¯ Ø¹Ù…Ù„ÙŠØ§Øª Ù…Ø³Ø¬Ù„Ø© Ø¨Ø¹Ø¯ â€” Ø§Ø¨Ø¯Ø£ Ø¨ØªØ³Ø¬ÙŠÙ„ Ø¥Ø¯Ø®Ø§Ù„ Ø£Ùˆ Ø¥Ø®Ø±Ø§Ø¬'}
                   </TableCell>
                 </TableRow>
               ) : (
@@ -351,7 +351,10 @@ function TransactionsList() {
                       <TableCell className="font-mono text-xs text-muted-foreground">
                         <span className="inline-flex items-center gap-1">
                           {tx.documentNumber}
-                          <CopyButton value={tx.documentNumber} label="رقم السند" />
+                          <CopyButton value={tx.documentNumber} label="Ø±Ù‚Ù… Ø§Ù„Ø³Ù†Ø¯" />
+                          <Link href={`/print/${tx.id}`} aria-label="Ø·Ø¨Ø§Ø¹Ø© Ø§Ù„Ù…Ø³ØªÙ†Ø¯" title="Ø·Ø¨Ø§Ø¹Ø© Ø§Ù„Ù…Ø³ØªÙ†Ø¯" className="text-muted-foreground hover:text-primary">
+                            <Printer className="h-3.5 w-3.5" />
+                          </Link>
                         </span>
                       </TableCell>
                       <TableCell className="text-sm whitespace-nowrap">
@@ -360,9 +363,9 @@ function TransactionsList() {
                       <TableCell>{typeBadge(tx.type)}</TableCell>
                       <TableCell>
                         <div>
-                          <div className="font-medium text-sm">{itemName || '—'}</div>
+                          <div className="font-medium text-sm">{itemName || 'â€”'}</div>
                           <div className="text-xs text-muted-foreground">
-                            {tx.itemType === 'equipment' ? 'تجهيز' : 'مادة'}
+                            {tx.itemType === 'equipment' ? 'ØªØ¬Ù‡ÙŠØ²' : 'Ù…Ø§Ø¯Ø©'}
                           </div>
                         </div>
                       </TableCell>
@@ -377,11 +380,11 @@ function TransactionsList() {
                             ) : null}
                           </span>
                         ) : (
-                          <span className="text-muted-foreground">—</span>
+                          <span className="text-muted-foreground">â€”</span>
                         )}
                       </TableCell>
                       <TableCell className="text-sm">
-                        {tx.recipientName || '—'}
+                        {tx.recipientName || 'â€”'}
                         {tx.recipientPerson && (
                           <div className="text-xs text-muted-foreground">
                             {tx.recipientPerson}
@@ -389,7 +392,7 @@ function TransactionsList() {
                         )}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
-                        {tx.createdByName || '—'}
+                        {tx.createdByName || 'â€”'}
                       </TableCell>
                       <TableCell>
                         <Button
@@ -398,7 +401,7 @@ function TransactionsList() {
                           onClick={() => {
                             window.open(`/print/${tx.id}`, '_blank');
                           }}
-                          title="طباعة / عرض السند"
+                          title="Ø·Ø¨Ø§Ø¹Ø© / Ø¹Ø±Ø¶ Ø§Ù„Ø³Ù†Ø¯"
                           className="h-8 w-8"
                         >
                           <Printer className="h-4 w-4" />
@@ -416,8 +419,8 @@ function TransactionsList() {
         {data && data.total > PAGE_SIZE && (
           <div className="flex items-center justify-between px-4 py-3 border-t text-sm">
             <span className="text-muted-foreground">
-              إجمالي <strong>{data.total}</strong> عملية — صفحة{' '}
-              <strong>{page}</strong> من <strong>{totalPages}</strong>
+              Ø¥Ø¬Ù…Ø§Ù„ÙŠ <strong>{data.total}</strong> Ø¹Ù…Ù„ÙŠØ© â€” ØµÙØ­Ø©{' '}
+              <strong>{page}</strong> Ù…Ù† <strong>{totalPages}</strong>
             </span>
             <div className="flex gap-1">
               <Button
@@ -445,3 +448,4 @@ function TransactionsList() {
     </div>
   );
 }
+

@@ -441,6 +441,22 @@ function AdjustmentDetailsBlock({ details, itemName }: { details: unknown; itemN
           {row('المرجع', itemName ?? '—')}
         </tbody>
       </table>
+
+      {/* Signatures + validity note (official document practice) */}
+      <div style={{ marginTop: "26px", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "18px", fontSize: "13px" }}>
+        {
+          ["أمين المستودع المُسلِّم", "أمين المستودع المستلِم", "المدير"].map((label) => (
+          <div key={label} style={{ borderTop: "1px solid #374151", paddingTop: "6px" }}>
+            <div style={{ fontWeight: 600 }}>{label}</div>
+            <div style={{ color: "#6b7280", fontSize: "12px", marginTop: "2px" }}>الاسم: ....................</div>
+            <div style={{ color: "#6b7280", fontSize: "12px" }}>التوقيع: ....................</div>
+          </div>
+          ))
+        }
+      </div>
+      <p style={{ marginTop: "14px", fontSize: "11px", color: "#6b7280", textAlign: "center" }}>
+        هذه الوثيقة غير صالحة بدون توقيع أمين المستودع. تُحفظ نسخة أصلية ونسخة صورة.
+      </p>
     </div>
   );
 }
