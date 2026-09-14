@@ -4,6 +4,7 @@ import { Printer, ArrowRight, FileDown, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatDateTime } from '@/lib/utils';
 import logoUrl from '@assets/damascus-health-directorate-logo.png';
+import { Barcode } from '@/components/barcode';
 import { Capacitor } from '@capacitor/core';
 import { nativeFileActions } from '@/lib/native-file-actions';
 
@@ -362,6 +363,20 @@ export function PrintTransactionPage() {
       <div className="print-hidden text-center text-xs text-gray-400 mb-4">
         لحفظ السند كملف PDF: اضغط "حفظ كـ PDF" ثم اختر "حفظ كـ PDF" من نافذة الطباعة
       </div>
+
+      <div style={{ marginTop: '18px', display: 'flex', justifyContent: 'center' }}>
+        <Barcode value={data.transaction?.documentNumber ?? ''} />
+      </div>
+
+      <div style={{ marginTop: '24px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '18px' }}>
+        <SignatureBox title="أمين المستودع المُسلِّم" />
+        <SignatureBox title="أمين المستودع المستلِم" />
+        <SignatureBox title="المدير" />
+      </div>
+
+      <p style={{ marginTop: '14px', fontSize: '11px', color: '#6b7280', textAlign: 'center' }}>
+        "هذه الوثيقة غير صالحة بدون توقيع أمين المستودع. تُحفظ نسخة أصلية ونسخة صورة."
+      </p>
     </div>
   );
 }
@@ -441,22 +456,6 @@ function AdjustmentDetailsBlock({ details, itemName }: { details: unknown; itemN
           {row('المرجع', itemName ?? '—')}
         </tbody>
       </table>
-
-      {/* Signatures + validity note (official document practice) */}
-      <div style={{ marginTop: "26px", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "18px", fontSize: "13px" }}>
-        {
-          ["أمين المستودع المُسلِّم", "أمين المستودع المستلِم", "المدير"].map((label) => (
-          <div key={label} style={{ borderTop: "1px solid #374151", paddingTop: "6px" }}>
-            <div style={{ fontWeight: 600 }}>{label}</div>
-            <div style={{ color: "#6b7280", fontSize: "12px", marginTop: "2px" }}>الاسم: ....................</div>
-            <div style={{ color: "#6b7280", fontSize: "12px" }}>التوقيع: ....................</div>
-          </div>
-          ))
-        }
-      </div>
-      <p style={{ marginTop: "14px", fontSize: "11px", color: "#6b7280", textAlign: "center" }}>
-        هذه الوثيقة غير صالحة بدون توقيع أمين المستودع. تُحفظ نسخة أصلية ونسخة صورة.
-      </p>
     </div>
   );
 }
