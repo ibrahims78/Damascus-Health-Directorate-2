@@ -1,39 +1,43 @@
-كيفية إعادة دمج حزم ويندوز 4.3.0 (الأجزاء المرفوعة على GitHub)
-================================================================
+Damascus Health Directorate 4.3.0 — كيف تُنزّل الحزم
+====================================================
 
-رفعتُ حزمتي ويندوز على 44 جزءًا (8 ميجابايت لكل جزء) لأن الشبكة المتاحة لا تتحمّل
-رفع ملف واحد كبير. الأجزاء كاملة على صفحة الإصدار v4.3.0.
+الحزم الكاملة تُنشر **غير مجزّأة** كمُرفقات في صفحة الإصدارات (GitHub Releases):
 
-الملفات
+    https://github.com/ibrahims78/Damascus-Health-Directorate-2/releases/tag/v4.3.0-catalog-import
+
+نزّل مباشرة:
+  - Damascus-Health-Directorate-4.3.0-Portable-Windows-x64.zip    (158.7 MB)
+  - Damascus-Health-Directorate-4.3.0-Protected-Windows-x64.zip   (158.7 MB)
+  - Damascus-Health-Directorate-v4.3.0-Android-Offline.apk        (7.9 MB)
+  - Damascus-Health-Directorate-v4.3.0-Android-Protected.apk      (7.9 MB)
+  - RELEASE-SHA256SUMS-4.3.0.txt                                  (البصمات)
+
+لا يوجد أي تقسيم ولا حاجة لأي دمج.
+
+
+لماذا هذه المجلدات في المستودع لا تحتوي الحزم الكاملة؟
+-----------------------------------------------------
+لأن أي ملف أكبر من 100 ميجابايت لا يقبله git داخل المستودع (قاعدة GitHub الصارمة)،
+بينما مرفقات الإصدارات (Release assets) تسمح حتى 2 جيجابايت للملف الواحد. لذلك:
+  - المستودع يحمل الكود + تعريفات الإصدار + ملفَّي APK (8 ميجابايت لكلٍّ، أقل من الحد).
+  - الحزم الكاملة (158.7 ميجابايت) تُحمّل من صفحة الإصدارات أعلاه.
+
+
+التحقّق بعد التنزيل
+-------------------
+    certutil -hashfile <الملف> SHA256
+
+البصمات المتوقّعة:
+    Portable  ZIP : D81F86D1B0C02E0842200DDB2A445ABB022BFC18AB1E541E52DC79D4E648642B
+    Protected ZIP : 8326A692496FBEB8DBF54D5B6C3FB8AA3FEBF7C02F55A8FE2FB8C057CC08E05C
+    Android Offline APK   : 5AFBFD14F5E21BA3D90D0EE9B10931E332B6C265FB84E71681B2B0035504BC00
+    Android Protected APK : F2B5B198ADAF3D19A9D8020E9CBE3E2FE3BA5C39CBB9A7479C5E44A286329E50
+
+
+التشغيل
 -------
-  Portable  : Damascus-Health-Directorate-4.3.0-Portable-Windows-x64.zip.p001 ... p022
-  Protected : Damascus-Health-Directorate-4.3.0-Protected-Windows-x64.zip.p001 ... p022
+  - ويندوز: فُكّ الضغط ثم شغّل "Damascus Health Directorate.exe".
+            نسخة Protected تطلب مفتاح تفعيل 4.3.0 (من مجموعة التفعيل لدى الجهة المالكة).
+  - أندرويد: ثبّت الـAPK مباشرة. نسخة Protected تطلب مفتاح تفعيل 4.3.0.
 
-خطوات الدمج على Windows (PowerShell)
-------------------------------------
-1) أنشئ مجلدًا فارغًا ونزّل فيه أجزاء الحزمة المطلوبة.
-2) افتح PowerShell داخل المجلد، ثم شغّل (مثال الحزمة المحمولة):
-
-   $parts = Get-ChildItem "Damascus-Health-Directorate-4.3.0-Portable-Windows-x64.zip.p*" | Sort-Object Name
-   $out = [System.IO.File]::Create("Damascus-Health-Directorate-4.3.0-Portable-Windows-x64.zip")
-   foreach ($p in $parts) { $b = [System.IO.File]::ReadAllBytes($p.FullName); $out.Write($b,0,$b.Length) }
-   $out.Close()
-
-   وللحزمة المحمية كرّر بتبديل الاسم إلى: ...-Protected-Windows-x64.zip
-
-3) تحقّق من البصمة بعد الدمج:
-
-   (Get-FileHash ".\Damascus-Health-Directorate-4.3.0-Portable-Windows-x64.zip" -Algorithm SHA256).Hash
-   (Get-FileHash ".\Damascus-Health-Directorate-4.3.0-Protected-Windows-x64.zip" -Algorithm SHA256).Hash
-
-البصمات المرجعية
-----------------
-  Portable  : A39C8754FB5C4BEFC01A34D3CC88EA80C8861CBBA31C7EA68CA4CE0B60EC350
-  Protected : 7F6DBB8FC7DFA1B6F2CE8676D917AF3EE55EDEF5CB60388A5F3D2C6997F01613
-
-ملاحظة: إن طابقت البصمة فالحزمة سليمة تمامًا؛ فُكّ الضغط ثم شغّل:
-  "Damascus Health Directorate.exe"
-
-بديل أبسط (سطر أوامر واحد)
---------------------------
-  copy /b Portable...p001+Portable...p002+...+Portable...p022 الحزمة.zip
+كل الحزم تشمل ميزة استيراد الكتالوج (المواد والتجهيزات) من Excel، وأيضًا في نسخة الهاتف.
