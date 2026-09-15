@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Printer } from 'lucide-react';
+import { Barcode } from '@/components/barcode';
 
 type Line = { id: number; itemId: number; quantity: number; unit: string | null; batchNumber: string | null; expiryDate: string | null; item: { id: number; code: string | null; name: string; unit: string } | null };
 
@@ -57,6 +58,10 @@ export function TransferPrintPage() {
           <h1 className="text-xl font-bold">مديرية صحة دمشق</h1>
           <p className="text-sm">مستند تحويل مخزني بين المستودعات</p>
         </header>
+
+        <div className="mt-3 flex justify-center">
+          <Barcode value={data.code} />
+        </div>
 
         <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
           <div><dt className="inline text-muted-foreground">رقم التحويل: </dt><dd className="inline font-mono font-bold">{data.code}</dd></div>

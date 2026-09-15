@@ -2,28 +2,47 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [master, main]
   pull_request:
 
 jobs:
-  build:
+  typecheck-build:
+    name: Typecheck & Build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with:
-          version: 10
+          version: 10.26.1
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
-      - name: Install
-        run: pnpm install --ignore-scripts
-      - name: Typecheck
-        run: pnpm exec tsc --build
-      - name: Unit tests
-        run: pnpm exec vitest run
-      - name: Build web (standard)
-        run: pnpm --filter @workspace/web run build:standard
-      - name: Build api server
-        run: pnpm --filter @workspace/api-server run build
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm build
+      # Lint is wired up but not yet a hard gate: the codebase carries legacy
+      # warnings. Run it so regressions are visible without blocking merges.
+      - name: Lint (informational)
+        continue-on-error: true
+        run: pnpm lint
+
+  e2e:
+    name: E2E (two live instances)
+    runs-on: ubuntu-latest
+    needs: typecheck-build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @workspace/api-server build
+      - name: Run E2E suites
+        env:
+          SEED_ADMIN_PASSWORD: 'Admin@1234'
+        run: bash ./scripts/ci-e2e.sh

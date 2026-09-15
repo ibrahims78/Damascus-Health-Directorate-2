@@ -1,9 +1,16 @@
 import { dmePackageSummary, readDmeSyncPackageInWorker, writeDmeSyncPackage } from './dme-sync-browser';
 import {
+  type CatalogAnalysis,
+  type CatalogEquipmentRow,
+  type CatalogImportMode,
+  type CatalogItemRow,
+  type CatalogValidationContext,
   createCategoryLookup,
   createUnitLookup,
   DEFAULT_INVENTORY_UNITS,
   normalizeHeader,
+  validateCatalogEquipmentRows,
+  validateCatalogItemRows,
   validateInventoryOpeningBatchRows,
   validateInventoryImportRows,
 } from '@workspace/api-zod';
@@ -670,6 +677,80 @@ function recordOfflineChange(
     });
   }
   return { changeId, operationId, globalId };
+}
+
+function catalogMode(value: unknown): CatalogImportMode {
+  return value === 'add-only' ? 'add-only' : 'add-and-update';
+}
+
+function catalogRows(value: unknown): Array<Record<string, unknown>> {
+  return Array.isArray(value)
+    ? value.filter((entry): entry is Record<string, unknown> => Boolean(entry) && typeof entry === 'object')
+    : [];
+}
+
+/**
+ * Reference context for the catalog import.
+ *
+ * Offline there is no server-side units table, so the accepted units are the
+ * shared default inventory units plus every unit already present locally; the
+ * categories come from the local catalog. Rules stay identical to the server
+ * because both sides call the same validators from @workspace/api-zod.
+ */
+function catalogContext(state: OfflineState, mode: CatalogImportMode): CatalogValidationContext {
+  const knownUnits = new Set<string>();
+  for (const unit of DEFAULT_INVENTORY_UNITS) knownUnits.add(unit);
+  for (const item of state.items) {
+    const unit = text(item.unit);
+    if (unit) knownUnits.add(unit);
+  }
+  if (state.settings.unitsList) {
+    try {
+      const parsed = JSON.parse(state.settings.unitsList) as unknown;
+      if (Array.isArray(parsed)) {
+        for (const entry of parsed) {
+          const name = typeof entry === 'string' ? entry : text((entry as { name?: unknown } | null)?.name);
+          if (name) knownUnits.add(name);
+        }
+      }
+    } catch {
+      /* legacy non-JSON list - ignore */
+    }
+  }
+
+  const knownCategories = new Set(state.categories.map((category) => category.name));
+
+  const existingItemKeys = new Set<string>();
+  for (const item of state.items) {
+    const code = text(item.code);
+    if (code) existingItemKeys.add(`code:${code}`);
+    else existingItemKeys.add(`name:${text(item.name)}|unit:${text(item.unit)}`);
+  }
+
+  const existingEquipmentKeys = new Set<string>();
+  for (const entry of state.equipment) {
+    const serial = text(entry.serialNumber);
+    if (serial) existingEquipmentKeys.add(`serial:${serial}`);
+    else existingEquipmentKeys.add(`name:${text(entry.name)}|model:${text(entry.model)}`);
+  }
+
+  return { knownUnits, knownCategories, existingItemKeys, existingEquipmentKeys, mode };
+}
+
+function catalogSummary(
+  items: CatalogAnalysis<CatalogItemRow>,
+  equipment: CatalogAnalysis<CatalogEquipmentRow>,
+) {
+  return {
+    items: items.summary,
+    equipment: equipment.summary,
+    totals: {
+      create: items.summary.create + equipment.summary.create,
+      update: items.summary.update + equipment.summary.update,
+      skip: items.summary.skip + equipment.summary.skip,
+      error: items.summary.error + equipment.summary.error,
+    },
+  };
 }
 
 function readBody(init?: RequestInit): any {
@@ -1410,6 +1491,130 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     });
   }
 
+  if (pathname === '/api/catalog/import/preview' && method === 'POST') {
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية لاستيراد الكتالوج');
+    return read((state) => {
+      const body = (readBody(init) ?? {}) as { mode?: unknown; items?: unknown; equipment?: unknown };
+      const mode = catalogMode(body.mode);
+      const context = catalogContext(state, mode);
+      const items = validateCatalogItemRows(catalogRows(body.items), context);
+      const equipment = validateCatalogEquipmentRows(catalogRows(body.equipment), context);
+      return json({
+        mode,
+        summary: catalogSummary(items, equipment),
+        items: items.rows,
+        equipment: equipment.rows,
+      });
+    });
+  }
+  if (pathname === '/api/catalog/import' && method === 'POST') {
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية لاستيراد الكتالوج');
+    return mutate((state) => {
+      const body = (readBody(init) ?? {}) as { mode?: unknown; items?: unknown; equipment?: unknown };
+      const mode = catalogMode(body.mode);
+      const context = catalogContext(state, mode);
+      const items = validateCatalogItemRows(catalogRows(body.items), context);
+      const equipment = validateCatalogEquipmentRows(catalogRows(body.equipment), context);
+      const summary = catalogSummary(items, equipment);
+      if (summary.totals.error > 0) {
+        return json({
+          error: 'لا يمكن التنفيذ مع وجود أخطاء في الملف. صحّح الأخطاء ثم أعد المحاولة.',
+          code: 'CATALOG_IMPORT_HAS_ERRORS',
+          summary,
+        }, 409);
+      }
+      const categories = createCategoryLookup(state.categories);
+      let createdItems = 0;
+      let updatedItems = 0;
+      let createdEquipment = 0;
+      let updatedEquipment = 0;
+      for (const decision of items.rows) {
+        if (decision.action === 'skip' || decision.action === 'error') continue;
+        const row = decision.data;
+        const categoryId = row.category ? categories.get(normalizeHeader(row.category)) ?? null : null;
+        const existing = decision.action === 'update'
+          ? state.items.find((entry) => (row.code
+            ? text(entry.code) === row.code
+            : text(entry.name) === row.name && text(entry.unit) === row.unit))
+          : undefined;
+        const value: Record<string, unknown> = {
+          code: row.code,
+          name: row.name,
+          categoryId,
+          itemType: 'consumable',
+          unit: row.unit,
+          minStock: row.minStock,
+          requiresBatchTracking: row.requiresBatch,
+          requiresExpiryTracking: row.requiresExpiry,
+          location: row.location,
+          supplier: row.supplier,
+          notes: row.notes,
+          isActive: row.active,
+        };
+        if (existing) {
+          Object.assign(existing, itemFromInput(state, { ...value }, existing));
+          updatedItems += 1;
+          recordOfflineChange(state, 'item', Number(existing.id), 'update', { name: row.name, quantity: numberValue(existing.currentStock), unit: row.unit });
+          addAudit(state, currentUser, 'update', 'item', Number(existing.id));
+        } else {
+          const item = itemFromInput(state, { ...value, currentStock: 0 }, undefined);
+          state.items.push(item);
+          createdItems += 1;
+          recordOfflineChange(state, 'item', Number(item.id), 'create', { name: row.name, quantity: 0, unit: row.unit });
+          addAudit(state, currentUser, 'create', 'item', Number(item.id));
+        }
+      }
+      for (const decision of equipment.rows) {
+        if (decision.action === 'skip' || decision.action === 'error') continue;
+        const row = decision.data;
+        const notes = [row.company ? `الشركة: ${row.company}` : null, row.notes].filter(Boolean).join(' | ') || null;
+        const existing = decision.action === 'update'
+          ? state.equipment.find((entry) => (row.serialNumber
+            ? text(entry.serialNumber) === row.serialNumber
+            : text(entry.name) === row.name))
+          : undefined;
+        if (existing) {
+          Object.assign(existing, {
+            code: row.code,
+            name: row.name,
+            equipmentType: row.equipmentType,
+            model: row.model,
+            serialNumber: row.serialNumber,
+            minQuantity: row.minQuantity,
+            notes,
+            isActive: row.active,
+            updatedAt: now(),
+          });
+          updatedEquipment += 1;
+          recordOfflineChange(state, 'equipment', Number(existing.id), 'update', { name: row.name });
+          addAudit(state, currentUser, 'update', 'equipment', Number(existing.id));
+        } else {
+          const equipment = {
+            id: nextId(state),
+            code: row.code,
+            name: row.name,
+            equipmentType: row.equipmentType,
+            model: row.model,
+            serialNumber: row.serialNumber,
+            unit: row.unit,
+            condition: 'good',
+            currentHolder: null,
+            quantity: 1,
+            minQuantity: row.minQuantity,
+            notes,
+            isActive: row.active,
+            createdAt: now(),
+            updatedAt: now(),
+          };
+          state.equipment.push(equipment);
+          createdEquipment += 1;
+          recordOfflineChange(state, 'equipment', Number(equipment.id), 'create', { name: row.name });
+          addAudit(state, currentUser, 'create', 'equipment', Number(equipment.id));
+        }
+      }
+      return json({ ok: true, mode, createdItems, updatedItems, createdEquipment, updatedEquipment, skipped: summary.totals.skip });
+    });
+  }
   if (pathname === '/api/recipients' && method === 'GET') {
     return read((state) => json(state.recipients.filter((entry) => searchParams.get('includeInactive') === 'true' || entry.isActive !== false)));
   }

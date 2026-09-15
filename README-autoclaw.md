@@ -1,6 +1,6 @@
 # دليل التطوير التقني — مستودعات مديرية صحة دمشق
 
-> هذا الدليل لمن يريد البناء من المصدر أو المساهمة. للاستخدام اليومي راجع [README.md](README.md) وصفحة [الإصدارات](https://github.com/ibrahims78/Damascus-Health-Directorate-2/releases).
+> هذا الدليل لمن يريد البناء من المصدر أو المساهمة. للاستخدام اليومي راجع [README.md](README.md) وصفحة [الإصدارات](https://github.com/ibrahims78/Damascus-Health-Directorate/releases).
 
 ## البيئة
 

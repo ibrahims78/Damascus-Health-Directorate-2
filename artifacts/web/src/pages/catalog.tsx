@@ -13,6 +13,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BookOpen, Plus, Ruler, Sparkles, Trash2, Wand2, Warehouse } from 'lucide-react';
+import { CatalogImportPanel } from '@/components/catalog-import-panel';
 
 type Unit = { id: number; name: string; symbol: string | null; isActive: boolean; isSystem: boolean; sortOrder: number };
 type WarehouseRow = { id: number; code: string; name: string; type: string; isActive: boolean };
@@ -54,6 +55,7 @@ export function CatalogPage() {
   });
   const [normalize, setNormalize] = useState<{ open: boolean; from: string; to: string }>({ open: false, from: '', to: '' });
   const [warehouses, setWarehouses] = useState<WarehouseRow[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
   const [currentWarehouse, setCurrentWarehouse] = useState<WarehouseRow | null>(null);
   const [warehouseDialog, setWarehouseDialog] = useState<{ open: boolean; code: string; name: string; type: string }>({
     open: false, code: '', name: '', type: 'branch',
@@ -77,6 +79,10 @@ export function CatalogPage() {
           api<WarehouseRow | null>('/warehouses/current'),
         ]);
         setWarehouses(Array.isArray(whs) ? whs : []);
+        try {
+          const cats = await api<Array<{ name: string }>>('/categories');
+          setCategories(Array.isArray(cats) ? cats.map((c) => c.name) : []);
+        } catch { /* categories optional */ }
         setCurrentWarehouse(cur ?? null);
       } catch { /* warehouse model optional */ }
       if (isAdmin) {
@@ -199,6 +205,7 @@ export function CatalogPage() {
       <Tabs defaultValue="units" className="space-y-4">
         <TabsList>
           <TabsTrigger value="units" className="gap-2"><Ruler className="w-4 h-4" /> الوحدات</TabsTrigger>
+          <TabsTrigger value="import" className="gap-2">استيراد الكتالوج</TabsTrigger>
           <TabsTrigger value="warehouses" className="gap-2"><Warehouse className="w-4 h-4" /> المستودعات</TabsTrigger>
           <TabsTrigger value="items" className="gap-2">المواد</TabsTrigger>
           <TabsTrigger value="equipment" className="gap-2">التجهيزات</TabsTrigger>
@@ -308,6 +315,14 @@ export function CatalogPage() {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        <TabsContent value="import" className="space-y-4">
+          <CatalogImportPanel
+            knownUnits={units.filter((u) => u.isActive).map((u) => u.name)}
+            knownCategories={categories}
+            onDone={() => void load()}
+          />
         </TabsContent>
 
         {/* ---------------- Warehouses ---------------- */}

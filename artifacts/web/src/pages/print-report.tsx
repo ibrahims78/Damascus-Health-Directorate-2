@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Printer, ArrowRight, RefreshCw } from 'lucide-react';
+import { Barcode } from '@/components/barcode';
 
 type Kind = 'stock' | 'below-min' | 'expiry';
 
@@ -75,6 +76,11 @@ export function PrintReportPage() {
 
   useEffect(() => { void load(); }, [load]);
 
+  const barcodeRef = useMemo(() => {
+    const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    return 'RPT-' + kind.toUpperCase() + '-' + stamp;
+  }, [kind]);
+
   const totalStock = useMemo(() => rows.reduce((sum, r) => sum + Number(r.currentStock ?? 0), 0), [rows]);
 
   if (loading) {
@@ -113,6 +119,10 @@ export function PrintReportPage() {
             {` · عدد السطور: ${rows.length}`}
           </p>
         </header>
+
+        <div className="mt-3 flex justify-center">
+          <Barcode value={barcodeRef} />
+        </div>
 
         {rows.length === 0 ? (
           <p className="mt-6 text-center text-sm text-muted-foreground">لا توجد بيانات لهذا الكشف.</p>
