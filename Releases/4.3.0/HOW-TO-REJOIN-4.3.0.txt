@@ -1,0 +1,39 @@
+كيفية إعادة دمج حزم ويندوز 4.3.0 (الأجزاء المرفوعة على GitHub)
+================================================================
+
+رفعتُ حزمتي ويندوز على 44 جزءًا (8 ميجابايت لكل جزء) لأن الشبكة المتاحة لا تتحمّل
+رفع ملف واحد كبير. الأجزاء كاملة على صفحة الإصدار v4.3.0.
+
+الملفات
+-------
+  Portable  : Damascus-Health-Directorate-4.3.0-Portable-Windows-x64.zip.p001 ... p022
+  Protected : Damascus-Health-Directorate-4.3.0-Protected-Windows-x64.zip.p001 ... p022
+
+خطوات الدمج على Windows (PowerShell)
+------------------------------------
+1) أنشئ مجلدًا فارغًا ونزّل فيه أجزاء الحزمة المطلوبة.
+2) افتح PowerShell داخل المجلد، ثم شغّل (مثال الحزمة المحمولة):
+
+   $parts = Get-ChildItem "Damascus-Health-Directorate-4.3.0-Portable-Windows-x64.zip.p*" | Sort-Object Name
+   $out = [System.IO.File]::Create("Damascus-Health-Directorate-4.3.0-Portable-Windows-x64.zip")
+   foreach ($p in $parts) { $b = [System.IO.File]::ReadAllBytes($p.FullName); $out.Write($b,0,$b.Length) }
+   $out.Close()
+
+   وللحزمة المحمية كرّر بتبديل الاسم إلى: ...-Protected-Windows-x64.zip
+
+3) تحقّق من البصمة بعد الدمج:
+
+   (Get-FileHash ".\Damascus-Health-Directorate-4.3.0-Portable-Windows-x64.zip" -Algorithm SHA256).Hash
+   (Get-FileHash ".\Damascus-Health-Directorate-4.3.0-Protected-Windows-x64.zip" -Algorithm SHA256).Hash
+
+البصمات المرجعية
+----------------
+  Portable  : A39C8754FB5C4BEFC01A34D3CC88EA80C8861CBBA31C7EA68CA4CE0B60EC350
+  Protected : 7F6DBB8FC7DFA1B6F2CE8676D917AF3EE55EDEF5CB60388A5F3D2C6997F01613
+
+ملاحظة: إن طابقت البصمة فالحزمة سليمة تمامًا؛ فُكّ الضغط ثم شغّل:
+  "Damascus Health Directorate.exe"
+
+بديل أبسط (سطر أوامر واحد)
+--------------------------
+  copy /b Portable...p001+Portable...p002+...+Portable...p022 الحزمة.zip
