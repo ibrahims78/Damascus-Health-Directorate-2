@@ -1,4 +1,0 @@
-14eba74a0dd39bb159c17ec8a4c2d2465cf4c1e2db1e55d1f5582ec760009ed8  Damascus-Health-Directorate-4.3.0-Protected-Windows-x64.zip
-f4c5919189a2276e27767aa24b945e1631f0642a9d801cee8bc74682704fd614  Damascus-Health-Directorate-4.3.0-Portable-Windows-x64.zip
-68726523c136f59b44953178f945345b74139487eb3b53d0a35169d6faad4f27  Damascus-Health-Directorate-v4.3.0-Android-Offline.apk
-4e51c459ca46652f07bfe20a0d4cc54809a7bd957d1bfbf69b51ab1ea95a7798  Damascus-Health-Directorate-v4.3.0-Android-Protected.apk

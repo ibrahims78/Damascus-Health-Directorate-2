@@ -39,7 +39,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 
-const APP_VERSION = import.meta.env.VITE_APP_VERSION ?? "v4.3.0";
+const APP_VERSION = import.meta.env.VITE_APP_VERSION ?? "v4.4.0";
 const DESIGNER_NAME = 'إبراهيم الصيداوي';
 const DESIGNER_PHONE = '0933706403';
 
