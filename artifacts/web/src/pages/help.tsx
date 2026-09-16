@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import {
   Activity,
+  Sparkles,
   AlertCircle,
   ArchiveRestore,
   ArrowDownToLine,
@@ -75,6 +76,16 @@ const troubleshootingItems: Array<{ problem: string; solution: string }> = [
     solution:
       'كان خلل ترميز في إصدار سابق، وصُحّح بالكامل في 5.0.1. ويوجد فحص آلي (docs/tests/encoding-check.mjs) يمنع عودة التشويه.',
   },
+];
+
+const newsItems: Array<{ version: string; title: string; detail: string }> = [
+  { version: '5.0.1', title: 'إصلاح ترميز العربية', detail: 'كانت بعض الشاشات تعرض نصوصًا مشوّهة؛ صُحّح الترميز بالكامل وأُضيف فحص آلي يمنع عودته، والعربية الآن سليمة في كل الواجهات والتقارير.' },
+  { version: '5.0.0', title: 'المصادقة الثنائية (2FA)', detail: 'رمز زمني من تطبيق مصادقة بعد كلمة المرور — على سطح المكتب وعلى الهاتف، مع استعادة الحساب بواسطة المدير.' },
+  { version: '5.0.0', title: 'ملصقات المواقع', detail: 'صفحة ملصقات قابلة للطباعة لكل موقع تخزين بالباركود والاسم والمنطقة.' },
+  { version: '4.8.0', title: 'مواقع التخزين (Zone/Bin)', detail: 'كتالوج مواقع بترميز فريد يُسند للمواد ويظهر في الجرد والتقارير.' },
+  { version: '4.7.0', title: 'إشعارات خارجية (Webhook)', detail: 'إرسال حمولة JSON عند إنشاء أو تصعيد أي تنبيه إلى «حرج».' },
+  { version: '4.6.0', title: 'سندات الاستلام (GRN) بفحص', detail: 'استلام بكميات مقبولة ومرفوضة وسبب إلزامي للرفض، ولا يدخل المخزون إلا المقبول.' },
+  { version: '4.5.0', title: 'الجرد الدوري · القيد العكسي · فروق التحويلات · إعادة الطلب · مؤشرات KPI/ABC', detail: 'حزمة الرقابة وإدارة المخزون المتقدمة.' },
 ];
 
 const operations: Operation[] = [
@@ -652,6 +663,23 @@ export function HelpPage() {
     [normalizedSearch],
   );
 
+  const filteredTroubleshooting = useMemo(
+    () =>
+      troubleshootingItems.filter(
+        (item) => !normalizedSearch || `${item.problem} ${item.solution}`.toLocaleLowerCase('ar').includes(normalizedSearch),
+      ),
+    [normalizedSearch],
+  );
+  const filteredNews = useMemo(
+    () =>
+      newsItems.filter(
+        (item) => !normalizedSearch || `${item.version} ${item.title} ${item.detail}`.toLocaleLowerCase('ar').includes(normalizedSearch),
+      ),
+    [normalizedSearch],
+  );
+  const resultCount = normalizedSearch
+    ? filteredOperations.length + filteredTroubleshooting.length + filteredNews.length
+    : null;
   return (
     <div className="mx-auto max-w-6xl space-y-12 pb-10" dir="rtl">
       <section className="relative overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br from-primary via-primary/90 to-cyan-700 px-6 py-8 text-primary-foreground shadow-lg md:px-10 md:py-10">
@@ -686,6 +714,9 @@ export function HelpPage() {
             aria-label="البحث في مركز المساعدة"
             className="h-11 w-full rounded-lg border bg-background px-10 text-sm outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
           />
+          {resultCount !== null && (
+            <p className="mt-2 text-xs text-muted-foreground">عدد النتائج: {resultCount}</p>
+          )}
         </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
           {[
@@ -702,6 +733,7 @@ export function HelpPage() {
             ['#help-operation-bins', 'المواقع والملصقات'],
             ['#help-operation-2fa', 'المصادقة الثنائية'],
             ['#troubleshooting', 'استكشاف الأخطاء'],
+            ['#whats-new', 'ما الجديد'],
           ].map(([href, label]) => (
             <a
               key={href}
@@ -893,6 +925,25 @@ export function HelpPage() {
         </div>
       </section>
 
+      <section id="whats-new" className="scroll-mt-6">
+        <SectionHeading
+          eyebrow="10 / ما الجديد"
+          title="أحدث ما أُضيف إلى النظام"
+          description="ملخّص التحديثات الأخيرة؛ راجع سجل التغييرات الكامل في المستودع."
+          icon={Sparkles}
+        />
+        <div className="space-y-3">
+          {filteredNews.map((item) => (
+            <div key={`${item.version}-${item.title}`} className="rounded-xl border bg-card p-4 shadow-sm">
+              <div className="mb-1 flex flex-wrap items-center gap-2">
+                <Badge variant="secondary" className="font-mono text-[11px]">{item.version}</Badge>
+                <span className="text-sm font-bold">{item.title}</span>
+              </div>
+              <p className="text-sm leading-6 text-muted-foreground">{item.detail}</p>
+            </div>
+          ))}
+        </div>
+      </section>
       <section id="troubleshooting" className="scroll-mt-6">
         <SectionHeading
           eyebrow="11 / استكشاف الأخطاء"
@@ -901,7 +952,7 @@ export function HelpPage() {
           icon={AlertCircle}
         />
         <div className="grid gap-4 md:grid-cols-2">
-          {troubleshootingItems.map((item) => (
+          {filteredTroubleshooting.map((item) => (
             <div key={item.problem} className="rounded-xl border bg-card p-4 shadow-sm">
               <div className="mb-2 flex items-start gap-2 text-sm font-bold">
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />

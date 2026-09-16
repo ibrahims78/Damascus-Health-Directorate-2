@@ -287,7 +287,33 @@ export function Header() {
   const { theme, setTheme } = useTheme();
   const { data: user } = useGetCurrentUser();
   const logout = useLogout();
-  const [location, setLocation] = useLocation();
+  /** Maps the current screen to the matching help section (contextual help). */
+const HELP_ANCHORS: Record<string, string> = {
+  '/': '#overview',
+  '/items': '#operations',
+  '/equipment': '#operations',
+  '/transactions': '#help-operation-reversal',
+  '/counts': '#help-operation-counts',
+  '/receipts': '#help-operation-receipts',
+  '/transfers': '#help-operation-transfer-variance',
+  '/inventory': '#help-operation-kpi',
+  '/catalog': '#help-operation-bins',
+  '/labels': '#help-operation-bins',
+  '/reports': '#operations',
+  '/users': '#help-operation-scope',
+  '/settings': '#help-operation-2fa',
+  '/sync': '#monitoring',
+  '/audit': '#monitoring',
+};
+
+function helpTarget(path: string): string {
+  const base = path.split('?')[0];
+  const direct = HELP_ANCHORS[base];
+  if (direct) return `/help${direct}`;
+  const match = Object.keys(HELP_ANCHORS).find((key) => key !== '/' && base.startsWith(key));
+  return match ? `/help${HELP_ANCHORS[match]}` : '/help';
+}
+const [location, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const markAllRead = useMarkAllAlertsRead();
   const logoutStarted = useRef(false);
@@ -377,19 +403,18 @@ export function Header() {
 
       <div className="flex items-center gap-3">
         {/* ── Help center ── */}
-        {location === '/' && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setLocation('/help')}
-            className="gap-1.5 border-primary/25 bg-primary/5 text-primary hover:bg-primary/10 hover:text-primary"
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setLocation(helpTarget(location))}
+          className="gap-1.5 border-primary/25 bg-primary/5 text-primary hover:bg-primary/10 hover:text-primary"
             aria-label="فتح مركز المساعدة"
             data-testid="button-open-help"
           >
-            <HelpCircle className="h-4 w-4" />
-            <span>مساعدة</span>
+          <HelpCircle className="h-4 w-4" />
+          <span>مساعدة</span>
           </Button>
-        )}
 
         {/* ── Alerts bell ── */}
         <DropdownMenu>
