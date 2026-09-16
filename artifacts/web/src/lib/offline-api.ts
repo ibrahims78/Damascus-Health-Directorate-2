@@ -42,7 +42,7 @@ type OfflineState = {
   syncCursors: Array<Record<string, unknown>>;
   conflictQueue: Array<Record<string, unknown>>;
   tombstones: Array<Record<string, unknown>>;
-  users: Array<PublicUser & { passwordHash: string; passwordSalt: string; isActive: boolean; createdAt: string }>;
+  users: Array<PublicUser & { passwordHash: string; passwordSalt: string; isActive: boolean; createdAt: string; twoFactorSecret?: string | null; twoFactorEnabled?: boolean }>;
   settings: {
     id: number;
     setupCompleted: boolean;
@@ -801,6 +801,87 @@ function catalogSummary(
   };
 }
 
+const OFFLINE_BASE32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+
+function offlineBase32Decode(input: string): Uint8Array {
+  let bits = 0;
+  let value = 0;
+  const out: number[] = [];
+  for (const char of input.replace(/=+$/, '').toUpperCase()) {
+    const index = OFFLINE_BASE32.indexOf(char);
+    if (index === -1) continue;
+    value = (value << 5) | index;
+    bits += 5;
+    if (bits >= 8) {
+      out.push((value >>> (bits - 8)) & 0xff);
+      bits -= 8;
+    }
+  }
+  return Uint8Array.from(out);
+}
+
+function offlineBase32Encode(bytes: Uint8Array): string {
+  let bits = 0;
+  let value = 0;
+  let output = '';
+  for (const byte of bytes) {
+    value = (value << 8) | byte;
+    bits += 8;
+    while (bits >= 5) {
+      output += OFFLINE_BASE32[(value >>> (bits - 5)) & 31];
+      bits -= 5;
+    }
+  }
+  if (bits > 0) output += OFFLINE_BASE32[(value << (5 - bits)) & 31];
+  return output;
+}
+
+/** RFC 4226 HOTP with HMAC-SHA1 through WebCrypto. */
+async function offlineHotp(secretBase32: string, counter: number, digits = 6): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    offlineBase32Decode(secretBase32) as unknown as BufferSource,
+    { name: 'HMAC', hash: 'SHA-1' },
+    false,
+    ['sign'],
+  );
+  const message = new Uint8Array(new ArrayBuffer(8));
+  const view = new DataView(message.buffer);
+  view.setUint32(0, Math.floor(counter / 0x100000000));
+  view.setUint32(4, counter % 0x100000000);
+  const digest = new Uint8Array(await crypto.subtle.sign('HMAC', key, message as unknown as BufferSource));
+  const offset = digest[digest.length - 1] & 0x0f;
+  const binary =
+    ((digest[offset] & 0x7f) << 24) |
+    ((digest[offset + 1] & 0xff) << 16) |
+    ((digest[offset + 2] & 0xff) << 8) |
+    (digest[offset + 3] & 0xff);
+  return String(binary % 10 ** digits).padStart(digits, '0');
+}
+
+/** Verifies a 6-digit token allowing one step of clock drift (RFC 6238). */
+async function offlineVerifyTotp(secretBase32: string, token: string): Promise<boolean> {
+  const candidate = String(token ?? '').replace(/\s+/g, '');
+  if (!/^\d{6}$/.test(candidate)) return false;
+  const counter = Math.floor(Date.now() / 1000 / 30);
+  for (let offset = -1; offset <= 1; offset += 1) {
+    if ((await offlineHotp(secretBase32, counter + offset)) === candidate) return true;
+  }
+  return false;
+}
+
+function offlineGenerateTotpSecret(): string {
+  const bytes = new Uint8Array(20);
+  crypto.getRandomValues(bytes);
+  return offlineBase32Encode(bytes);
+}
+
+function offlineTotpUri(secret: string, account: string, issuer = 'Damascus Health Directorate'): string {
+  const label = encodeURIComponent(`${issuer}:${account}`);
+  const params = new URLSearchParams({ secret, issuer, algorithm: 'SHA1', digits: '6', period: '30' });
+  return `otpauth://totp/${label}?${params.toString()}`;
+}
+
 function offlineWarehouseView(warehouse: Record<string, unknown> | null | undefined) {
   if (!warehouse) return null;
   return {
@@ -1341,6 +1422,15 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
       // Upgrade legacy SHA-256 hashes to PBKDF2 on successful login.
       if (!user.passwordHash.startsWith('pbkdf2$')) {
         user.passwordHash = await passwordHash(text(body.password), user.passwordSalt);
+      }
+      if (user.twoFactorEnabled && user.twoFactorSecret) {
+        const code = text(body.code).trim();
+        if (!code) {
+          return json({ error: 'أدخل رمز المصادقة الثنائية.', twoFactorRequired: true }, 401);
+        }
+        if (!(await offlineVerifyTotp(text(user.twoFactorSecret), code))) {
+          return json({ error: 'رمز المصادقة الثنائية غير صحيح.', twoFactorRequired: true }, 401);
+        }
       }
       state.currentUserId = user.id;
       return json(publicUser(user));
@@ -4433,6 +4523,74 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     });
   }
 
+  /* ---------------- P2-16: two-factor authentication on the device ---------------- */
+  if (pathname === '/api/auth/2fa/status' && method === 'GET') {
+    return read((state) => {
+      const user = auth(state);
+      const stored = state.users.find((entry) => numberValue(entry.id) === numberValue(user?.id));
+      return json({ enabled: Boolean(stored?.twoFactorEnabled) });
+    });
+  }
+  if (pathname === '/api/auth/2fa/setup' && method === 'POST') {
+    return mutate((state) => {
+      const user = auth(state);
+      if (!user) return failure(401, 'Not authenticated');
+      const secret = offlineGenerateTotpSecret();
+      const stored = state.users.find((entry) => numberValue(entry.id) === numberValue(user.id));
+      if (!stored) return failure(404, 'المستخدم غير موجود.');
+      stored.twoFactorSecret = secret;
+      return json({ secret, otpauthUri: offlineTotpUri(secret, text(user.username)), enabled: Boolean(stored.twoFactorEnabled) });
+    });
+  }
+  if (pathname === '/api/auth/2fa/enable' && method === 'POST') {
+    return mutate(async (state) => {
+      const user = auth(state);
+      if (!user) return failure(401, 'Not authenticated');
+      const body = readBody(init) ?? {};
+      const stored = state.users.find((entry) => numberValue(entry.id) === numberValue(user.id));
+      if (!stored?.twoFactorSecret) {
+        return json({ error: 'ابدأ الإعداد أولًا للحصول على مفتاح.', code: 'TWO_FACTOR_NOT_SET_UP' }, 409);
+      }
+      if (!(await offlineVerifyTotp(text(stored.twoFactorSecret), text(body.code)))) {
+        return json({ error: 'الرمز غير صحيح. تأكد من ساعة الجهاز.', code: 'TWO_FACTOR_INVALID_CODE' }, 400);
+      }
+      stored.twoFactorEnabled = true;
+      addAudit(state, currentUser, 'enable', 'two_factor', numberValue(user.id));
+      return json({ ok: true, enabled: true });
+    });
+  }
+  if (pathname === '/api/auth/2fa/disable' && method === 'POST') {
+    return mutate(async (state) => {
+      const user = auth(state);
+      if (!user) return failure(401, 'Not authenticated');
+      const body = readBody(init) ?? {};
+      const stored = state.users.find((entry) => numberValue(entry.id) === numberValue(user.id));
+      if (!stored?.twoFactorEnabled || !stored.twoFactorSecret) {
+        return json({ error: 'المصادقة الثنائية غير مُفعّلة.', code: 'TWO_FACTOR_NOT_ENABLED' }, 409);
+      }
+      if (!(await offlineVerifyTotp(text(stored.twoFactorSecret), text(body.code)))) {
+        return json({ error: 'الرمز غير صحيح.', code: 'TWO_FACTOR_INVALID_CODE' }, 400);
+      }
+      stored.twoFactorEnabled = false;
+      stored.twoFactorSecret = null;
+      addAudit(state, currentUser, 'disable', 'two_factor', numberValue(user.id));
+      return json({ ok: true, enabled: false });
+    });
+  }
+  if (pathname === '/api/auth/2fa/reset' && method === 'POST') {
+    return mutate((state) => {
+      if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
+      const body = readBody(init) ?? {};
+      const userId = numberValue(body.userId);
+      if (userId <= 0) return json({ error: 'معرّف المستخدم غير صالح.' }, 400);
+      const stored = state.users.find((entry) => numberValue(entry.id) === userId);
+      if (!stored) return failure(404, 'المستخدم غير موجود.');
+      stored.twoFactorEnabled = false;
+      stored.twoFactorSecret = null;
+      addAudit(state, currentUser, 'reset', 'two_factor', userId);
+      return json({ ok: true });
+    });
+  }
   return failure(404, 'Ø§Ù„Ù…Ø³Ø§Ø± ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯ ÙÙŠ Ø§Ù„ÙˆØ¶Ø¹ Ø§Ù„Ù…Ø­Ù„ÙŠ');
 }
 

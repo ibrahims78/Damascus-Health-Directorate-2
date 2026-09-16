@@ -8,6 +8,7 @@
  * governance, the sync overview, the newer reports and the items export.
  */
 import fs from "node:fs";
+import crypto from "node:crypto";
 
 // ------------------------------- shims -------------------------------
 const store = new Map();
@@ -293,6 +294,41 @@ const deviceBinInUse = await api("DELETE", `/bins/${Number(deviceBin.data?.id)}`
 check("bins: in-use location cannot be archived on the device", deviceBinInUse.status === 409 && deviceBinInUse.data?.code === "BIN_IN_USE", `status=${deviceBinInUse.status}`);
 const deviceBinUsage = await api("GET", "/bins/usage");
 check("bins: usage responds on the device", (deviceBinUsage.data ?? []).some((row) => row.binCode === "DEV-B1" && row.known === true));
+// --------------------- 2fa on the device ---------------------
+const B32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+const decodeB32 = (input) => {
+  let bits = 0; let value = 0; const out = [];
+  for (const char of input.replace(/=+$/, "").toUpperCase()) {
+    const index = B32.indexOf(char);
+    if (index === -1) continue;
+    value = (value << 5) | index; bits += 5;
+    if (bits >= 8) { out.push((value >>> (bits - 8)) & 0xff); bits -= 8; }
+  }
+  return Buffer.from(out);
+};
+const totpAt = (secret, seconds) => {
+  const counter = Math.floor(seconds / 30);
+  const buffer = Buffer.alloc(8);
+  buffer.writeUInt32BE(Math.floor(counter / 0x100000000), 0);
+  buffer.writeUInt32BE(counter % 0x100000000, 4);
+  const digest = crypto.createHmac("sha1", decodeB32(secret)).update(buffer).digest();
+  const offset = digest[digest.length - 1] & 0x0f;
+  const binary = ((digest[offset] & 0x7f) << 24) | ((digest[offset + 1] & 0xff) << 16) | ((digest[offset + 2] & 0xff) << 8) | (digest[offset + 3] & 0xff);
+  return String(binary % 1000000).padStart(6, "0");
+};
+const deviceSecret = (await api("POST", "/auth/2fa/setup", {})).data?.secret ?? "";
+check("2fa: the device issues a secret", /^[A-Z2-7]{16,}$/.test(deviceSecret), `secret=${deviceSecret.slice(0, 6)}...`);
+const badEnableDevice = await api("POST", "/auth/2fa/enable", { code: "000000" });
+check("2fa: a wrong code cannot enable it on the device", badEnableDevice.status === 400, `status=${badEnableDevice.status}`);
+const enableOnDevice = await api("POST", "/auth/2fa/enable", { code: totpAt(deviceSecret, Date.now() / 1000) });
+check("2fa: enabling works on the device", enableOnDevice.status === 200 && enableOnDevice.data?.enabled === true, `status=${enableOnDevice.status}`);
+await api("POST", "/auth/logout", {});
+const deviceNoCode = await api("POST", "/auth/login", { username: "admin", password: "Admin@1234567" });
+check("2fa: device login without a code is refused", deviceNoCode.status === 401 && deviceNoCode.data?.twoFactorRequired === true, `status=${deviceNoCode.status}`);
+const deviceWithCode = await api("POST", "/auth/login", { username: "admin", password: "Admin@1234567", code: totpAt(deviceSecret, Date.now() / 1000) });
+check("2fa: device login with the correct code succeeds", deviceWithCode.status === 200, `status=${deviceWithCode.status}`);
+const disableOnDevice = await api("POST", "/auth/2fa/disable", { code: totpAt(deviceSecret, Date.now() / 1000) });
+check("2fa: disabling works on the device", disableOnDevice.status === 200 && disableOnDevice.data?.enabled === false, `status=${disableOnDevice.status}`);
 const failed = checks.filter((c) => !c.ok);
 console.log(`\n${checks.length - failed.length}/${checks.length} checks passed`);
 fs.writeFileSync(new URL("./.offline-parity/results.txt", import.meta.url), checks.map((c) => `${c.ok ? "PASS" : "FAIL"}  ${c.name}`).join("\n") + "\n", "utf8");
