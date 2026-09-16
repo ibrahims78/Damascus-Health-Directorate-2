@@ -89,14 +89,14 @@ const PREVIEW_KEY = 'pending-restore-preview';
 const OFFLINE_HEADER = 'X-Damascus-Offline';
 const INDEXED_DB_TIMEOUT_MS = 15_000;
 const OFFLINE_REQUEST_TIMEOUT_MS = 20_000;
-const DEFAULT_ORG_NAME = 'Ù…Ø³ØªÙˆØ¯Ø¹Ø§Øª Ù…Ø¯ÙŠØ±ÙŠØ© ØµØ­Ø© Ø¯Ù…Ø´Ù‚';
+const DEFAULT_ORG_NAME = 'مستودعات مديرية صحة دمشق';
 
 function isLegacyOrgName(value: string): boolean {
   const normalized = value.trim();
   return (
     normalized !== DEFAULT_ORG_NAME &&
-    /^(Ù…Ù†Ø¸ÙˆÙ…Ø©|Ù†Ø¸Ø§Ù…)\s/u.test(normalized) &&
-    /(Ø§Ù„Ø¥Ø­Ø§Ù„Ø©|Ø§Ù„Ø§Ø­Ø§Ù„Ø©|Ø§Ù„Ø¥Ø³Ø¹Ø§Ù ÙˆØ§Ù„Ø·ÙˆØ§Ø±Ø¦|Ø§Ù„Ø§Ø³Ø¹Ø§Ù ÙˆØ§Ù„Ø·ÙˆØ§Ø±Ø¦)/u.test(normalized)
+    /^(منظومة|نظام)\s/u.test(normalized) &&
+    /(الإحالة|الاحالة|الإسعاف والطوارئ|الاسعاف والطوارئ)/u.test(normalized)
   );
 }
 
@@ -155,16 +155,16 @@ function initialState(): OfflineState {
       updatedAt: timestamp,
     },
     categories: [
-      { id: 1, name: 'Ù…ÙˆØ§Ø¯ Ø·Ø¨ÙŠØ©', type: 'consumable', createdAt: timestamp },
-      { id: 2, name: 'ØªØ¬Ù‡ÙŠØ²Ø§Øª', type: 'equipment', createdAt: timestamp },
+      { id: 1, name: 'مواد طبية', type: 'consumable', createdAt: timestamp },
+      { id: 2, name: 'تجهيزات', type: 'equipment', createdAt: timestamp },
     ],
     items: [],
     equipment: [],
     recipients: [],
     exitReasons: [
-      { id: 1, name: 'ØµØ±Ù Ø§Ø¹ØªÙŠØ§Ø¯ÙŠ', isSystem: true, isActive: true, createdAt: timestamp },
-      { id: 2, name: 'ØªÙ„Ù', isSystem: true, isActive: true, createdAt: timestamp },
-      { id: 3, name: 'Ø¥Ø±Ø¬Ø§Ø¹ Ù…Ø±ÙƒØ²ÙŠ', isSystem: true, isActive: true, createdAt: timestamp },
+      { id: 1, name: 'صرف اعتيادي', isSystem: true, isActive: true, createdAt: timestamp },
+      { id: 2, name: 'تلف', isSystem: true, isActive: true, createdAt: timestamp },
+      { id: 3, name: 'إرجاع مركزي', isSystem: true, isActive: true, createdAt: timestamp },
     ],
     transactions: [],
     inventoryBatches: [],
@@ -180,7 +180,7 @@ function initialState(): OfflineState {
       {
         id: 1,
         code: 'C',
-        name: 'Ø§Ù„Ù…Ø³ØªÙˆØ¯Ø¹ Ø§Ù„Ù…Ø±ÙƒØ²ÙŠ',
+        name: 'المستودع المركزي',
         type: 'central',
         notes: null,
         isActive: true,
@@ -248,10 +248,10 @@ function openDatabase(): Promise<IDBDatabase> {
         db.onversionchange = () => db.close();
         resolve(db);
       };
-      request.onerror = () => reject(request.error ?? new Error('ØªØ¹Ø°Ø± ÙØªØ­ Ù‚Ø§Ø¹Ø¯Ø© Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ù…Ø­Ù„ÙŠØ©'));
-      request.onblocked = () => reject(new Error('Ù‚Ø§Ø¹Ø¯Ø© Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ù…Ø­Ù„ÙŠØ© Ù…Ø´ØºÙˆÙ„Ø© Ø¨Ø¹Ù…Ù„ÙŠØ© Ø£Ø®Ø±Ù‰'));
+      request.onerror = () => reject(request.error ?? new Error('تعذر فتح قاعدة البيانات المحلية'));
+      request.onblocked = () => reject(new Error('قاعدة البيانات المحلية مشغولة بعملية أخرى'));
     }),
-    'Ø§Ù†ØªÙ‡Øª Ù…Ù‡Ù„Ø© ÙØªØ­ Ù‚Ø§Ø¹Ø¯Ø© Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ù…Ø­Ù„ÙŠØ©',
+    'انتهت مهلة فتح قاعدة البيانات المحلية',
   );
 }
 
@@ -265,10 +265,10 @@ async function loadState(): Promise<OfflineState> {
         const request = transaction.objectStore(STORE_NAME).get(STATE_KEY);
         request.onsuccess = () => resolve(request.result as OfflineState | undefined);
         request.onerror = () => reject(request.error);
-        transaction.onerror = () => reject(transaction.error ?? new Error('ØªØ¹Ø°Ø± Ù‚Ø±Ø§Ø¡Ø© Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ù…Ø­Ù„ÙŠØ©'));
-        transaction.onabort = () => reject(transaction.error ?? new Error('ØªÙ… Ø¥Ù„ØºØ§Ø¡ Ù‚Ø±Ø§Ø¡Ø© Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ù…Ø­Ù„ÙŠØ©'));
+        transaction.onerror = () => reject(transaction.error ?? new Error('تعذر قراءة البيانات المحلية'));
+        transaction.onabort = () => reject(transaction.error ?? new Error('تم إلغاء قراءة البيانات المحلية'));
       }),
-      'Ø§Ù†ØªÙ‡Øª Ù…Ù‡Ù„Ø© Ù‚Ø±Ø§Ø¡Ø© Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ù…Ø­Ù„ÙŠØ©',
+      'انتهت مهلة قراءة البيانات المحلية',
     );
   } finally {
     db.close();
@@ -339,12 +339,12 @@ async function saveState(state: OfflineState) {
         } catch {
           // The transaction may already have completed or aborted.
         }
-        finish(new Error('Ø§Ù†ØªÙ‡Øª Ù…Ù‡Ù„Ø© Ø­ÙØ¸ Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ù…Ø­Ù„ÙŠØ©'));
+        finish(new Error('انتهت مهلة حفظ البيانات المحلية'));
       }, 15000);
       const clear = () => window.clearTimeout(timeout);
       request.onerror = () => {
         clear();
-        finish(request.error ?? new Error('ØªØ¹Ø°Ø± Ø­ÙØ¸ Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ù…Ø­Ù„ÙŠØ©'));
+        finish(request.error ?? new Error('تعذر حفظ البيانات المحلية'));
       };
       transaction.oncomplete = () => {
         clear();
@@ -352,11 +352,11 @@ async function saveState(state: OfflineState) {
       };
       transaction.onerror = () => {
         clear();
-        finish(transaction.error ?? new Error('ØªØ¹Ø°Ø± Ø­ÙØ¸ Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ù…Ø­Ù„ÙŠØ©'));
+        finish(transaction.error ?? new Error('تعذر حفظ البيانات المحلية'));
       };
       transaction.onabort = () => {
         clear();
-        finish(transaction.error ?? new Error('ØªÙ… Ø¥Ù„ØºØ§Ø¡ Ø­ÙØ¸ Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ù…Ø­Ù„ÙŠØ©'));
+        finish(transaction.error ?? new Error('تم إلغاء حفظ البيانات المحلية'));
       };
     });
   } finally {
@@ -371,12 +371,12 @@ async function savePendingPreview(preview: NonNullable<typeof pendingDmePreview>
       new Promise<void>((resolve, reject) => {
         const transaction = db.transaction(STORE_NAME, 'readwrite');
         const request = transaction.objectStore(STORE_NAME).put(preview, PREVIEW_KEY);
-        request.onerror = () => reject(request.error ?? new Error('ØªØ¹Ø°Ø± Ø­ÙØ¸ Ù†Ù‚Ø·Ø© Ø§Ù„Ø§Ø³ØªØ¹Ø§Ø¯Ø© Ø§Ù„Ù…Ø­Ù„ÙŠØ©'));
+        request.onerror = () => reject(request.error ?? new Error('تعذر حفظ نقطة الاستعادة المحلية'));
         transaction.oncomplete = () => resolve();
-        transaction.onerror = () => reject(transaction.error ?? new Error('ØªØ¹Ø°Ø± Ø­ÙØ¸ Ù†Ù‚Ø·Ø© Ø§Ù„Ø§Ø³ØªØ¹Ø§Ø¯Ø© Ø§Ù„Ù…Ø­Ù„ÙŠØ©'));
-        transaction.onabort = () => reject(transaction.error ?? new Error('ØªÙ… Ø¥Ù„ØºØ§Ø¡ Ø­ÙØ¸ Ù†Ù‚Ø·Ø© Ø§Ù„Ø§Ø³ØªØ¹Ø§Ø¯Ø© Ø§Ù„Ù…Ø­Ù„ÙŠØ©'));
+        transaction.onerror = () => reject(transaction.error ?? new Error('تعذر حفظ نقطة الاستعادة المحلية'));
+        transaction.onabort = () => reject(transaction.error ?? new Error('تم إلغاء حفظ نقطة الاستعادة المحلية'));
       }),
-      'Ø§Ù†ØªÙ‡Øª Ù…Ù‡Ù„Ø© Ø­ÙØ¸ Ù†Ù‚Ø·Ø© Ø§Ù„Ø§Ø³ØªØ¹Ø§Ø¯Ø© Ø§Ù„Ù…Ø­Ù„ÙŠØ©',
+      'انتهت مهلة حفظ نقطة الاستعادة المحلية',
     );
   } finally {
     db.close();
@@ -402,12 +402,12 @@ async function clearPendingPreview() {
       new Promise<void>((resolve, reject) => {
         const transaction = db.transaction(STORE_NAME, 'readwrite');
         const request = transaction.objectStore(STORE_NAME).delete(PREVIEW_KEY);
-        request.onerror = () => reject(request.error ?? new Error('ØªØ¹Ø°Ø± Ø­Ø°Ù Ù†Ù‚Ø·Ø© Ø§Ù„Ø§Ø³ØªØ¹Ø§Ø¯Ø© Ø§Ù„Ù…Ø­Ù„ÙŠØ©'));
+        request.onerror = () => reject(request.error ?? new Error('تعذر حذف نقطة الاستعادة المحلية'));
         transaction.oncomplete = () => resolve();
-        transaction.onerror = () => reject(transaction.error ?? new Error('ØªØ¹Ø°Ø± Ø­Ø°Ù Ù†Ù‚Ø·Ø© Ø§Ù„Ø§Ø³ØªØ¹Ø§Ø¯Ø© Ø§Ù„Ù…Ø­Ù„ÙŠØ©'));
-        transaction.onabort = () => reject(transaction.error ?? new Error('ØªÙ… Ø¥Ù„ØºØ§Ø¡ Ø­Ø°Ù Ù†Ù‚Ø·Ø© Ø§Ù„Ø§Ø³ØªØ¹Ø§Ø¯Ø© Ø§Ù„Ù…Ø­Ù„ÙŠØ©'));
+        transaction.onerror = () => reject(transaction.error ?? new Error('تعذر حذف نقطة الاستعادة المحلية'));
+        transaction.onabort = () => reject(transaction.error ?? new Error('تم إلغاء حذف نقطة الاستعادة المحلية'));
       }),
-      'Ø§Ù†ØªÙ‡Øª Ù…Ù‡Ù„Ø© Ø­Ø°Ù Ù†Ù‚Ø·Ø© Ø§Ù„Ø§Ø³ØªØ¹Ø§Ø¯Ø© Ø§Ù„Ù…Ø­Ù„ÙŠØ©',
+      'انتهت مهلة حذف نقطة الاستعادة المحلية',
     );
   } finally {
     db.close();
@@ -508,7 +508,7 @@ function syncVector(state: OfflineState): Record<string, number> {
 
 function applyOfflineRow(state: OfflineState, change: Record<string, unknown>) {
   const key = STATE_KEY_BY_ENTITY[text(change.entityType)];
-  if (!key || key === 'users') throw new Error(`Ù†ÙˆØ¹ Ø§Ù„ÙƒÙŠØ§Ù† ØºÙŠØ± Ù…Ø¯Ø¹ÙˆÙ…: ${text(change.entityType)}`);
+  if (!key || key === 'users') throw new Error(`نوع الكيان غير مدعوم: ${text(change.entityType)}`);
   const rows = (state as unknown as Record<string, unknown[]>)[key];
   const row = { ...((change.payload ?? {}) as Record<string, unknown>) };
   if (text(change.entityType) === 'item' && row.categoryGlobalId != null) {
@@ -531,16 +531,16 @@ function applyOfflineRow(state: OfflineState, change: Record<string, unknown>) {
 
 function applyOfflineTransactionBundle(state: OfflineState, change: Record<string, unknown>) {
   const bundle = (change.payload ?? {}) as { transaction?: Record<string, unknown>; effects?: Array<Record<string, unknown>> };
-  if (!bundle.transaction) throw new Error('Ø­Ø²Ù…Ø© Ø­Ø±ÙƒØ© ØºÙŠØ± Ù…ÙƒØªÙ…Ù„Ø©');
+  if (!bundle.transaction) throw new Error('حزمة حركة غير مكتملة');
   const txRow = { ...bundle.transaction };
   if (txRow.itemGlobalId != null) {
     const itemId = resolveGlobalId(state, 'item', String(txRow.itemGlobalId));
-    if (itemId == null) throw new Error('Ø§Ù„Ù…Ø§Ø¯Ø© Ø§Ù„Ù…Ø±Ø¬Ø¹ÙŠØ© Ù„Ù„Ø­Ø±ÙƒØ© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø© Ù…Ø­Ù„ÙŠØ§Ù‹');
+    if (itemId == null) throw new Error('المادة المرجعية للحركة غير موجودة محلياً');
     txRow.itemId = itemId;
   }
   if (txRow.equipmentGlobalId != null) {
     const equipmentId = resolveGlobalId(state, 'equipment', String(txRow.equipmentGlobalId));
-    if (equipmentId == null) throw new Error('Ø§Ù„Ù…Ø¹Ø¯Ø© Ø§Ù„Ù…Ø±Ø¬Ø¹ÙŠØ© Ù„Ù„Ø­Ø±ÙƒØ© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø© Ù…Ø­Ù„ÙŠØ§Ù‹');
+    if (equipmentId == null) throw new Error('المعدة المرجعية للحركة غير موجودة محلياً');
     txRow.equipmentId = equipmentId;
   }
   delete txRow.itemGlobalId;
@@ -641,7 +641,7 @@ function applyOfflineChanges(state: OfflineState, changes: unknown[]) {
         entityGlobalId: text(change.entityGlobalId),
         severity: 'medium',
         status: 'open',
-        message: error instanceof Error ? error.message : 'ØªØ¹Ø°Ø± ØªØ·Ø¨ÙŠÙ‚ Ø§Ù„ØªØºÙŠÙŠØ±',
+        message: error instanceof Error ? error.message : 'تعذر تطبيق التغيير',
         createdAt: now(),
       });
       state.nextId += 1;
@@ -1088,7 +1088,7 @@ function offlineApplyTransferOut(
     transactionDate: date,
     itemId,
     quantity,
-    notes: `Ø¥Ø±Ø³Ø§Ù„ ØªØ­ÙˆÙŠÙ„ ${code}`,
+    notes: `إرسال تحويل ${code}`,
     createdBy: user?.id ?? null,
     createdAt: now(),
     warehouseId,
@@ -1144,7 +1144,7 @@ function offlineApplyTransferIn(
     transactionDate: date,
     itemId,
     quantity,
-    notes: `Ø§Ø³ØªÙ„Ø§Ù… ØªØ­ÙˆÙŠÙ„ ${deliveryNoteNumber}`,
+    notes: `استلام تحويل ${deliveryNoteNumber}`,
     createdBy: user?.id ?? null,
     createdAt: now(),
     warehouseId,
@@ -1298,7 +1298,7 @@ function addAudit(state: OfflineState, user: PublicUser | null, action: string, 
   state.auditLog.unshift({
     id: nextId(state),
     userId: user?.id ?? null,
-    userNameSnap: user?.fullName ?? 'Ù…Ø­Ù„ÙŠ',
+    userNameSnap: user?.fullName ?? 'محلي',
     action,
     entityType,
     entityId: entityId ?? null,
@@ -1316,7 +1316,7 @@ function itemFromInput(state: OfflineState, body: Record<string, unknown>, exist
     name: text(body.name, text(existing?.name)),
     categoryId: body.categoryId ?? existing?.categoryId ?? null,
     itemType: text(body.itemType, text(existing?.itemType, 'consumable')),
-    unit: text(body.unit, text(existing?.unit, 'Ù‚Ø·Ø¹Ø©')),
+    unit: text(body.unit, text(existing?.unit, 'قطعة')),
     currentStock: numberValue(body.currentStock, numberValue(existing?.currentStock)),
     minStock: numberValue(body.minStock, numberValue(existing?.minStock)),
     reorderPoint:
@@ -1417,7 +1417,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     return mutate(async (state) => {
       const user = state.users.find((entry) => entry.username === text(body.username) && entry.isActive);
       if (!user || !(await verifyPassword(text(body.password), user.passwordSalt, user.passwordHash))) {
-        return failure(401, 'Ø§Ø³Ù… Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù… Ø£Ùˆ ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ± ØºÙŠØ± ØµØ­ÙŠØ­Ø©');
+        return failure(401, 'اسم المستخدم أو كلمة المرور غير صحيحة');
       }
       // Upgrade legacy SHA-256 hashes to PBKDF2 on successful login.
       if (!user.passwordHash.startsWith('pbkdf2$')) {
@@ -1458,7 +1458,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     return read((state) => json(state.categories.map(({ id, name, type }) => ({ id, name, type }))));
   }
   if (pathname === '/api/categories' && method === 'POST') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
     return mutate((state) => {
       const body = readBody(init);
       const name = text(body.name);
@@ -1471,10 +1471,10 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
   }
   const categoryId = idFrom(pathname, 'categories');
   if (categoryId && pathname === `/api/categories/${categoryId}` && method === 'PUT') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
     return mutate((state) => {
       const category = state.categories.find((entry) => entry.id === categoryId);
-      if (!category) return failure(404, 'Ø§Ù„ØªØµÙ†ÙŠÙ ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯');
+      if (!category) return failure(404, 'التصنيف غير موجود');
       const body = readBody(init);
       category.name = text(body.name, category.name);
       category.type = text(body.type, category.type);
@@ -1484,7 +1484,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     });
   }
   if (categoryId && pathname === `/api/categories/${categoryId}` && method === 'DELETE') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
     return mutate((state) => {
       state.categories = state.categories.filter((entry) => entry.id !== categoryId);
       recordOfflineChange(state, 'category', categoryId, 'delete', {});
@@ -1509,7 +1509,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     });
   }
   if (pathname === '/api/items' && method === 'POST') {
-    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'ليس لديك صلاحية');
     return mutate((state) => {
       const item = itemFromInput(state, readBody(init));
       state.items.push(item);
@@ -1526,24 +1526,24 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
   if (itemId && pathname === `/api/items/${itemId}` && method === 'GET') {
     return read((state) => {
       const item = state.items.find((entry) => entry.id === itemId && entry.isActive !== false);
-      return item ? json(itemWithCategory(state, item)) : failure(404, 'Ø§Ù„Ù…Ø§Ø¯Ø© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø©');
+      return item ? json(itemWithCategory(state, item)) : failure(404, 'المادة غير موجودة');
     });
   }
   if (itemId && pathname === `/api/items/${itemId}` && method === 'PUT') {
-    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'ليس لديك صلاحية');
     return mutate((state) => {
       const index = state.items.findIndex((entry) => entry.id === itemId);
-      if (index < 0) return failure(404, 'Ø§Ù„Ù…Ø§Ø¯Ø© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø©');
+      if (index < 0) return failure(404, 'المادة غير موجودة');
       state.items[index] = itemFromInput(state, readBody(init), state.items[index]);
       addAudit(state, currentUser, 'update', 'item', itemId);
       return json(itemWithCategory(state, state.items[index]));
     });
   }
   if (itemId && pathname === `/api/items/${itemId}` && method === 'DELETE') {
-    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'ليس لديك صلاحية');
     return mutate((state) => {
       const item = state.items.find((entry) => entry.id === itemId);
-      if (!item) return failure(404, 'Ø§Ù„Ù…Ø§Ø¯Ø© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø©');
+      if (!item) return failure(404, 'المادة غير موجودة');
       item.isActive = false;
       item.updatedAt = now();
       addAudit(state, currentUser, 'delete', 'item', itemId);
@@ -1554,7 +1554,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     const historyItemId = Number(searchParams.get('itemId'));
     return read((state) => {
       const rawItem = state.items.find((item) => numberValue(item.id) === historyItemId && item.isActive !== false);
-      if (!rawItem) return failure(404, 'Ø§Ù„Ù…Ø§Ø¯Ø© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø©');
+      if (!rawItem) return failure(404, 'المادة غير موجودة');
       const item = itemWithCategory(state, rawItem);
       const allMovements = state.transactions
         .filter((transaction) => numberValue(transaction.itemId) === historyItemId)
@@ -1592,7 +1592,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
           name: text(item.name, 'â€”'),
           categoryName: text(item.categoryName) || null,
           itemType: text(item.itemType, 'item'),
-          unit: text(item.unit, 'Ù‚Ø·Ø¹Ø©'),
+          unit: text(item.unit, 'قطعة'),
           currentStock: numberValue(item.currentStock),
           minStock: numberValue(item.minStock),
           expiryDate: text(item.expiryDate) || null,
@@ -1704,7 +1704,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     });
   }
   if (pathname === '/api/items/bulk-import' && method === 'POST') {
-    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'ليس لديك صلاحية');
     return mutate((state) => {
       const body = readBody(init);
       const input = Array.isArray(body) ? body : Array.isArray((body as { items?: unknown }).items) ? (body as { items: unknown[] }).items : [];
@@ -1748,12 +1748,12 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
         .filter((decision) => decision.state === 'error');
       if (preflightErrors.length > 0) {
         return json({
-          error: 'Ù„Ø§ ÙŠÙ…ÙƒÙ† ØªÙ†ÙÙŠØ° Ø§Ù„Ø§Ø³ØªÙŠØ±Ø§Ø¯ Ù‚Ø¨Ù„ Ù…Ø¹Ø§Ù„Ø¬Ø© Ø§Ù„Ø£Ø®Ø·Ø§Ø¡ Ø§Ù„Ø­Ø±Ø¬Ø©',
+          error: 'لا يمكن تنفيذ الاستيراد قبل معالجة الأخطاء الحرجة',
           valid: false,
           errors: preflightErrors.map((decision) => ({
             row: decision.row.rowNumber,
-            name: decision.row.code || `ØµÙ ${decision.row.rowNumber}`,
-            error: decision.errors.map((issue) => issue.message).join('Ø› '),
+            name: decision.row.code || `صف ${decision.row.rowNumber}`,
+            error: decision.errors.map((issue) => issue.message).join('؛ '),
           })),
         }, 422);
       }
@@ -1764,7 +1764,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
       const warnings: Array<{ row: number; name: string; warning: string }> = [];
       for (const decision of decisions) {
         const row = decision.row;
-        const name = row.name || `ØµÙ ${row.rowNumber}`;
+        const name = row.name || `صف ${row.rowNumber}`;
         if (decision.state === 'empty') continue;
         for (const warning of decision.warnings) {
           warnings.push({ row: row.rowNumber, name, warning: warning.message });
@@ -1773,7 +1773,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
           errors.push({
             row: row.rowNumber,
             name,
-            error: decision.errors.map((issue) => issue.message).join('Ø› '),
+            error: decision.errors.map((issue) => issue.message).join('؛ '),
           });
           continue;
         }
@@ -1818,7 +1818,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
               remainingQuantity: row.currentStock,
               expiryDate: row.expiryDate,
               supplier: row.supplier,
-              deliveryNoteNumber: `Ø§ÙØªØªØ§Ø­ÙŠ-${item.id}`,
+              deliveryNoteNumber: `افتتاحي-${item.id}`,
               deliveryNoteDate: now().slice(0, 10),
             };
             state.inventoryBatches.push(batch);
@@ -1836,7 +1836,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
       for (const decision of batchDecisions) {
         if (decision.state === 'empty') continue;
         const item = state.items.find((entry) => text(entry.code) === decision.row.code);
-        if (!item) return failure(400, `Ø§Ù„Ù…Ø§Ø¯Ø© Ø°Ø§Øª Ø§Ù„Ø±Ù…Ø² ${decision.row.code} ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø©`);
+        if (!item) return failure(400, `المادة ذات الرمز ${decision.row.code} غير موجودة`);
         const quantity = numberValue(decision.row.quantity);
         const batch = {
           id: nextId(state),
@@ -1846,7 +1846,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
           remainingQuantity: quantity,
           expiryDate: decision.row.expiryDate,
           supplier: decision.row.supplier,
-          deliveryNoteNumber: decision.row.deliveryNoteNumber ?? `Ø§Ø³ØªÙŠØ±Ø§Ø¯-Ø¯ÙØ¹Ø©-${item.id}-${decision.row.rowNumber}`,
+          deliveryNoteNumber: decision.row.deliveryNoteNumber ?? `استيراد-دفعة-${item.id}-${decision.row.rowNumber}`,
           deliveryNoteDate: decision.row.deliveryNoteDate ?? now().slice(0, 10),
         };
         item.currentStock = numberValue(item.currentStock) + quantity;
@@ -1905,7 +1905,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     });
   }
   if (pathname === '/api/equipment' && method === 'POST') {
-    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'ليس لديك صلاحية');
     return mutate((state) => {
       const equipment = equipmentFromInput(state, readBody(init));
       state.equipment.push(equipment);
@@ -1922,18 +1922,18 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
   if (equipmentId && pathname === `/api/equipment/${equipmentId}` && method === 'GET') {
     return read((state) => {
       const equipment = state.equipment.find((entry) => entry.id === equipmentId);
-      return equipment ? json(equipment) : failure(404, 'Ø§Ù„ØªØ¬Ù‡ÙŠØ² ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯');
+      return equipment ? json(equipment) : failure(404, 'التجهيز غير موجود');
     });
   }
   if (equipmentId && pathname === `/api/equipment/${equipmentId}` && method === 'PUT') {
-    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'ليس لديك صلاحية');
     return mutate((state) => {
       const index = state.equipment.findIndex((entry) => entry.id === equipmentId);
-      if (index < 0) return failure(404, 'Ø§Ù„ØªØ¬Ù‡ÙŠØ² ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯');
+      if (index < 0) return failure(404, 'التجهيز غير موجود');
       const body = readBody(init);
       const existing = state.equipment[index];
       if (body.quantity !== undefined && Number(body.quantity) !== numberValue(existing.quantity)) {
-        return failure(409, 'Ù„Ø§ ÙŠÙ…ÙƒÙ† ØªØ¹Ø¯ÙŠÙ„ ÙƒÙ…ÙŠØ© Ø§Ù„ØªØ¬Ù‡ÙŠØ² Ù…Ø¨Ø§Ø´Ø±Ø© â€” Ø§Ø³ØªØ®Ø¯Ù… ØªØ³ÙˆÙŠØ© Ø§Ù„Ø¬Ø±Ø¯ (Ø§Ù„Ø±ØµÙŠØ¯ ÙŠÙØ¯Ø§Ø± Ø¹Ø¨Ø± Ø³Ù†Ø¯Ø§Øª Ø§Ù„Ø­Ø±ÙƒØ©)' );
+        return failure(409, 'لا يمكن تعديل كمية التجهيز مباشرة — استخدم تسوية الجرد (الرصيد يُدار عبر سندات الحركة)' );
       }
       state.equipment[index] = equipmentFromInput(state, body, existing);
       addAudit(state, currentUser, 'update', 'equipment', equipmentId);
@@ -1941,7 +1941,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     });
   }
   if (equipmentId && pathname === `/api/equipment/${equipmentId}` && method === 'DELETE') {
-    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'ليس لديك صلاحية');
     return mutate((state) => {
       state.equipment = state.equipment.filter((entry) => entry.id !== equipmentId);
       addAudit(state, currentUser, 'delete', 'equipment', equipmentId);
@@ -1949,7 +1949,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     });
   }
   if (pathname === '/api/equipment/bulk-import' && method === 'POST') {
-    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'ليس لديك صلاحية');
     return mutate((state) => {
       const body = readBody(init);
       const input = Array.isArray(body) ? body : Array.isArray((body as { equipment?: unknown }).equipment) ? (body as { equipment: unknown[] }).equipment : [];
@@ -1960,7 +1960,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
         const value = (entry ?? {}) as Record<string, unknown>;
         const name = text(value.name);
         if (!name) {
-          errors.push({ row: index + 2, name: '', error: 'Ø§Ø³Ù… Ø§Ù„ØªØ¬Ù‡ÙŠØ² Ù…Ø·Ù„ÙˆØ¨' });
+          errors.push({ row: index + 2, name: '', error: 'اسم التجهيز مطلوب' });
           continue;
         }
         const serial = text(value.serialNumber);
@@ -1980,7 +1980,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
   }
 
   if (pathname === '/api/catalog/import/preview' && method === 'POST') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ© Ù„Ø§Ø³ØªÙŠØ±Ø§Ø¯ Ø§Ù„ÙƒØªØ§Ù„ÙˆØ¬');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية لاستيراد الكتالوج');
     return read((state) => {
       const body = (readBody(init) ?? {}) as { mode?: unknown; items?: unknown; equipment?: unknown };
       const mode = catalogMode(body.mode);
@@ -1996,7 +1996,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     });
   }
   if (pathname === '/api/catalog/import' && method === 'POST') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ© Ù„Ø§Ø³ØªÙŠØ±Ø§Ø¯ Ø§Ù„ÙƒØªØ§Ù„ÙˆØ¬');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية لاستيراد الكتالوج');
     return mutate((state) => {
       const body = (readBody(init) ?? {}) as { mode?: unknown; items?: unknown; equipment?: unknown };
       const mode = catalogMode(body.mode);
@@ -2006,7 +2006,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
       const summary = catalogSummary(items, equipment);
       if (summary.totals.error > 0) {
         return json({
-          error: 'Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø§Ù„ØªÙ†ÙÙŠØ° Ù…Ø¹ ÙˆØ¬ÙˆØ¯ Ø£Ø®Ø·Ø§Ø¡ ÙÙŠ Ø§Ù„Ù…Ù„Ù. ØµØ­Ù‘Ø­ Ø§Ù„Ø£Ø®Ø·Ø§Ø¡ Ø«Ù… Ø£Ø¹Ø¯ Ø§Ù„Ù…Ø­Ø§ÙˆÙ„Ø©.',
+          error: 'لا يمكن التنفيذ مع وجود أخطاء في الملف. صحّح الأخطاء ثم أعد المحاولة.',
           code: 'CATALOG_IMPORT_HAS_ERRORS',
           summary,
         }, 409);
@@ -2055,7 +2055,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
       for (const decision of equipment.rows) {
         if (decision.action === 'skip' || decision.action === 'error') continue;
         const row = decision.data;
-        const notes = [row.company ? `Ø§Ù„Ø´Ø±ÙƒØ©: ${row.company}` : null, row.notes].filter(Boolean).join(' | ') || null;
+        const notes = [row.company ? `الشركة: ${row.company}` : null, row.notes].filter(Boolean).join(' | ') || null;
         const existing = decision.action === 'update'
           ? state.equipment.find((entry) => (row.serialNumber
             ? text(entry.serialNumber) === row.serialNumber
@@ -2122,7 +2122,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     return read((state) => json(state.recipients.filter((entry) => searchParams.get('includeInactive') === 'true' || entry.isActive !== false)));
   }
   if (pathname === '/api/recipients' && method === 'POST') {
-    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'ليس لديك صلاحية');
     return mutate((state) => {
       const body = readBody(init);
       const recipient = { id: nextId(state), name: text(body.name), notes: body.notes ?? null, isActive: true, createdAt: now() };
@@ -2133,20 +2133,20 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
   }
   const recipientId = idFrom(pathname, 'recipients');
   if (recipientId && pathname === `/api/recipients/${recipientId}` && method === 'PUT') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
     return mutate((state) => {
       const recipient = state.recipients.find((entry) => entry.id === recipientId);
-      if (!recipient) return failure(404, 'Ø§Ù„Ø¬Ù‡Ø© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø©');
+      if (!recipient) return failure(404, 'الجهة غير موجودة');
       const body = readBody(init);
       Object.assign(recipient, { name: text(body.name, text(recipient.name)), notes: body.notes ?? recipient.notes });
       return json(recipient);
     });
   }
   if (recipientId && pathname === `/api/recipients/${recipientId}/toggle` && method === 'PATCH') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
     return mutate((state) => {
       const recipient = state.recipients.find((entry) => entry.id === recipientId);
-      if (!recipient) return failure(404, 'Ø§Ù„Ø¬Ù‡Ø© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø©');
+      if (!recipient) return failure(404, 'الجهة غير موجودة');
       recipient.isActive = !recipient.isActive;
       return json(recipient);
     });
@@ -2156,7 +2156,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     return read((state) => json(state.exitReasons.filter((entry) => searchParams.get('includeInactive') === 'true' || entry.isActive !== false)));
   }
   if (pathname === '/api/exit-reasons' && method === 'POST') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
     return mutate((state) => {
       const body = readBody(init);
       const reason = { id: nextId(state), name: text(body.name), isSystem: false, isActive: true, createdAt: now() };
@@ -2166,20 +2166,20 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
   }
   const reasonId = idFrom(pathname, 'exit-reasons');
   if (reasonId && pathname === `/api/exit-reasons/${reasonId}` && method === 'PUT') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
     return mutate((state) => {
       const reason = state.exitReasons.find((entry) => entry.id === reasonId);
-      if (!reason) return failure(404, 'Ø³Ø¨Ø¨ Ø§Ù„Ø¥Ø®Ø±Ø§Ø¬ ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯');
+      if (!reason) return failure(404, 'سبب الإخراج غير موجود');
       reason.name = text(readBody(init).name, text(reason.name));
       return json(reason);
     });
   }
   if (reasonId && pathname === `/api/exit-reasons/${reasonId}/toggle` && method === 'PATCH') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
     return mutate((state) => {
       const reason = state.exitReasons.find((entry) => entry.id === reasonId);
-      if (!reason) return failure(404, 'Ø³Ø¨Ø¨ Ø§Ù„Ø¥Ø®Ø±Ø§Ø¬ ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯');
-      if (reason.isSystem) return failure(400, 'Ù„Ø§ ÙŠÙ…ÙƒÙ† ØªØ¹Ø·ÙŠÙ„ Ø§Ù„Ø£Ø³Ø¨Ø§Ø¨ Ø§Ù„Ø§ÙØªØ±Ø§Ø¶ÙŠØ© Ù„Ù„Ù†Ø¸Ø§Ù…');
+      if (!reason) return failure(404, 'سبب الإخراج غير موجود');
+      if (reason.isSystem) return failure(400, 'لا يمكن تعطيل الأسباب الافتراضية للنظام');
       reason.isActive = !reason.isActive;
       return json(reason);
     });
@@ -2196,7 +2196,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     });
   }
   if (pathname.startsWith('/api/transactions/') && !pathname.endsWith('/reverse') && method === 'POST') {
-    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'ليس لديك صلاحية');
     return mutate((state) => {
       const body = readBody(init);
       const requestedType = pathname.split('/').pop() ?? 'adjust';
@@ -2209,16 +2209,16 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
         : undefined;
       if (type === 'custody_out') {
         const requestedQuantity = numberValue(body.quantity, 1);
-        if (!custodyEquipment) return failure(404, 'Ø§Ù„ØªØ¬Ù‡ÙŠØ² ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯');
+        if (!custodyEquipment) return failure(404, 'التجهيز غير موجود');
         if (requestedQuantity < 1 || requestedQuantity > numberValue(custodyEquipment.quantity, 1)) {
-          return failure(400, 'ÙƒÙ…ÙŠØ© Ø§Ù„Ø¹Ù‡Ø¯Ø© ØºÙŠØ± ØµØ§Ù„Ø­Ø©');
+          return failure(400, 'كمية العهدة غير صالحة');
         }
       }
       if (type === 'custody_return') {
         const requestedQuantity = numberValue(body.quantity);
-        if (!custodyReturn) return failure(404, 'Ø§Ù„Ø¹Ù‡Ø¯Ø© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø©');
+        if (!custodyReturn) return failure(404, 'العهدة غير موجودة');
         if (requestedQuantity < 1 || requestedQuantity > numberValue(custodyReturn.quantity) - numberValue(custodyReturn.returnedQuantity)) {
-          return failure(400, 'ÙƒÙ…ÙŠØ© Ø§Ù„Ø¥Ø¹Ø§Ø¯Ø© ØªØªØ¬Ø§ÙˆØ² Ø§Ù„Ù…ØªØ¨Ù‚ÙŠ ÙÙŠ Ø§Ù„Ø¹Ù‡Ø¯Ø©');
+          return failure(400, 'كمية الإعادة تتجاوز المتبقي في العهدة');
         }
       }
       const transaction = {
@@ -2238,15 +2238,15 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
         const newStock = numberValue(body.newStock);
         if (body.itemType === 'equipment') {
           const equipment = state.equipment.find((entry) => entry.id === Number(body.equipmentId));
-          if (!equipment) return failure(404, 'Ø§Ù„ØªØ¬Ù‡ÙŠØ² ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯');
+          if (!equipment) return failure(404, 'التجهيز غير موجود');
           const previousStock = numberValue(equipment.quantity, 0);
-          if (newStock < previousStock && newStock < 0) return failure(400, 'Ø§Ù„Ø±ØµÙŠØ¯ Ø§Ù„Ø¬Ø¯ÙŠØ¯ ÙŠØ¬Ø¨ Ø£Ù† ÙŠÙƒÙˆÙ† ØµÙØ±Ù‹Ø§ Ø£Ùˆ Ø£ÙƒØ¨Ø±');
+          if (newStock < previousStock && newStock < 0) return failure(400, 'الرصيد الجديد يجب أن يكون صفرًا أو أكبر');
           equipment.quantity = newStock;
           transaction.quantity = Math.abs(newStock - previousStock);
           transaction.details = { previousStock, newStock, delta: newStock - previousStock, deltaType: newStock > previousStock ? 'increase' : 'decrease', openCustody: 0, availableBefore: previousStock, equipmentNameSnap: equipment.name, equipmentModelSnap: equipment.model ?? null, equipmentSerialSnap: equipment.serialNumber ?? null, equipmentConditionSnap: equipment.condition ?? null };
         } else {
           const item = state.items.find((entry) => entry.id === Number(body.itemId));
-          if (!item) return failure(404, 'Ø§Ù„Ù…Ø§Ø¯Ø© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø©');
+          if (!item) return failure(404, 'المادة غير موجودة');
           const previousStock = numberValue(item.currentStock, 0);
           item.currentStock = newStock;
           const delta = newStock - previousStock;
@@ -2322,7 +2322,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
       if (type === 'custody_out') {
         const equipment = custodyEquipment;
         const quantity = numberValue(body.quantity, 1);
-        if (!equipment) return failure(404, 'Ø§Ù„ØªØ¬Ù‡ÙŠØ² ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯');
+        if (!equipment) return failure(404, 'التجهيز غير موجود');
         const custody = {
           id: nextId(state),
           equipmentId: equipment.id,
@@ -2355,10 +2355,10 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
       if (type === 'custody_return') {
         const custodyId = numberValue(body.custodyId);
         const custody = custodyReturn;
-        if (!custody) return failure(404, 'Ø§Ù„Ø¹Ù‡Ø¯Ø© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø©');
+        if (!custody) return failure(404, 'العهدة غير موجودة');
         const quantity = numberValue(body.quantity);
         const outstanding = numberValue(custody.quantity) - numberValue(custody.returnedQuantity);
-        if (quantity < 1 || quantity > outstanding) return failure(400, `ÙƒÙ…ÙŠØ© Ø§Ù„Ø¥Ø¹Ø§Ø¯Ø© ØªØªØ¬Ø§ÙˆØ² Ø§Ù„Ù…ØªØ¨Ù‚ÙŠ ÙÙŠ Ø§Ù„Ø¹Ù‡Ø¯Ø© (${outstanding})`);
+        if (quantity < 1 || quantity > outstanding) return failure(400, `كمية الإعادة تتجاوز المتبقي في العهدة (${outstanding})`);
         const condition = text(body.returnCondition, 'good');
         const returnRecord = {
           id: nextId(state),
@@ -2404,7 +2404,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
   if (transactionId && pathname === `/api/transactions/${transactionId}` && method === 'GET') {
     return read((state) => {
       const transaction = state.transactions.find((entry) => entry.id === transactionId);
-      return transaction ? json(transaction) : failure(404, 'Ø§Ù„Ø³Ù†Ø¯ ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯');
+      return transaction ? json(transaction) : failure(404, 'السند غير موجود');
     });
   }
   if (transactionId && pathname === `/api/transactions/${transactionId}/print` && method === 'GET') {
@@ -2419,7 +2419,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
           batchNumber: entry.batchNumberSnap ? text(entry.batchNumberSnap) : null,
           expiryDate: entry.expiryDateSnap ? text(entry.expiryDateSnap) : null,
         }));
-      if (!transaction) return failure(404, 'Ø§Ù„Ø³Ù†Ø¯ ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯');
+      if (!transaction) return failure(404, 'السند غير موجود');
       const item = state.items.find((entry) => entry.id === Number(transaction.itemId));
       const equipment = state.equipment.find((entry) => entry.id === Number(transaction.equipmentId));
       return json({
@@ -2474,7 +2474,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     return read((state) => {
       const raw = state.personalCustodies.find((entry) => numberValue(entry.id) === custodyId);
       const equipment = raw && state.equipment.find((entry) => numberValue(entry.id) === numberValue(raw.equipmentId));
-      if (!raw || !equipment) return failure(404, 'Ø§Ù„Ø¹Ù‡Ø¯Ø© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø©');
+      if (!raw || !equipment) return failure(404, 'العهدة غير موجودة');
       const quantity = numberValue(raw.quantity);
       const returnedQuantity = numberValue(raw.returnedQuantity);
       const outstandingQuantity = Math.max(0, quantity - returnedQuantity);
@@ -2491,7 +2491,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
         {
           id: `transaction-${source?.id ?? raw.id}`,
           kind: 'created',
-          label: 'Ø¥Ù†Ø´Ø§Ø¡ Ø§Ù„Ø¹Ù‡Ø¯Ø© ÙˆØªØ³Ù„ÙŠÙ… Ø§Ù„ØªØ¬Ù‡ÙŠØ²',
+          label: 'إنشاء العهدة وتسليم التجهيز',
           date: source?.transactionDate ?? raw.deliveryDate,
           quantity,
           documentNumber: raw.deliveryNoteNumber,
@@ -2505,7 +2505,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
           return {
             id: `return-${entry.id}`,
             kind: entry.condition === 'damaged' ? 'damaged' : 'returned',
-            label: returnedSoFar >= quantity ? 'Ø¥Ø¹Ø§Ø¯Ø© ÙƒØ§Ù…Ù„Ø©' : 'Ø¥Ø¹Ø§Ø¯Ø© Ø¬Ø²Ø¦ÙŠØ©',
+            label: returnedSoFar >= quantity ? 'إعادة كاملة' : 'إعادة جزئية',
             date: entry.returnDate,
             quantity: numberValue(entry.quantity),
             documentNumber: entry.documentNumber,
@@ -2544,7 +2544,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     const historyEquipmentId = Number(pathname.split('/')[3]);
     return read((state) => {
       const rawEquipment = state.equipment.find((entry) => numberValue(entry.id) === historyEquipmentId);
-      if (!rawEquipment) return failure(404, 'Ø§Ù„ØªØ¬Ù‡ÙŠØ² ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯');
+      if (!rawEquipment) return failure(404, 'التجهيز غير موجود');
       const equipmentCustodies = state.personalCustodies.filter((entry) => numberValue(entry.equipmentId) === historyEquipmentId);
       const typeFilter = text(searchParams.get('type'));
       const from = text(searchParams.get('from'));
@@ -2698,7 +2698,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
           generated.push({
             id: `below_min-${item.id}`, dbId: numberValue(item.id), type: 'below_min',
             entityId: numberValue(item.id), entityType: 'item', entityName: text(item.name, 'â€”'),
-            itemName: text(item.name, 'â€”'), message: `Ø§Ù„Ø±ØµÙŠØ¯ ${current} Ø£Ù‚Ù„ Ù…Ù† Ø£Ùˆ ÙŠØ³Ø§ÙˆÙŠ Ø§Ù„Ø­Ø¯ Ø§Ù„Ø£Ø¯Ù†Ù‰ ${minimum}`,
+            itemName: text(item.name, '—'), message: `الرصيد ${current} أقل من أو يساوي الحد الأدنى ${minimum}`,
             severity: current === 0 ? 'critical' : 'warning', isRead: false, createdAt: now(), updatedAt: now(),
           });
         }
@@ -2709,7 +2709,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
             generated.push({
               id: `near_expiry-${item.id}`, dbId: numberValue(item.id), type: 'near_expiry',
               entityId: numberValue(item.id), entityType: 'item', entityName: text(item.name, 'â€”'),
-              itemName: text(item.name, 'â€”'), message: expired ? 'Ø§Ù„Ù…Ø§Ø¯Ø© Ù…Ù†ØªÙ‡ÙŠØ© Ø§Ù„ØµÙ„Ø§Ø­ÙŠØ©' : `ØªÙ†ØªÙ‡ÙŠ Ø§Ù„ØµÙ„Ø§Ø­ÙŠØ© ÙÙŠ ${String(item.expiryDate).slice(0, 10)}`,
+              itemName: text(item.name, '—'), message: expired ? 'المادة منتهية الصلاحية' : `تنتهي الصلاحية في ${String(item.expiryDate).slice(0, 10)}`,
               severity: expired ? 'critical' : 'warning', isRead: false, createdAt: now(), updatedAt: now(),
             });
           }
@@ -2721,7 +2721,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
           generated.push({
             id: `equipment_maintenance-${equipment.id}`, dbId: numberValue(equipment.id), type: 'equipment_maintenance',
             entityId: numberValue(equipment.id), entityType: 'equipment', entityName: text(equipment.name, 'â€”'),
-            message: condition === 'broken' ? 'Ø§Ù„ØªØ¬Ù‡ÙŠØ² Ù…Ø¹Ø·Ù„ ÙˆÙŠØ­ØªØ§Ø¬ Ø¥Ù„Ù‰ Ù…Ø¹Ø§Ù„Ø¬Ø©' : 'Ø§Ù„ØªØ¬Ù‡ÙŠØ² ÙŠØ­ØªØ§Ø¬ Ø¥Ù„Ù‰ ØµÙŠØ§Ù†Ø© Ø£Ùˆ ÙØ­Øµ',
+            message: condition === 'broken' ? 'التجهيز معطل ويحتاج إلى معالجة' : 'التجهيز يحتاج إلى صيانة أو فحص',
             severity: condition === 'broken' ? 'critical' : 'warning', isRead: false, createdAt: now(), updatedAt: now(),
           });
         }
@@ -2817,16 +2817,16 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
            },
          });
        }
-      return failure(404, 'Ø§Ù„ØªÙ‚Ø±ÙŠØ± ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯');
+      return failure(404, 'التقرير غير موجود');
     });
   }
 
   if (pathname === '/api/users' && method === 'GET') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
     return read((state) => json(state.users.map(publicUser)));
   }
   if (pathname === '/api/users' && method === 'POST') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
     return mutate(async (state) => {
       const body = readBody(init);
       const username = text(body.username);
@@ -2848,16 +2848,16 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
   }
   const userId = idFrom(pathname, 'users');
   if (userId && pathname === `/api/users/${userId}` && method === 'PUT') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
     return mutate((state) => {
       const user = state.users.find((entry) => entry.id === userId);
-      if (!user) return failure(404, 'Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù… ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯');
+      if (!user) return failure(404, 'المستخدم غير موجود');
       Object.assign(user, readBody(init));
       return json(publicUser(user));
     });
   }
   if (userId && pathname === `/api/users/${userId}` && method === 'DELETE') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
     return mutate((state) => {
       state.users = state.users.filter((entry) => entry.id !== userId);
       if (state.currentUserId === userId) state.currentUserId = null;
@@ -2867,7 +2867,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
 
   if (pathname === '/api/settings' && method === 'GET') return read((state) => json(state.settings));
   if (pathname === '/api/settings' && method === 'PUT') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
     return mutate((state) => {
       Object.assign(state.settings, readBody(init), { updatedAt: now() });
       return json(state.settings);
@@ -2876,7 +2876,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
   if (pathname === '/api/settings/profile' && method === 'PATCH') {
     return mutate((state) => {
       const user = state.users.find((entry) => entry.id === currentUser.id);
-      if (!user) return failure(404, 'Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù… ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯');
+      if (!user) return failure(404, 'المستخدم غير موجود');
       Object.assign(user, { fullName: text(readBody(init).fullName, user.fullName) });
       return json(publicUser(user));
     });
@@ -2884,7 +2884,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
   if (pathname === '/api/settings/change-password' && method === 'POST') {
     return mutate(async (state) => {
       const user = state.users.find((entry) => entry.id === currentUser.id);
-      if (!user) return failure(404, 'Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù… ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯');
+      if (!user) return failure(404, 'المستخدم غير موجود');
       const body = readBody(init);
       if (text(body.newPassword).length < 8) return failure(400, 'Password must be at least 8 characters');
       const salt = crypto.randomUUID();
@@ -2895,7 +2895,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
   }
   if (pathname === '/api/settings/my-activity' && method === 'GET') return read((state) => json(state.auditLog.filter((entry) => entry.userId === currentUser.id)));
   if (pathname === '/api/audit' && method === 'GET') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
     return read((state) => {
       const from = text(searchParams.get('from'));
       const to = text(searchParams.get('to'));
@@ -2922,7 +2922,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     headers: { 'content-type': 'application/json', 'content-disposition': 'attachment; filename="damascus-backup.json"', [OFFLINE_HEADER]: '1' },
   }));
   if (pathname === '/api/backups/export' && method === 'POST') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
     return read((state) => new Response(JSON.stringify({ version: 1, exportedAt: now(), data: state }, null, 2), {
       status: 200,
       headers: {
@@ -2938,7 +2938,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
       const pkg = await readDmeSyncPackageInWorker(Uint8Array.from(atob(text(body.packageBase64)), (character) => character.charCodeAt(0)), text(body.password));
       return json(dmePackageSummary(pkg));
     } catch (error) {
-      return failure(400, error instanceof Error ? error.message : 'ØªØ¹Ø°Ø± ÙØ­Øµ Ø§Ù„Ø­Ø²Ù…Ø©');
+      return failure(400, error instanceof Error ? error.message : 'تعذر فحص الحزمة');
     }
   }
   if (pathname === '/api/backups/dry-run' && method === 'POST') {
@@ -2981,15 +2981,15 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
       });
       return json({ token, report: { mode: pendingDmePreview.mode, packageHash: pkg.packageHash, packageType: pkg.manifest.packageType, counts: { total: records.length, applied: counts.applied ?? 0, duplicate: 0, rejected: 0, conflict: 0, skipped: counts.skipped ?? 0 }, records }, summary: dmePackageSummary(pkg) });
     } catch (error) {
-      return failure(400, error instanceof Error ? error.message : 'ØªØ¹Ø°Ø± ØªÙ†ÙÙŠØ° Ø§Ù„Ù…Ø¹Ø§ÙŠÙ†Ø©');
+      return failure(400, error instanceof Error ? error.message : 'تعذر تنفيذ المعاينة');
     }
   }
   if (pathname === '/api/backups/restore' && method === 'POST') {
     const body = readBody(init);
-    if (body.confirm !== true) return failure(400, 'ÙŠØ¬Ø¨ ØªØ£ÙƒÙŠØ¯ Ø§Ù„Ø§Ø³ØªØ¹Ø§Ø¯Ø© Ø¨Ø¹Ø¯ Ø§Ù„Ù…Ø¹Ø§ÙŠÙ†Ø©');
+    if (body.confirm !== true) return failure(400, 'يجب تأكيد الاستعادة بعد المعاينة');
     const preview = pendingDmePreview ?? await loadPendingPreview();
-    if (!preview || preview.token !== text(body.previewToken)) return failure(400, 'Ø§Ù„Ù…Ø¹Ø§ÙŠÙ†Ø© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø© Ø£Ùˆ Ù…Ù†ØªÙ‡ÙŠØ©');
-    if (preview.mode !== (text(body.mode) === 'full' ? 'full' : 'merge')) return failure(400, 'Ù†Ù…Ø· Ø§Ù„Ø§Ø³ØªØ¹Ø§Ø¯Ø© Ù„Ø§ ÙŠØ·Ø§Ø¨Ù‚ Ø§Ù„Ù…Ø¹Ø§ÙŠÙ†Ø©');
+    if (!preview || preview.token !== text(body.previewToken)) return failure(400, 'المعاينة غير موجودة أو منتهية');
+    if (preview.mode !== (text(body.mode) === 'full' ? 'full' : 'merge')) return failure(400, 'نمط الاستعادة لا يطابق المعاينة');
     return mutate((state) => {
        const entities: Record<string, keyof OfflineState> = {
         categories: 'categories',
@@ -3062,14 +3062,14 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
   }
 
   if (pathname === '/api/sync/node' && method === 'GET') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
     return read((state) => json({ nodeId: state.nodeIdentity.nodeId, vector: syncVector(state) }));
   }
   if (pathname === '/api/sync/export' && method === 'POST') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
     const body = readBody(init);
     const password = text(body.password);
-    if (password.length < 8) return failure(400, 'ÙƒÙ„Ù…Ø© Ù…Ø±ÙˆØ± Ø§Ù„Ø­Ø²Ù…Ø© ÙŠØ¬Ø¨ Ø£Ù† ØªÙƒÙˆÙ† 8 Ø£Ø­Ø±Ù Ø¹Ù„Ù‰ Ø§Ù„Ø£Ù‚Ù„');
+    if (password.length < 8) return failure(400, 'كلمة مرور الحزمة يجب أن تكون 8 أحرف على الأقل');
     return mutate(async (state) => {
       const changes = state.changeLog.filter((entry) => text(entry.status) !== 'rejected');
       const records: Array<{ entityType: string; localId: number; data: Record<string, unknown> }> = [];
@@ -3099,7 +3099,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     });
   }
   if (pathname === '/api/sync/import' && method === 'POST') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
     const body = readBody(init);
     let pkg;
     try {
@@ -3108,7 +3108,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
         text(body.password),
       );
     } catch (error) {
-      return failure(400, error instanceof Error ? error.message : 'ØªØ¹Ø°Ø± ÙÙƒ ØªØ´ÙÙŠØ± Ø§Ù„Ø­Ø²Ù…Ø©');
+      return failure(400, error instanceof Error ? error.message : 'تعذر فك تشفير الحزمة');
     }
     return mutate((state) => {
       const counts = applyOfflineChanges(state, pkg.changes);
@@ -3141,7 +3141,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     });
   }
   if (pathname === '/api/units/usage' && method === 'GET') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
     return read((state) => {
       const known = new Set(state.units.filter((unit) => unit.isActive !== false).map((unit) => text(unit.name)));
       const counts = new Map<string, number>();
@@ -3157,7 +3157,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     });
   }
   if (pathname === '/api/units/seed-defaults' && method === 'POST') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
     return mutate((state) => {
       let created = 0;
       for (const name of DEFAULT_INVENTORY_UNITS) {
@@ -3179,13 +3179,13 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     });
   }
   if (pathname === '/api/units/normalize' && method === 'POST') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
     return mutate((state) => {
       const body = readBody(init) ?? {};
       const from = text(body.from).trim();
       const to = text(body.to).trim();
-      if (!from || !to) return failure(400, 'from Ùˆ to Ù…Ø·Ù„ÙˆØ¨Ø§Ù†');
-      if (from === to) return failure(400, 'Ø§Ù„ÙˆØ­Ø¯Ø© Ø§Ù„Ù…ØµØ¯Ø± ÙˆØ§Ù„Ù‡Ø¯Ù Ù…ØªØ·Ø§Ø¨Ù‚ØªØ§Ù†');
+      if (!from || !to) return failure(400, 'from و to مطلوبان');
+      if (from === to) return failure(400, 'الوحدة المصدر والهدف متطابقتان');
       let updated = 0;
       for (const item of state.items) {
         if (text(item.unit) !== from) continue;
@@ -3198,13 +3198,13 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     });
   }
   if (pathname === '/api/units' && method === 'POST') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
     return mutate((state) => {
       const body = readBody(init) ?? {};
       const name = text(body.name).trim();
-      if (!name) return failure(400, 'Ø§Ø³Ù… Ø§Ù„ÙˆØ­Ø¯Ø© Ù…Ø·Ù„ÙˆØ¨');
+      if (!name) return failure(400, 'اسم الوحدة مطلوب');
       if (state.units.some((unit) => text(unit.name) === name)) {
-        return json({ error: 'ÙŠÙˆØ¬Ø¯ ÙˆØ­Ø¯Ø© Ù…Ø³Ø¬Ù‘Ù„Ø© Ø¨Ù†ÙØ³ Ø§Ù„Ø§Ø³Ù….', code: 'UNIT_NAME_DUPLICATE' }, 409);
+        return json({ error: 'يوجد وحدة مسجّلة بنفس الاسم.', code: 'UNIT_NAME_DUPLICATE' }, 409);
       }
       const unit = {
         id: nextId(state),
@@ -3222,18 +3222,18 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     });
   }
   if (pathname.startsWith('/api/units/') && (method === 'PUT' || method === 'DELETE')) {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
     return mutate((state) => {
       const id = Number.parseInt(pathname.split('/').pop() ?? '', 10);
-      if (!Number.isSafeInteger(id) || id <= 0) return failure(400, 'Ù…Ø¹Ø±Ù‘Ù Ø§Ù„ÙˆØ­Ø¯Ø© ØºÙŠØ± ØµØ§Ù„Ø­');
+      if (!Number.isSafeInteger(id) || id <= 0) return failure(400, 'معرّف الوحدة غير صالح');
       const unit = state.units.find((entry) => numberValue(entry.id) === id);
-      if (!unit) return failure(404, 'Ø§Ù„ÙˆØ­Ø¯Ø© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø©');
+      if (!unit) return failure(404, 'الوحدة غير موجودة');
       if (method === 'DELETE') {
         const inUse = state.items.filter((item) => text(item.unit) === text(unit.name)).length;
         if (inUse > 0) {
           return json(
             {
-              error: `Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø£Ø±Ø´ÙØ© ÙˆØ­Ø¯Ø© Ù…Ø³ØªØ®Ø¯Ù…Ø© ÙÙŠ ${inUse} ØµÙ†Ù. ÙˆØ­Ù‘Ø¯ Ø§Ù„ÙˆØ­Ø¯Ø§Øª Ø£Ùˆ Ø£Ø±Ø´Ù Ø§Ù„Ø£ØµÙ†Ø§Ù Ø£ÙˆÙ„Ù‹Ø§.`,
+              error: `لا يمكن أرشفة وحدة مستخدمة في ${inUse} صنف. وحّد الوحدات أو أرشف الأصناف أولًا.`,
               code: 'UNIT_IN_USE',
               items: inUse,
             },
@@ -3248,9 +3248,9 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
       const body = readBody(init) ?? {};
       if (body.name !== undefined) {
         const name = text(body.name).trim();
-        if (!name) return failure(400, 'Ø§Ø³Ù… Ø§Ù„ÙˆØ­Ø¯Ø© Ù…Ø·Ù„ÙˆØ¨');
+        if (!name) return failure(400, 'اسم الوحدة مطلوب');
         if (state.units.some((other) => text(other.name) === name && numberValue(other.id) !== id)) {
-          return json({ error: 'ÙŠÙˆØ¬Ø¯ ÙˆØ­Ø¯Ø© Ù…Ø³Ø¬Ù‘Ù„Ø© Ø¨Ù†ÙØ³ Ø§Ù„Ø§Ø³Ù….', code: 'UNIT_NAME_DUPLICATE' }, 409);
+          return json({ error: 'يوجد وحدة مسجّلة بنفس الاسم.', code: 'UNIT_NAME_DUPLICATE' }, 409);
         }
         unit.name = name;
       }
@@ -3281,22 +3281,22 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     return read((state) => json(offlineCurrentWarehouse(state)));
   }
   if (pathname === '/api/warehouses/current' && method === 'POST') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
     return mutate((state) => {
       const body = readBody(init) ?? {};
       const id = numberValue(body.id);
       const warehouse = state.warehouses.find((entry) => numberValue(entry.id) === id);
-      if (!warehouse) return failure(404, 'Ø§Ù„Ù…Ø³ØªÙˆØ¯Ø¹ ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯.');
+      if (!warehouse) return failure(404, 'المستودع غير موجود.');
       state.currentWarehouseId = id;
       addAudit(state, currentUser, 'set_current_warehouse', 'warehouse', id);
       return json(offlineWarehouseView(warehouse));
     });
   }
   if (pathname === '/api/warehouses/next-document-number' && method === 'GET') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
     return mutate((state) => {
       const type = text(searchParams.get('type')).trim();
-      if (!type) return failure(400, 'type Ù…Ø·Ù„ÙˆØ¨ (Ù…Ø«Ø§Ù„: in).');
+      if (!type) return failure(400, 'type مطلوب (مثال: in).');
       const DOC_TYPES: Record<string, string> = {
         IN: 'IN',
         OUT: 'OUT',
@@ -3312,14 +3312,14 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     });
   }
   if (pathname === '/api/warehouses' && method === 'POST') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
     return mutate((state) => {
       const body = readBody(init) ?? {};
       const code = text(body.code).trim().toUpperCase();
       const name = text(body.name).trim();
-      if (!code || !name) return failure(400, 'Ø§Ù„Ø±Ù…Ø² ÙˆØ§Ù„Ø§Ø³Ù… Ù…Ø·Ù„ÙˆØ¨Ø§Ù†.');
+      if (!code || !name) return failure(400, 'الرمز والاسم مطلوبان.');
       if (state.warehouses.some((warehouse) => text(warehouse.code) === code)) {
-        return json({ error: 'Ø±Ù…Ø² Ø§Ù„Ù…Ø³ØªÙˆØ¯Ø¹ Ù…Ø³Ø¬Ù‘Ù„ Ù…Ø³Ø¨Ù‚Ù‹Ø§.', code: 'WAREHOUSE_CODE_DUPLICATE' }, 409);
+        return json({ error: 'رمز المستودع مسجّل مسبقًا.', code: 'WAREHOUSE_CODE_DUPLICATE' }, 409);
       }
       const warehouse = {
         id: nextId(state),
@@ -3337,16 +3337,16 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     });
   }
   if (pathname.startsWith('/api/warehouses/') && method === 'PUT') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
     return mutate((state) => {
       const id = Number.parseInt(pathname.split('/').pop() ?? '', 10);
-      if (!Number.isSafeInteger(id) || id <= 0) return failure(400, 'Ù…Ø¹Ø±Ù‘Ù Ø§Ù„Ù…Ø³ØªÙˆØ¯Ø¹ ØºÙŠØ± ØµØ§Ù„Ø­.');
+      if (!Number.isSafeInteger(id) || id <= 0) return failure(400, 'معرّف المستودع غير صالح.');
       const warehouse = state.warehouses.find((entry) => numberValue(entry.id) === id);
-      if (!warehouse) return failure(404, 'Ø§Ù„Ù…Ø³ØªÙˆØ¯Ø¹ ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯.');
+      if (!warehouse) return failure(404, 'المستودع غير موجود.');
       const body = readBody(init) ?? {};
       if (body.name !== undefined) {
         const name = text(body.name).trim();
-        if (!name) return failure(400, 'Ø§Ù„Ø§Ø³Ù… Ù…Ø·Ù„ÙˆØ¨.');
+        if (!name) return failure(400, 'الاسم مطلوب.');
         warehouse.name = name;
       }
       if (body.notes !== undefined) warehouse.notes = body.notes ? text(body.notes).trim() : null;
@@ -3371,15 +3371,15 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     });
   }
   if (pathname.startsWith('/api/transfers/') && method === 'POST') {
-    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'ليس لديك صلاحية');
     return mutate((state) => {
       const segments = pathname.split('/').filter(Boolean);
       const rawId = segments[2];
       const action = segments[3] ?? '';
       const id = Number.parseInt(rawId ?? '', 10);
-      if (!Number.isSafeInteger(id) || id <= 0) return failure(400, 'Ù…Ø¹Ø±Ù‘Ù Ø§Ù„ØªØ­ÙˆÙŠÙ„ ØºÙŠØ± ØµØ§Ù„Ø­.');
+      if (!Number.isSafeInteger(id) || id <= 0) return failure(400, 'معرّف التحويل غير صالح.');
       const transfer = state.transfers.find((entry) => numberValue(entry.id) === id);
-      if (!transfer) return failure(404, 'Ø§Ù„ØªØ­ÙˆÙŠÙ„ ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯.');
+      if (!transfer) return failure(404, 'التحويل غير موجود.');
       const body = readBody(init) ?? {};
       const status = text(transfer.status);
       const openStatuses = ['requested', 'issued'];
@@ -3387,7 +3387,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
 
       if (action === 'issue') {
         if (status !== 'requested') {
-          return json({ error: `Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø§Ù„Ø¥Ø±Ø³Ø§Ù„. Ø§Ù„Ø­Ø§Ù„Ø© Ø§Ù„Ø­Ø§Ù„ÙŠØ© Â«${status}Â».`, code: 'INVALID_TRANSITION' }, 409);
+          return json({ error: `لا يمكن الإرسال. الحالة الحالية «${status}».`, code: 'INVALID_TRANSITION' }, 409);
         }
         const lines = state.transferLines.filter((line) => numberValue(line.transferId) === id);
         if (lines.length === 0) {
@@ -3433,10 +3433,10 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
       if (action === 'receive') {
         const provisional = Boolean(body.provisional);
         if (status !== 'issued' && !provisional) {
-          return json({ error: 'Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø§Ù„Ø§Ø³ØªÙ„Ø§Ù…. ÙŠØ¬Ø¨ Ø§Ù„Ø¥Ø±Ø³Ø§Ù„ Ø£ÙˆÙ„Ù‹Ø§.', code: 'INVALID_TRANSITION' }, 409);
+          return json({ error: 'لا يمكن الاستلام. يجب الإرسال أولًا.', code: 'INVALID_TRANSITION' }, 409);
         }
         if (status === 'received' || status === 'closed') {
-          return json({ error: 'ØªÙ… Ø§Ø³ØªÙ„Ø§Ù… Ù‡Ø°Ø§ Ø§Ù„ØªØ­ÙˆÙŠÙ„ Ù…Ø³Ø¨Ù‚Ù‹Ø§.', code: 'ALREADY_RECEIVED' }, 409);
+          return json({ error: 'تم استلام هذا التحويل مسبقًا.', code: 'ALREADY_RECEIVED' }, 409);
         }
         const deliveryNoteNumber = text(body.deliveryNoteNumber, text(transfer.deliveryNoteNumber, text(transfer.code)));
         const toWarehouseId = numberValue(transfer.toWarehouseId, offlineWarehouseId(state));
@@ -3480,7 +3480,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
 
       if (action === 'reject') {
         if (!openStatuses.includes(status)) {
-          return json({ error: 'Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø±ÙØ¶ Ø§Ù„ØªØ­ÙˆÙŠÙ„ ÙÙŠ Ø­Ø§Ù„ØªÙ‡.', code: 'INVALID_TRANSITION' }, 409);
+          return json({ error: 'لا يمكن رفض التحويل في حالته.', code: 'INVALID_TRANSITION' }, 409);
         }
         transfer.status = 'rejected';
         transfer.rejectionReason = body.reason ? text(body.reason).trim() : null;
@@ -3491,7 +3491,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
 
       if (action === 'cancel') {
         if (!openStatuses.includes(status)) {
-          return json({ error: 'Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø¥Ù„ØºØ§Ø¡ Ø§Ù„ØªØ­ÙˆÙŠÙ„ ÙÙŠ Ø­Ø§Ù„ØªÙ‡.', code: 'INVALID_TRANSITION' }, 409);
+          return json({ error: 'لا يمكن إلغاء التحويل في حالته.', code: 'INVALID_TRANSITION' }, 409);
         }
         transfer.status = 'cancelled';
         transfer.updatedAt = now();
@@ -3499,20 +3499,20 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
         return json(offlineTransferSummary(state, id));
       }
 
-      return failure(404, 'Ø¥Ø¬Ø±Ø§Ø¡ Ø§Ù„ØªØ­ÙˆÙŠÙ„ ØºÙŠØ± Ù…Ø¹Ø±ÙˆÙ.');
+      return failure(404, 'إجراء التحويل غير معروف.');
     });
   }
   if (pathname === '/api/transfers' && method === 'POST') {
-    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'ليس لديك صلاحية');
     return mutate((state) => {
       const body = readBody(init) ?? {};
       const current = offlineCurrentWarehouse(state);
-      if (!current) return json({ error: 'Ù„Ø§ ÙŠÙˆØ¬Ø¯ Ù…Ø³ØªÙˆØ¯Ø¹ Ù…Ø±ÙƒØ²ÙŠ Ù…Ø¹Ø±Ù‘Ù.', code: 'NO_WAREHOUSE' }, 409);
+      if (!current) return json({ error: 'لا يوجد مستودع مركزي معرّف.', code: 'NO_WAREHOUSE' }, 409);
       const rawItems = Array.isArray(body.items) ? body.items : [];
-      if (rawItems.length === 0) return failure(400, 'ÙŠØ¬Ø¨ Ø¥Ø¶Ø§ÙØ© Ø¨Ù†Ø¯ ÙˆØ§Ø­Ø¯ Ø¹Ù„Ù‰ Ø§Ù„Ø£Ù‚Ù„.');
+      if (rawItems.length === 0) return failure(400, 'يجب إضافة بند واحد على الأقل.');
       const toWarehouseId = numberValue(body.toWarehouseId, current.id);
       const fromWarehouseId = numberValue(body.fromWarehouseId, current.id);
-      if (toWarehouseId === fromWarehouseId) return failure(400, 'Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø§Ù„ØªØ­ÙˆÙŠÙ„ Ø¥Ù„Ù‰ Ù†ÙØ³ Ø§Ù„Ù…Ø³ØªÙˆØ¯Ø¹.');
+      if (toWarehouseId === fromWarehouseId) return failure(400, 'لا يمكن التحويل إلى نفس المستودع.');
       const transfer = {
         id: nextId(state),
         code: offlineNextDocumentNumber(state, 'TRF') ?? `TRF-${Date.now()}`,
@@ -3548,7 +3548,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
       for (const line of parsedLines) {
         const itemId = line.itemId;
         const quantity = line.quantity;
-        if (itemId <= 0 || quantity <= 0) return failure(400, 'Ø¨ÙŠØ§Ù†Ø§Øª Ø¨Ù†Ø¯ ØºÙŠØ± ØµØ­ÙŠØ­Ø©: Ø§Ù„ÙƒÙ…ÙŠØ© ÙˆØ±Ù‚Ù… Ø§Ù„ØµÙ†Ù Ù…Ø·Ù„ÙˆØ¨Ø§Ù†.');
+        if (itemId <= 0 || quantity <= 0) return failure(400, 'بيانات بند غير صحيحة: الكمية ورقم الصنف مطلوبان.');
         state.transferLines.push({
           id: nextId(state),
           transferId: transfer.id,
@@ -3569,15 +3569,15 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
   if (pathname.startsWith('/api/transfers/') && method === 'GET') {
     return read((state) => {
       const id = Number.parseInt(pathname.split('/').pop() ?? '', 10);
-      if (!Number.isSafeInteger(id) || id <= 0) return failure(400, 'Ù…Ø¹Ø±Ù‘Ù Ø§Ù„ØªØ­ÙˆÙŠÙ„ ØºÙŠØ± ØµØ§Ù„Ø­.');
+      if (!Number.isSafeInteger(id) || id <= 0) return failure(400, 'معرّف التحويل غير صالح.');
       const summary = offlineTransferSummary(state, id);
-      return summary ? json(summary) : failure(404, 'Ø§Ù„ØªØ­ÙˆÙŠÙ„ ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯.');
+      return summary ? json(summary) : failure(404, 'التحويل غير موجود.');
     });
   }
 
   // -------------------------- import governance ------------------------
   if (pathname === '/api/import-batches' && method === 'GET') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
     return read((state) => {
       const limit = Math.min(500, Math.max(1, numberValue(searchParams.get('limit'), 100)));
       const rows = [...state.importBatches]
@@ -3587,13 +3587,13 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     });
   }
   if (pathname.startsWith('/api/import-batches/') && pathname.endsWith('/rollback') && method === 'POST') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
     return mutate((state) => {
       const id = Number.parseInt(pathname.split('/')[3] ?? '', 10);
-      if (!Number.isSafeInteger(id) || id <= 0) return failure(400, 'Ù…Ø¹Ø±Ù‘Ù Ø¯ÙØ¹Ø© Ø§Ù„Ø§Ø³ØªÙŠØ±Ø§Ø¯ ØºÙŠØ± ØµØ§Ù„Ø­.');
+      if (!Number.isSafeInteger(id) || id <= 0) return failure(400, 'معرّف دفعة الاستيراد غير صالح.');
       const batch = state.importBatches.find((entry) => numberValue(entry.id) === id);
-      if (!batch) return failure(404, 'Ø¯ÙØ¹Ø© Ø§Ù„Ø§Ø³ØªÙŠØ±Ø§Ø¯ ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø©.');
-      if (batch.rolledBack) return json({ error: 'ØªÙ… Ø§Ù„ØªØ±Ø§Ø¬Ø¹ Ø¹Ù† Ù‡Ø°Ù‡ Ø§Ù„Ø¯ÙØ¹Ø© Ù…Ø³Ø¨Ù‚Ù‹Ø§.', code: 'ALREADY_ROLLED_BACK' }, 409);
+      if (!batch) return failure(404, 'دفعة الاستيراد غير موجودة.');
+      if (batch.rolledBack) return json({ error: 'تم التراجع عن هذه الدفعة مسبقًا.', code: 'ALREADY_ROLLED_BACK' }, 409);
       const createdKeys = Array.isArray(batch.createdItemKeys) ? (batch.createdItemKeys as string[]) : [];
       let removed = 0;
       for (const key of createdKeys) {
@@ -3617,7 +3617,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
 
   // ------------------------------ sync overview ------------------------
   if (pathname === '/api/sync/overview' && method === 'GET') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
     return read((state) => {
       const pending = state.outbox.filter((entry) => text(entry.status) === 'pending').length;
       const exported = state.outbox.filter((entry) => text(entry.status) === 'exported').length;
@@ -3648,7 +3648,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
 
   // ------------------------------ reports ------------------------------
   if (pathname === '/api/reports/reconciliation' && method === 'GET') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
     return read((state) => {
       const rows = state.items
         .filter((item) => item.isActive !== false)
@@ -3726,7 +3726,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     });
   }
   if (pathname === '/api/reports/consolidated' && method === 'GET') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
     return read((state) => {
       const minById = new Map(
         state.items.filter((item) => item.isActive !== false).map((item) => [numberValue(item.id), numberValue(item.minStock)]),
@@ -3776,7 +3776,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
 
   // ---------------------------- items export ---------------------------
   if (pathname === '/api/items/export' && method === 'GET') {
-    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'ليس لديك صلاحية');
     return read((state) => {
       const categoryById = new Map(state.categories.map((category) => [numberValue(category.id), text(category.name)]));
       return json({
@@ -4591,7 +4591,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
       return json({ ok: true });
     });
   }
-  return failure(404, 'Ø§Ù„Ù…Ø³Ø§Ø± ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯ ÙÙŠ Ø§Ù„ÙˆØ¶Ø¹ Ø§Ù„Ù…Ø­Ù„ÙŠ');
+  return failure(404, 'المسار غير موجود في الوضع المحلي');
 }
 
 export function installOfflineApi() {
@@ -4603,13 +4603,13 @@ export function installOfflineApi() {
       const method = init?.method ?? (input instanceof Request ? input.method : 'GET');
       const response = await withTimeout(
         route(url.pathname, url.searchParams, method, init),
-        'Ø§Ù†ØªÙ‡Øª Ù…Ù‡Ù„Ø© ØªÙ†ÙÙŠØ° Ø§Ù„Ø¹Ù…Ù„ÙŠØ© Ø§Ù„Ù…Ø­Ù„ÙŠØ©',
+        'انتهت مهلة تنفيذ العملية المحلية',
         OFFLINE_REQUEST_TIMEOUT_MS,
       );
       return response;
     } catch (error) {
       console.error('Offline API error:', error);
-      return failure(500, error instanceof Error ? error.message : 'ØªØ¹Ø°Ø± ØªÙ†ÙÙŠØ° Ø§Ù„Ø¹Ù…Ù„ÙŠØ© Ø§Ù„Ù…Ø­Ù„ÙŠØ©');
+      return failure(500, error instanceof Error ? error.message : 'تعذر تنفيذ العملية المحلية');
     }
   };
 }

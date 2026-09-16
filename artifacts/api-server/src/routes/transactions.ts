@@ -30,7 +30,7 @@ function movementFailureResponse(
       ? error
       : new InventoryMovementError(
           "INTERNAL_MOVEMENT_ERROR",
-          "ØªØ¹Ø°Ø± ØªÙ†ÙÙŠØ° Ø§Ù„Ø­Ø±ÙƒØ© Ø¨Ø³Ø¨Ø¨ Ø®Ø·Ø£ Ø¯Ø§Ø®Ù„ÙŠ",
+          "تعذر تنفيذ الحركة بسبب خطأ داخلي",
           500,
         );
 
@@ -241,25 +241,25 @@ router.post("/:id/reverse", requireAuth, requireRole("admin"), async (req, res) 
   try {
     const id = Number.parseInt(String(req.params.id), 10);
     if (!Number.isSafeInteger(id) || id <= 0) {
-      res.status(400).json({ error: "Ù…Ø¹Ø±Ù‘Ù Ø§Ù„Ø­Ø±ÙƒØ© ØºÙŠØ± ØµØ§Ù„Ø­." });
+      res.status(400).json({ error: "معرّف الحركة غير صالح." });
       return;
     }
     const [original] = await db.select().from(transactionsTable).where(eq(transactionsTable.id, id)).limit(1);
     if (!original) {
-      res.status(404).json({ error: "Ø§Ù„Ø­Ø±ÙƒØ© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø©." });
+      res.status(404).json({ error: "الحركة غير موجودة." });
       return;
     }
     if (original.reversedById) {
-      res.status(409).json({ error: "ØªÙ… Ø¹ÙƒØ³ Ù‡Ø°Ù‡ Ø§Ù„Ø­Ø±ÙƒØ© Ù…Ø³Ø¨Ù‚Ù‹Ø§.", code: "ALREADY_REVERSED" });
+      res.status(409).json({ error: "تم عكس هذه الحركة مسبقًا.", code: "ALREADY_REVERSED" });
       return;
     }
     if (original.reversalOfId) {
-      res.status(409).json({ error: "Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø¹ÙƒØ³ Ù‚ÙŠØ¯ Ø¹ÙƒØ³ÙŠ.", code: "CANNOT_REVERSE_REVERSAL" });
+      res.status(409).json({ error: "لا يمكن عكس قيد عكسي.", code: "CANNOT_REVERSE_REVERSAL" });
       return;
     }
     if (String(original.type).startsWith("custody")) {
       res.status(409).json({
-        error: "Ø­Ø±ÙƒØ§Øª Ø§Ù„Ø¹Ù‡Ø¯Ø© ØªÙØ¯Ø§Ø± Ø¹Ø¨Ø± Ø¯ÙˆØ±Ø© Ø§Ù„Ø¹Ù‡Ø¯Ø© (Ø¥Ø±Ø¬Ø§Ø¹) Ù„Ø§ Ø¹Ø¨Ø± Ù‚ÙŠØ¯ Ø¹ÙƒØ³ÙŠ.",
+        error: "حركات العهدة تُدار عبر دورة العهدة (إرجاع) لا عبر قيد عكسي.",
         code: "CUSTODY_USE_RETURN_FLOW",
       });
       return;
@@ -293,7 +293,7 @@ router.post("/:id/reverse", requireAuth, requireRole("admin"), async (req, res) 
     }
     if (newStock === null) {
       res.status(409).json({
-        error: "Ù„Ø§ ÙŠÙ…ÙƒÙ† ØªØ­Ø¯ÙŠØ¯ Ø§Ù„Ø±ØµÙŠØ¯ Ø§Ù„Ù…Ø±Ø¬Ø¹ÙŠ Ù„Ù‡Ø°Ù‡ Ø§Ù„Ø­Ø±ÙƒØ©Ø› Ø§Ø³ØªØ®Ø¯Ù… ØªØ³ÙˆÙŠØ© ÙŠØ¯ÙˆÙŠØ© Ù…ÙˆØ«Ù‘Ù‚Ø©.",
+        error: "لا يمكن تحديد الرصيد المرجعي لهذه الحركة؛ استخدم تسوية يدوية موثّقة.",
         code: "REVERSAL_NOT_SUPPORTED",
       });
       return;
@@ -309,7 +309,7 @@ router.post("/:id/reverse", requireAuth, requireRole("admin"), async (req, res) 
         newStock,
         documentDate: today,
         documentNumber: "REV-" + original.documentNumber,
-        reason: "Ù‚ÙŠØ¯ Ø¹ÙƒØ³ÙŠ Ù„Ù„Ù…Ø³ØªÙ†Ø¯ " + original.documentNumber + ": " + reason,
+        reason: "قيد عكسي للمستند " + original.documentNumber + ": " + reason,
         warehouseId: original.warehouseId ?? undefined,
       } as never,
       movementContextFromRequest(req),
@@ -370,7 +370,7 @@ router.get("/:id/print", requireAuth, async (req, res) => {
       transaction,
       allocations,
       organizationName:
-        settings?.orgName ?? "Ù…Ø³ØªÙˆØ¯Ø¹Ø§Øª Ù…Ø¯ÙŠØ±ÙŠØ© ØµØ­Ø© Ø¯Ù…Ø´Ù‚",
+        settings?.orgName ?? "مستودعات مديرية صحة دمشق",
       orgSubtitle: settings?.orgSubtitle ?? null,
       printedAt: new Date().toISOString(),
     });

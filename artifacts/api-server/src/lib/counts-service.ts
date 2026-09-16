@@ -61,7 +61,7 @@ export async function createCountSession(input: {
     .orderBy(asc(itemsTable.name));
 
   if (rows.length === 0) {
-    throw new CountError("COUNT_NO_ITEMS", "Ù„Ø§ ØªÙˆØ¬Ø¯ Ø£ØµÙ†Ø§Ù Ù…Ø·Ø§Ø¨Ù‚Ø© Ù„Ù†Ø·Ø§Ù‚ Ø§Ù„Ø¬Ø±Ø¯.", 409);
+    throw new CountError("COUNT_NO_ITEMS", "لا توجد أصناف مطابقة لنطاق الجرد.", 409);
   }
 
   return db.transaction(async (tx) => {
@@ -121,7 +121,7 @@ export async function listCountSessions(limit = 100) {
 
 export async function getCountSession(id: number) {
   const [session] = await db.select().from(countSessionsTable).where(eq(countSessionsTable.id, id)).limit(1);
-  if (!session) throw new CountError("COUNT_NOT_FOUND", "Ø¬Ù„Ø³Ø© Ø§Ù„Ø¬Ø±Ø¯ ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø©.", 404);
+  if (!session) throw new CountError("COUNT_NOT_FOUND", "جلسة الجرد غير موجودة.", 404);
   const lines = await db
     .select()
     .from(countLinesTable)
@@ -138,7 +138,7 @@ export async function recordCountEntries(
 ) {
   const session = await getCountSession(sessionId);
   if (session.status !== "open") {
-    throw new CountError("COUNT_NOT_OPEN", "Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø¥Ø¯Ø®Ø§Ù„ Ø¬Ø±Ø¯ Ù„Ø¬Ù„Ø³Ø© Ù…ØºÙ„Ù‚Ø©.", 409);
+    throw new CountError("COUNT_NOT_OPEN", "لا يمكن إدخال جرد لجلسة مغلقة.", 409);
   }
   const byId = new Map(session.lines.map((line) => [Number(line.id), line]));
   const now = new Date();
@@ -198,13 +198,13 @@ export async function approveCountSession(
 ) {
   const session = await getCountSession(sessionId);
   if (session.status !== "open") {
-    throw new CountError("COUNT_NOT_OPEN", "Ø§Ù„Ø¬Ù„Ø³Ø© Ù„ÙŠØ³Øª Ù…ÙØªÙˆØ­Ø©.", 409);
+    throw new CountError("COUNT_NOT_OPEN", "الجلسة ليست مفتوحة.", 409);
   }
   const uncounted = session.lines.filter((line) => line.countedQuantity === null);
   if (uncounted.length > 0) {
     throw new CountError(
       "COUNT_INCOMPLETE",
-      `Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø§Ù„Ø§Ø¹ØªÙ…Ø§Ø¯: ${uncounted.length} Ø³Ø·Ø±Ù‹Ø§ Ù„Ù… ÙŠÙØ¬Ø±ÙŽØ¯ Ø¨Ø¹Ø¯.`,
+      `لا يمكن الاعتماد: ${uncounted.length} سطرًا لم يُجرَد بعد.`,
       409,
     );
   }
@@ -214,7 +214,7 @@ export async function approveCountSession(
   if (missingReason) {
     throw new CountError(
       "COUNT_VARIANCE_REASON_REQUIRED",
-      `ÙŠØ¬Ø¨ ØªØ³Ø¬ÙŠÙ„ Ø³Ø¨Ø¨ Ù„ÙƒÙ„ ÙØ±Ù‚ (Ø§Ù„ØµÙ†Ù: ${missingReason.itemName}).`,
+      `يجب تسجيل سبب لكل فرق (الصنف: ${missingReason.itemName}).`,
       409,
     );
   }
@@ -233,7 +233,7 @@ export async function approveCountSession(
         newStock: Number(line.countedQuantity),
         documentDate: today,
         documentNumber: session.code,
-        reason: `Ø¬Ø±Ø¯ Ø¯ÙˆØ±ÙŠ ${session.code}: ${line.varianceReason}`,
+        reason: `جرد دوري ${session.code}: ${line.varianceReason}`,
         warehouseId: session.warehouseId,
       } as never,
       context,
@@ -258,7 +258,7 @@ export async function approveCountSession(
 export async function cancelCountSession(sessionId: number) {
   const session = await getCountSession(sessionId);
   if (session.status !== "open") {
-    throw new CountError("COUNT_NOT_OPEN", "Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø¥Ù„ØºØ§Ø¡ Ø¬Ù„Ø³Ø© Ù…ØºÙ„Ù‚Ø©.", 409);
+    throw new CountError("COUNT_NOT_OPEN", "لا يمكن إلغاء جلسة مغلقة.", 409);
   }
   const [updated] = await db
     .update(countSessionsTable)
