@@ -1,4 +1,4 @@
-﻿import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import {
   countLinesTable,
   countSessionsTable,

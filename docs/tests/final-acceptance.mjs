@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env node
+#!/usr/bin/env node
 /**
  * Final acceptance sweep: verifies every shipped artifact against the recorded
  * checksums and prints the deliverables inventory.

@@ -1,4 +1,4 @@
-﻿import { Router } from "express";
+import { Router } from "express";
 import healthRouter from "./health";
 import authRouter from "./auth";
 import categoriesRouter from "./categories";

@@ -15,13 +15,17 @@ const roots = [
   path.join(root, "artifacts", "api-server", "src"),
   path.join(root, "lib", "db", "src"),
   path.join(root, "scripts"),
+  path.join(root, "lib", "db", "drizzle"),
 ];
+
+const IGNORED = [".offline-parity", ".twofactor-run", ".advanced-run", ".catalog-run", ".zipverify-430", ".kitverify", ".release-cleanup", ".bootcheck", ".probe-run", "encoding-check.mjs"]; // SKIP_SELF: generated artifacts and this guard's own pattern
 
 const files = [];
 const walk = (dir) => {
   if (!fs.existsSync(dir)) return;
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const p = path.join(dir, entry.name);
+    if (IGNORED.some((part) => p.includes(part))) continue;
     if (entry.isDirectory()) walk(p);
     else if (/\.(ts|tsx|mjs|cjs|sql|json)$/.test(entry.name)) files.push(p);
   }

@@ -1,4 +1,4 @@
-﻿import { dmePackageSummary, readDmeSyncPackageInWorker, writeDmeSyncPackage } from './dme-sync-browser';
+import { dmePackageSummary, readDmeSyncPackageInWorker, writeDmeSyncPackage } from './dme-sync-browser';
 import {
   type CatalogAnalysis,
   type CatalogEquipmentRow,

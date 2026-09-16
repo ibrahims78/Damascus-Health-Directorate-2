@@ -1,4 +1,4 @@
-﻿import { db, categoriesTable, usersTable, recipientsTable, exitReasonsTable } from "@workspace/db";
+import { db, categoriesTable, usersTable, recipientsTable, exitReasonsTable } from "@workspace/db";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "node:crypto";
 

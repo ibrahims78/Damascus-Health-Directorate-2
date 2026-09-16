@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env node
+#!/usr/bin/env node
 /**
  * Catalog import (materials + equipment definitions) integration test.
  *
@@ -74,8 +74,8 @@ try {
   console.log("API ready\n");
 
   const admin = makeJar();
-  await req(admin, "POST", "/api/auth/setup", { username: "admin", password: "Admin@1234567", fullName: "Ù…Ø¯ÙŠØ±" });
-  await req(admin, "POST", "/api/users", { username: "wh1", password: "Warehouse@123", fullName: "Ø£Ù…ÙŠÙ†", role: "warehouse_manager" });
+  await req(admin, "POST", "/api/auth/setup", { username: "admin", password: "Admin@1234567", fullName: "مدير" });
+  await req(admin, "POST", "/api/users", { username: "wh1", password: "Warehouse@123", fullName: "أمين", role: "warehouse_manager" });
   const wh = makeJar();
   await req(wh, "POST", "/api/auth/login", { username: "wh1", password: "Warehouse@123" });
 
@@ -89,8 +89,8 @@ try {
   check("preview is admin-only (403)", (await req(wh, "POST", "/api/catalog/import/preview", { items: [] })).status === 403);
   check("commit is admin-only (403)", (await req(wh, "POST", "/api/catalog/import", { items: [] })).status === 403);
 
-  const goodItems = [{ code: "CAT-1", name: "Ù…Ø§Ø¯Ø© ÙƒØªØ§Ù„ÙˆØ¬", unit: unitName, minStock: 3, requiresBatch: "Ù†Ø¹Ù…" }];
-  const goodEquipment = [{ code: "CEQ-1", name: "Ø¬Ù‡Ø§Ø² ÙƒØªØ§Ù„ÙˆØ¬", serialNumber: "SN-CAT-1", minQuantity: 1 }];
+  const goodItems = [{ code: "CAT-1", name: "مادة كتالوج", unit: unitName, minStock: 3, requiresBatch: "نعم" }];
+  const goodEquipment = [{ code: "CEQ-1", name: "جهاز كتالوج", serialNumber: "SN-CAT-1", minQuantity: 1 }];
 
   // ---- preview does not write --------------------------------------------
   const preview = await req(admin, "POST", "/api/catalog/import/preview", { mode: "add-and-update", items: goodItems, equipment: goodEquipment });
@@ -102,19 +102,19 @@ try {
   check("preview wrote nothing", Array.isArray(itemsAfterPreview.data?.items) && itemsAfterPreview.data.items.length === 0, `items=${itemsAfterPreview.data?.items?.length}`);
 
   // ---- validation errors --------------------------------------------------
-  const badUnit = await req(admin, "POST", "/api/catalog/import/preview", { items: [{ name: "Ù…Ø§Ø¯Ø©", unit: "ÙˆØ­Ø¯Ø©-ØºÙŠØ±-Ù…Ø¹Ø±ÙˆÙØ©" }] });
+  const badUnit = await req(admin, "POST", "/api/catalog/import/preview", { items: [{ name: "مادة", unit: "وحدة-غير-معروفة" }] });
   const badUnitCodes = (badUnit.data?.items ?? []).flatMap((r) => (r.issues ?? []).map((i) => i.code));
   check("unknown unit is reported", badUnitCodes.includes("UNIT_UNKNOWN"), `codes=${badUnitCodes.join(",")}`);
 
-  const badCategory = await req(admin, "POST", "/api/catalog/import/preview", { items: [{ name: "Ù…Ø§Ø¯Ø©", unit: unitName, category: "ØªØµÙ†ÙŠÙ-ÙˆÙ‡Ù…ÙŠ" }] });
+  const badCategory = await req(admin, "POST", "/api/catalog/import/preview", { items: [{ name: "مادة", unit: unitName, category: "تصنيف-وهمي" }] });
   const badCategoryCodes = (badCategory.data?.items ?? []).flatMap((r) => (r.issues ?? []).map((i) => i.code));
   check("unknown category is reported", badCategoryCodes.includes("CATEGORY_UNKNOWN"), `codes=${badCategoryCodes.join(",")}`);
 
-  const qtyColumn = await req(admin, "POST", "/api/catalog/import/preview", { items: [{ name: "Ù…Ø§Ø¯Ø©", unit: unitName, quantity: 5 }] });
+  const qtyColumn = await req(admin, "POST", "/api/catalog/import/preview", { items: [{ name: "مادة", unit: unitName, quantity: 5 }] });
   const qtyCodes = (qtyColumn.data?.items ?? []).flatMap((r) => (r.issues ?? []).map((i) => i.code));
   check("quantity column is rejected in a catalog sheet", qtyCodes.includes("SERIAL_WITH_QTY_COLUMN"), `codes=${qtyCodes.join(",")}`);
 
-  const withError = await req(admin, "POST", "/api/catalog/import", { mode: "add-and-update", items: [{ name: "Ù…Ø§Ø¯Ø©", unit: "ÙˆØ­Ø¯Ø©-ØºÙŠØ±-Ù…Ø¹Ø±ÙˆÙØ©" }] });
+  const withError = await req(admin, "POST", "/api/catalog/import", { mode: "add-and-update", items: [{ name: "مادة", unit: "وحدة-غير-معروفة" }] });
   check("commit refuses a file with errors (409)", withError.status === 409, `status=${withError.status}`);
 
   // ---- commit + idempotency ----------------------------------------------
@@ -133,7 +133,7 @@ try {
   const again = await req(admin, "POST", "/api/catalog/import", { mode: "add-only", items: goodItems, equipment: goodEquipment });
   check("add-only skips existing rows", Number(again.data?.skipped) === 2, `skipped=${again.data?.skipped}`);
 
-  const updateRun = await req(admin, "POST", "/api/catalog/import", { mode: "add-and-update", items: [{ ...goodItems[0], name: "Ù…Ø§Ø¯Ø© ÙƒØªØ§Ù„ÙˆØ¬ (Ù…Ø¹Ø¯Ù‘Ù„Ø©)", minStock: 7 }] });
+  const updateRun = await req(admin, "POST", "/api/catalog/import", { mode: "add-and-update", items: [{ ...goodItems[0], name: "مادة كتالوج (معدّلة)", minStock: 7 }] });
   check("add-and-update updates the row", Number(updateRun.data?.updatedItems) === 1, `updatedItems=${updateRun.data?.updatedItems}`);
   const afterUpdate = await req(admin, "GET", "/api/items?limit=5000");
   const updated = (afterUpdate.data?.items ?? []).find((i) => i.code === "CAT-1");

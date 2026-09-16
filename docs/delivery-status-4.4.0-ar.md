@@ -1,4 +1,4 @@
-﻿# Damascus Health Directorate — حالة التسليم 4.4.0
+# Damascus Health Directorate — حالة التسليم 4.4.0
 
 الإصدار الحالي: 4.4.0 (versionCode 440) ويشمل ميزة استيراد الكتالوج (مواد + تجهيزات) من Excel.
 

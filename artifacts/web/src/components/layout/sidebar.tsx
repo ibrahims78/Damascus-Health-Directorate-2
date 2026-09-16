@@ -1,4 +1,4 @@
-﻿import { Link, useLocation } from 'wouter';
+import { Link, useLocation } from 'wouter';
 import { useGetCurrentUser } from '@workspace/api-client-react';
 import {LayoutDashboard,
   Package,

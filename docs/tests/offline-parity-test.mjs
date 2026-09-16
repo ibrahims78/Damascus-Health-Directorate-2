@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env node
+#!/usr/bin/env node
 /**
  * Offline-layer parity test.
  *
@@ -114,7 +114,7 @@ async function api(method, path, body) {
 const today = new Date().toISOString().slice(0, 10);
 
 // ------------------------------- run ---------------------------------
-await api("POST", "/auth/setup", { username: "admin", password: "Admin@1234567", fullName: "Ù…Ø¯ÙŠØ±" });
+await api("POST", "/auth/setup", { username: "admin", password: "Admin@1234567", fullName: "مدير" });
 
 // units
 const seeded = await api("POST", "/units/seed-defaults");
@@ -131,9 +131,9 @@ check("units: usage returns rows", Array.isArray(usage.data), `rows=${usage.data
 // warehouses
 const whList = await api("GET", "/warehouses");
 check("warehouses: a central warehouse exists out of the box", Array.isArray(whList.data) && whList.data.some((w) => w.type === "central" && w.code === "C"), `count=${whList.data?.length}`);
-const branch = await api("POST", "/warehouses", { code: "B1", name: "Ù…Ø³ØªÙˆØ¯Ø¹ Ø§Ù„ÙØ±Ø¹", type: "branch" });
+const branch = await api("POST", "/warehouses", { code: "B1", name: "مستودع الفرع", type: "branch" });
 check("warehouses: create branch (201)", branch.status === 201 && branch.data?.code === "B1", `status=${branch.status}`);
-const dupWh = await api("POST", "/warehouses", { code: "B1", name: "Ù…ÙƒØ±Ø±" });
+const dupWh = await api("POST", "/warehouses", { code: "B1", name: "مكرر" });
 check("warehouses: duplicate code rejected (409)", dupWh.status === 409 && dupWh.data?.code === "WAREHOUSE_CODE_DUPLICATE", `status=${dupWh.status}`);
 const branchId = Number(branch.data?.id);
 const switched = await api("POST", "/warehouses/current", { id: branchId });
@@ -146,7 +146,7 @@ const centralId = Number(centralList.data.find((w) => w.code === "C")?.id);
 await api("POST", "/warehouses/current", { id: centralId });
 
 // item + stock at the central warehouse
-const item = await api("POST", "/items", { code: "P-1", name: "ØµÙ†Ù Ø§Ø®ØªØ¨Ø§Ø±", unit: unitName, itemType: "item", minStock: 5 });
+const item = await api("POST", "/items", { code: "P-1", name: "صنف اختبار", unit: unitName, itemType: "item", minStock: 5 });
 const itemId = Number(item.data?.id);
 check("items: create works on the device", Boolean(itemId), `id=${itemId}`);
 const moveIn = await api("POST", "/transactions/in", {
@@ -162,16 +162,16 @@ check("reports: reconciliation responds", recon.status === 200 && typeof recon.d
 check("reports: reconciliation agrees with the batch ledger", Number(recon.data?.mismatches) === 0, `mismatches=${recon.data?.mismatches}`);
 const byWh = await api("GET", "/reports/stock-by-warehouse");
 check("reports: stock-by-warehouse lists positions", byWh.status === 200 && Array.isArray(byWh.data?.positions) && byWh.data.positions.length === 1, `positions=${byWh.data?.positions?.length}`);
-check("reports: stock-by-warehouse carries warehouse + item", byWh.data?.positions?.[0]?.warehouse?.code === "C" && byWh.data?.positions?.[0]?.item?.name === "ØµÙ†Ù Ø§Ø®ØªØ¨Ø§Ø±");
+check("reports: stock-by-warehouse carries warehouse + item", byWh.data?.positions?.[0]?.warehouse?.code === "C" && byWh.data?.positions?.[0]?.item?.name === "صنف اختبار");
 const consolidated = await api("GET", "/reports/consolidated");
 check("reports: consolidated totals", consolidated.status === 200 && Number(consolidated.data?.totals?.quantity) === 10, `quantity=${consolidated.data?.totals?.quantity}`);
 
 // transfers
-const created = await api("POST", "/transfers", { fromWarehouseId: centralId, toWarehouseId: branchId, items: [{ itemId, quantity: 4 }], notes: "Ø§Ø®ØªØ¨Ø§Ø±" });
+const created = await api("POST", "/transfers", { fromWarehouseId: centralId, toWarehouseId: branchId, items: [{ itemId, quantity: 4 }], notes: "اختبار" });
 const transferId = Number(created.data?.id);
 check("transfers: request created (201)", created.status === 201 && created.data?.status === "requested", `code=${created.data?.code}`);
 check("transfers: code is numbered per warehouse", typeof created.data?.code === "string" && created.data.code.startsWith("C-TRF-"), `code=${created.data?.code}`);
-check("transfers: lines carry the item", created.data?.lines?.[0]?.item?.name === "ØµÙ†Ù Ø§Ø®ØªØ¨Ø§Ø±");
+check("transfers: lines carry the item", created.data?.lines?.[0]?.item?.name === "صنف اختبار");
 const badTransition = await api("POST", `/transfers/${transferId}/receive`, {});
 check("transfers: cannot receive before issue (409)", badTransition.status === 409 && badTransition.data?.code === "INVALID_TRANSITION", `status=${badTransition.status}`);
 const issued = await api("POST", `/transfers/${transferId}/issue`, {});

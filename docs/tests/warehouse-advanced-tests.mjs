@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env node
+#!/usr/bin/env node
 /**
  * Warehouse-practice audit features (P0/P1) integration test:
  * cycle counting, reversal documents, transfer variance, reorder suggestions,
@@ -65,14 +65,14 @@ try {
   if (!ready) throw new Error("API did not become ready");
   console.log("API ready\n");
 
-  await req("POST", "/api/auth/setup", { username: "admin", password: "Admin@1234567", fullName: "Ù…Ø¯ÙŠØ±" });
+  await req("POST", "/api/auth/setup", { username: "admin", password: "Admin@1234567", fullName: "مدير" });
   await req("POST", "/api/units/seed-defaults");
   const units = await req("GET", "/api/units");
-  const unitName = Array.isArray(units.data) && units.data.length ? units.data[0].name : "Ù‚Ø·Ø¹Ø©";
+  const unitName = Array.isArray(units.data) && units.data.length ? units.data[0].name : "قطعة";
 
   // two items with stock 10 and 5 at the central warehouse
-  const itemA = await req("POST", "/api/items", { code: "CNT-A", name: "ØµÙ†Ù Ø§Ù„Ø¬Ø±Ø¯ Ø£", unit: unitName, itemType: "item", minStock: 4, reorderPoint: 6, maxStock: 20, safetyStock: 2, binCode: "A-01-1" });
-  const itemB = await req("POST", "/api/items", { code: "CNT-B", name: "ØµÙ†Ù Ø§Ù„Ø¬Ø±Ø¯ Ø¨", unit: unitName, itemType: "item", minStock: 1, reorderPoint: 10, maxStock: 30 });
+  const itemA = await req("POST", "/api/items", { code: "CNT-A", name: "صنف الجرد أ", unit: unitName, itemType: "item", minStock: 4, reorderPoint: 6, maxStock: 20, safetyStock: 2, binCode: "A-01-1" });
+  const itemB = await req("POST", "/api/items", { code: "CNT-B", name: "صنف الجرد ب", unit: unitName, itemType: "item", minStock: 1, reorderPoint: 10, maxStock: 30 });
   const idA = Number(itemA.data?.id);
   const idB = Number(itemB.data?.id);
   check("items: reorder/bin fields accepted", itemA.status === 201 && itemA.data?.reorderPoint === 6 && itemA.data?.binCode === "A-01-1", `status=${itemA.status}`);
@@ -86,7 +86,7 @@ try {
   }
 
   // ---------------- cycle counting ----------------
-  const session = await req("POST", "/api/counts", { blindCount: true, notes: "Ø¬Ø±Ø¯ Ø§Ø®ØªØ¨Ø§Ø±ÙŠ" });
+  const session = await req("POST", "/api/counts", { blindCount: true, notes: "جرد اختباري" });
   const sessionId = Number(session.data?.id);
   check("counts: session created with lines", session.status === 201 && Array.isArray(session.data?.lines) && session.data.lines.length >= 2, `lines=${session.data?.lines?.length}`);
   const lineA = (session.data?.lines ?? []).find((l) => Number(l.itemId) === idA);
@@ -101,7 +101,7 @@ try {
   await req("POST", `/api/counts/${sessionId}/entries`, { entries: [{ lineId: Number(lineB?.id), countedQuantity: 5, varianceReason: "" }] });
   const approveNoReason = await req("POST", `/api/counts/${sessionId}/approve`, {});
   check("counts: a variance without a reason is refused", approveNoReason.status === 409 && approveNoReason.data?.code === "COUNT_VARIANCE_REASON_REQUIRED", `status=${approveNoReason.status}`);
-  await req("POST", `/api/counts/${sessionId}/entries`, { entries: [{ lineId: Number(lineA?.id), countedQuantity: 8, varianceReason: "ØªØ§Ù„Ù Ø£Ø«Ù†Ø§Ø¡ Ø§Ù„ØªØ®Ø²ÙŠÙ†" }] });
+  await req("POST", `/api/counts/${sessionId}/entries`, { entries: [{ lineId: Number(lineA?.id), countedQuantity: 8, varianceReason: "تالف أثناء التخزين" }] });
   const approved = await req("POST", `/api/counts/${sessionId}/approve`, {});
   check("counts: approval posts the differences", approved.status === 200 && Number(approved.data?.posted) === 1, `posted=${approved.data?.posted}`);
   const afterA = await req("GET", `/api/items/${idA}`);
@@ -114,17 +114,17 @@ try {
   // ---------------- reversal ----------------
   const txs = await req("GET", "/api/transactions?limit=50");
   const countTx = (txs.data?.transactions ?? []).find((t) => t.type === "adjust" && Number(t.itemId) === idA);
-  const reverse = await req("POST", `/api/transactions/${Number(countTx?.id)}/reverse`, { reason: "Ø¥Ù„ØºØ§Ø¡ ØªØ³ÙˆÙŠØ© Ø§Ù„Ø¬Ø±Ø¯ Ù„Ø®Ø·Ø£ ÙÙŠ Ø§Ù„Ø¹Ø¯" });
+  const reverse = await req("POST", `/api/transactions/${Number(countTx?.id)}/reverse`, { reason: "إلغاء تسوية الجرد لخطأ في العد" });
   check("reversal: compensating document posted", reverse.status === 200 && Boolean(reverse.data?.reversal?.id), `status=${reverse.status}`);
   const afterReverse = await req("GET", `/api/items/${idA}`);
   check("reversal: stock restored to the pre-count value", Number(afterReverse.data?.currentStock) === 10, `stock=${afterReverse.data?.currentStock}`);
-  const twice = await req("POST", `/api/transactions/${Number(countTx?.id)}/reverse`, { reason: "Ù…Ø­Ø§ÙˆÙ„Ø© Ø¹ÙƒØ³ Ø«Ø§Ù†ÙŠØ© Ù„Ù„Ø§Ø®ØªØ¨Ø§Ø±" });
+  const twice = await req("POST", `/api/transactions/${Number(countTx?.id)}/reverse`, { reason: "محاولة عكس ثانية للاختبار" });
   check("reversal: a second reversal is rejected", twice.status === 409 && twice.data?.code === "ALREADY_REVERSED", `status=${twice.status}`);
-  const shortReason = await req("POST", `/api/transactions/${Number(countTx?.id)}/reverse`, { reason: "Ø®Ø·Ø£" });
+  const shortReason = await req("POST", `/api/transactions/${Number(countTx?.id)}/reverse`, { reason: "خطأ" });
   check("reversal: short reasons are rejected", shortReason.status >= 400, `status=${shortReason.status}`);
 
   // ---------------- transfer variance ----------------
-  const branch = await req("POST", "/api/warehouses", { code: "VB1", name: "ÙØ±Ø¹ Ø§Ù„ÙØ±ÙˆÙ‚", type: "branch" });
+  const branch = await req("POST", "/api/warehouses", { code: "VB1", name: "فرع الفروق", type: "branch" });
   const branchId = Number(branch.data?.id);
   const transfer = await req("POST", "/api/transfers", { fromWarehouseId: 1, toWarehouseId: branchId, items: [{ itemId: idA, quantity: 5 }] });
   const transferId = Number(transfer.data?.id);
@@ -132,7 +132,7 @@ try {
   const receiveLine = transfer.data?.lines?.[0];
   const receive = await req("POST", `/api/transfers/${transferId}/receive`, {
     deliveryNoteNumber: "VN-1",
-    lines: [{ lineId: Number(receiveLine?.id), receivedQuantity: 4, varianceReason: "Ù†Ù‚Øµ ÙÙŠ Ø§Ù„Ø´Ø­Ù†Ø©" }],
+    lines: [{ lineId: Number(receiveLine?.id), receivedQuantity: 4, varianceReason: "نقص في الشحنة" }],
   });
   check("transfers: receive accepts the counted quantity", receive.status === 200, `status=${receive.status}`);
   const varianceReport = await req("GET", "/api/reports/transfer-variance");
@@ -150,11 +150,11 @@ try {
   check("abc: classification responds", abc.status === 200 && Boolean(abc.data?.counts), `A=${abc.data?.counts?.A}`);
 
   // ---------------- user scope ----------------
-  const scoped = await req("POST", "/api/users", { username: "branchuser", password: "Branch@12345", fullName: "Ù…Ø³ØªØ®Ø¯Ù… ÙØ±Ø¹", role: "warehouse_manager", warehouseId: branchId });
+  const scoped = await req("POST", "/api/users", { username: "branchuser", password: "Branch@12345", fullName: "مستخدم فرع", role: "warehouse_manager", warehouseId: branchId });
   check("users: warehouse scope is stored", scoped.status === 201, `status=${scoped.status}`);
 
   // ---------------- goods receipt note (GRN) ----------------
-  const draftNoReason = await req("POST", "/api/receipts", { supplierName: "Ù…ÙˆØ±Ø¯ Ø§Ù„Ø§Ø®ØªØ¨Ø§Ø±", deliveryNoteNumber: "GDN-1", deliveryNoteDate: today, lines: [{ itemId: idA, orderedQuantity: 10, receivedQuantity: 8, rejectedQuantity: 2 }] });
+  const draftNoReason = await req("POST", "/api/receipts", { supplierName: "مورد الاختبار", deliveryNoteNumber: "GDN-1", deliveryNoteDate: today, lines: [{ itemId: idA, orderedQuantity: 10, receivedQuantity: 8, rejectedQuantity: 2 }] });
   check("GRN: draft created with lines", draftNoReason.status === 201 && Array.isArray(draftNoReason.data?.lines), `status=${draftNoReason.status}`);
   const noReasonId = Number(draftNoReason.data?.id);
   const postNoReason = await req("POST", `/api/receipts/${noReasonId}/post`, {});
@@ -165,8 +165,8 @@ try {
 
   const beforeGrn = await req("GET", `/api/items/${idA}`);
   const stockBefore = Number(beforeGrn.data?.currentStock ?? 0);
-  const draft = await req("POST", "/api/receipts", { supplierName: "Ù…ÙˆØ±Ø¯ Ø§Ù„Ø§Ø®ØªØ¨Ø§Ø±", deliveryNoteNumber: "GDN-2", deliveryNoteDate: today, referenceNumber: "PO-77", lines: [
-    { itemId: idA, orderedQuantity: 10, receivedQuantity: 8, rejectedQuantity: 2, rejectionReason: "Ø¹Ø¨ÙˆØ© ØªØ§Ù„ÙØ©", batchNumber: "GRN-B-1", expiryDate: "2027-06-30" },
+  const draft = await req("POST", "/api/receipts", { supplierName: "مورد الاختبار", deliveryNoteNumber: "GDN-2", deliveryNoteDate: today, referenceNumber: "PO-77", lines: [
+    { itemId: idA, orderedQuantity: 10, receivedQuantity: 8, rejectedQuantity: 2, rejectionReason: "عبوة تالفة", batchNumber: "GRN-B-1", expiryDate: "2027-06-30" },
   ] });
   const draftId = Number(draft.data?.id);
   const beforePost = await req("GET", `/api/items/${idA}`);
@@ -181,7 +181,7 @@ try {
   const twice2 = await req("POST", `/api/receipts/${draftId}/post`, {});
   check("GRN: a posted receipt cannot be posted twice", twice2.status === 409, `status=${twice2.status}`);
   const supplierSummary = await req("GET", "/api/receipts/summary");
-  const supplierRow = (supplierSummary.data?.suppliers ?? []).find((row) => row.supplierName === "Ù…ÙˆØ±Ø¯ Ø§Ù„Ø§Ø®ØªØ¨Ø§Ø±");
+  const supplierRow = (supplierSummary.data?.suppliers ?? []).find((row) => row.supplierName === "مورد الاختبار");
   check("GRN: supplier performance is reported", Boolean(supplierRow) && Number(supplierRow?.rejected) === 2, `rejected=${supplierRow?.rejected}`);
   // ---------------- external alert notifications (webhook) ----------------
   const hookPayloads = [];
@@ -202,7 +202,7 @@ try {
   check("webhook: the settings endpoint exposes it", settingsNow.data?.alertWebhookUrl === hookUrl, `value=${settingsNow.data?.alertWebhookUrl}`);
 
   // an item below its minimum makes the worker raise a critical alert
-  const lowItem = await req("POST", "/api/items", { code: "HOOK-1", name: "ØµÙ†Ù ØªÙ†Ø¨ÙŠÙ‡", unit: unitName, itemType: "item", minStock: 10 });
+  const lowItem = await req("POST", "/api/items", { code: "HOOK-1", name: "صنف تنبيه", unit: unitName, itemType: "item", minStock: 10 });
   check("webhook: probe item created", lowItem.status === 201, `status=${lowItem.status}`);
   await req("POST", "/api/alerts/refresh", {});
   for (let attempt = 0; attempt < 24 && hookPayloads.length === 0; attempt += 1) {
@@ -217,19 +217,19 @@ try {
   await req("PUT", "/api/settings", { alertWebhookUrl: null });
   hookServer.close();
   // ---------------- storage locations (bins) ----------------
-  const bin = await req("POST", "/api/bins", { code: "B-01-1", name: "Ø±Ù 1", zone: "A" });
+  const bin = await req("POST", "/api/bins", { code: "B-01-1", name: "رف 1", zone: "A" });
   check("bins: location created", bin.status === 201, `status=${bin.status}`);
-  const dupBin = await req("POST", "/api/bins", { code: "B-01-1", name: "Ù…ÙƒØ±Ø±" });
+  const dupBin = await req("POST", "/api/bins", { code: "B-01-1", name: "مكرر" });
   check("bins: duplicate code is rejected", dupBin.status === 409 && dupBin.data?.code === "BIN_CODE_DUPLICATE", `status=${dupBin.status}`);
   const binList = await req("GET", "/api/bins");
   check("bins: list responds", Array.isArray(binList.data) && binList.data.some((row) => row.code === "B-01-1"), `rows=${binList.data?.length}`);
-  const binItem = await req("POST", "/api/items", { code: "BIN-1", name: "ØµÙ†Ù Ù…ÙˆÙ‚Ø¹", unit: unitName, itemType: "item", binCode: "B-01-1" });
+  const binItem = await req("POST", "/api/items", { code: "BIN-1", name: "صنف موقع", unit: unitName, itemType: "item", binCode: "B-01-1" });
   check("bins: an item can carry the location code", binItem.status === 201 && binItem.data?.binCode === "B-01-1", `binCode=${binItem.data?.binCode}`);
   const binUsage = await req("GET", "/api/bins/usage");
   check("bins: usage reports known codes", (binUsage.data ?? []).some((row) => row.binCode === "B-01-1" && row.known === true && Number(row.items) >= 1), `rows=${binUsage.data?.length}`);
   const binInUse = await req("DELETE", `/api/bins/${Number(bin.data?.id)}`);
   check("bins: archiving an in-use location is refused", binInUse.status === 409 && binInUse.data?.code === "BIN_IN_USE", `status=${binInUse.status}`);
-  const freeBin = await req("POST", "/api/bins", { code: "B-99-9", name: "Ø±Ù ÙØ§Ø±Øº" });
+  const freeBin = await req("POST", "/api/bins", { code: "B-99-9", name: "رف فارغ" });
   const freeArchive = await req("DELETE", `/api/bins/${Number(freeBin.data?.id)}`);
   check("bins: an unused location is archived", freeArchive.status === 200 && freeArchive.data?.isActive === false, `status=${freeArchive.status}`);
   // ---------------- print detail: one movement drawn from two batches ----------------
@@ -238,7 +238,7 @@ try {
   const exitReasons = await req("GET", "/api/exit-reasons");
   const recipientId = Number(createdRecipient.data?.id ?? (recipients.data ?? [])[0]?.id ?? 0);
   const exitReasonId = Number((exitReasons.data ?? [])[0]?.id ?? 0);
-  const multiItem = await req("POST", "/api/items", { code: "MULTI-1", name: "ØµÙ†Ù Ø¨Ø¯ÙØ¹ØªÙŠÙ†", unit: unitName, itemType: "item", minStock: 0 });
+  const multiItem = await req("POST", "/api/items", { code: "MULTI-1", name: "صنف بدفعتين", unit: unitName, itemType: "item", minStock: 0 });
   const multiId = Number(multiItem.data?.id);
   await req("POST", "/api/transactions/in", { itemId: multiId, itemType: "item", quantity: 600, supplySource: "central_warehouses", deliveryNoteNumber: "DN-LOT-A", deliveryNoteDate: today, documentDate: today, batchNumber: "LOT-A", expiryDate: "2027-03-31" });
   await req("POST", "/api/transactions/in", { itemId: multiId, itemType: "item", quantity: 100, supplySource: "central_warehouses", deliveryNoteNumber: "DN-LOT-B", deliveryNoteDate: today, documentDate: today, batchNumber: "LOT-B", expiryDate: "2026-12-31" });

@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useRoute, useLocation, Link } from 'wouter';
 import { useListTransactions,
   useGetCurrentUser, type Transaction } from '@workspace/api-client-react';
