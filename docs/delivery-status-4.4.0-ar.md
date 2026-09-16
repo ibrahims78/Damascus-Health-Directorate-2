@@ -9,14 +9,16 @@
 ## البصمات (SHA-256)
 | العنصر | البصمة |
 |---|---|
-| Portable Windows ZIP | 013065CCDAC66918A5E26CC70D54EF80DB2905DE3A9F8AD4D2A1A5D75CF194B8 |
-| Protected Windows ZIP | 3284116D0EFB7DC0B05961F9FFE577FA521CEFD243707D319347E58974A40512 |
-| Android Offline APK | B048962604A10C72F98690196E84414A47FD95BDB2D21BF0B6A2B2AD6219330C |
-| Android Protected APK | 31201638E8E3FAA4C1D99F76B508377C98AFC3DCE54FC7CCF3376732E751DA28 |
+| Portable Windows ZIP | 77F74913C5CD04CA9FC10E07C311E7CD84F49BC3B1342D1C80E9AA6593E900C9 |
+| Protected Windows ZIP | 2E8C4DD636D9A82AF39C463651D2F3EE2C9D482CCF8B8FD39C7FE09FA2134843 |
+| Android Offline APK | 3C804EFAFB9FEE6AABCC270ED1E2A5744258893181C915A0D7CF4007AD9062A8 |
+| Android Protected APK | E2A5E64C15FC5939861F48FE9203EC52AF379854E736990FC329FD6DFBA0B24C |
 | Activation Kit ZIP | DF15FDAC7D3018F26A55C493AA1A637C4045DEF0D96A4395ECAC90290B416126 |
 
 ## التحقّق المُنفَّذ
 - فحص الأنواع وبناء API وحزم الويب الأربع: ناجح.
 - حزم ويندوز: asar يحتوي catalog/import ويحمل الإصدار 4.4.0؛ الحزمة المحمية تضم المفتاح العام.
 - APK: versionCode=440 و versionName=4.4.0 وبصمة الميزة داخل الأصول.
+- **مراجعة معمّقة للكود**: 8 مسائل مُصلَحة (تحقق رصيد المصدر، منع الكتابة الجزئية، دفتر الدفعات في التسويات،
+  مطابقة دلالات الترصيد والتصدير، حاكمية الاستيراد مع تراجع فعّال على الهاتف، توحيد رموز الأخطاء).
 - التفعيل: 10/10 — مفتاح المجموعة مطابق للمدمج، تراخيص 4.4.0 صحيحة، ترخيص 4.3.0 مرفوض، والتعديل يفشل التحقّق.
