@@ -40,7 +40,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 
-const APP_VERSION = import.meta.env.VITE_APP_VERSION ?? "v4.9.0";
+const APP_VERSION = import.meta.env.VITE_APP_VERSION ?? "v5.0.0";
 const DESIGNER_NAME = 'Ø¥Ø¨Ø±Ø§Ù‡ÙŠÙ… Ø§Ù„ØµÙŠØ¯Ø§ÙˆÙŠ';
 const DESIGNER_PHONE = '0933706403';
 
