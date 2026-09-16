@@ -88,6 +88,40 @@ const newsItems: Array<{ version: string; title: string; detail: string }> = [
   { version: '4.5.0', title: 'الجرد الدوري · القيد العكسي · فروق التحويلات · إعادة الطلب · مؤشرات KPI/ABC', detail: 'حزمة الرقابة وإدارة المخزون المتقدمة.' },
 ];
 
+const exampleItems: Array<{ title: string; scenario: string; steps: string[]; outcome: string }> = [
+  {
+    title: 'صرف 700 قطعة من دفعتين مختلفتي الصلاحية',
+    scenario: 'لدينا 600 قطعة دفعة LOT-A (صلاحية 2027-03-31) و100 قطعة دفعة LOT-B (صلاحية 2026-12-31)، والمطلوب صرف 700 قطعة.',
+    steps: [
+      'أدخل الدفعتين عبر «إدخال مادة»: الأولى 600 بالدفعة LOT-A وتاريخ صلاحيتها، والثانية 100 بالدفعة LOT-B وتاريخها.',
+      'من «إخراج مادة» اكتب الكمية 700 واختر الجهة والسبب (إلزامي) والوجهة ومستند التسليم الداخلي.',
+      'يرتّب النظام الدفعات بالأقرب صلاحية (FEFO): تخرج LOT-B (100) أولًا ثم LOT-A (600).',
+      'اطبع مستند الحركة: يظهر جدول «تفصيل الدفعات المصروفة» بالكمية والصلاحية وإجمالي 700.',
+    ],
+    outcome: 'سجل الدفعات يبقى مصدر الحقيقة، وتقرير الترصيد يبقى صفر فروق، والمستند يوضّح كل دفعة على حدة.',
+  },
+  {
+    title: 'جرد دوري يكشف فرق 2 قطع',
+    scenario: 'الرصيد الدفتري للصنف 10 قطع، والجرد الفيزيائي 8 قطع (تالف غير مسجَّل).',
+    steps: [
+      'أنشئ «جلسة جرد جديدة» (أعمى) وأدخل 8 في سطر الصنف.',
+      'اكتب سبب الفرق: «تالف أثناء التخزين».',
+      'أكمل جرد بقية الأسطر ثم اضغط «اعتماد وترحيل الفروق».',
+    ],
+    outcome: 'تُرحَّل تسوية بمقدار -2 موثّقة باسم جلسة الجرد، ويصبح الرصيد 8 مع دفتر دفعات متوافق.',
+  },
+  {
+    title: 'استلام جزئي مع رفض كمية',
+    scenario: 'أمر شراء 10 صناديق، وصل المورّد بـ8 سليمة و2 تالفة.',
+    steps: [
+      'أنشئ «سند استلام»: المورّد ورقم سند التسليم ومرجع أمر الشراء.',
+      'أدخل البند: مطلوب 10 · مستلم 8 · مرفوض 2 مع سبب الرفض «عبوة تالفة».',
+      '«ترحيل» السند — تُدخل 8 فقط إلى المخزون برقم الدفعة والصلاحية.',
+    ],
+    outcome: 'المخزون يزيد 8 فقط، والمرفوض موثّق في السند، وتقرير أداء المورّدين يرفع نسبة رفضه.',
+  },
+];
+
 const operations: Operation[] = [
   {
     id: 'inbound',
@@ -733,7 +767,8 @@ export function HelpPage() {
             ['#help-operation-bins', 'المواقع والملصقات'],
             ['#help-operation-2fa', 'المصادقة الثنائية'],
             ['#troubleshooting', 'استكشاف الأخطاء'],
-            ['#whats-new', 'ما الجديد'],
+            ['#examples', 'أمثلة عملية'],
+['#whats-new', 'ما الجديد'],
           ].map(([href, label]) => (
             <a
               key={href}
@@ -925,6 +960,31 @@ export function HelpPage() {
         </div>
       </section>
 
+      <section id="examples" className="scroll-mt-6">
+        <SectionHeading
+          eyebrow="09 / أمثلة عملية"
+          title="سيناريوهات كاملة خطوة بخطوة"
+          description="ثلاث حالات من العمل اليومي موضّحة بالأرقام والنتيجة المتوقّعة، لتقليل الخطأ في أول استخدام."
+          icon={BookOpen}
+        />
+        <div className="space-y-4">
+          {exampleItems.map((example, index) => (
+            <div key={example.title} className="rounded-xl border bg-card p-5 shadow-sm">
+              <div className="mb-2 flex items-center gap-2 text-sm font-bold">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">{index + 1}</span>
+                {example.title}
+              </div>
+              <p className="mb-3 rounded-lg border border-primary/15 bg-primary/5 px-3 py-2 text-sm leading-6">{example.scenario}</p>
+              <ol className="space-y-2">
+                {example.steps.map((step) => (
+                  <li key={step} className="text-sm leading-6 text-muted-foreground">• {step}</li>
+                ))}
+              </ol>
+              <p className="mt-3 text-sm font-semibold text-emerald-700">{example.outcome}</p>
+            </div>
+          ))}
+        </div>
+      </section>
       <section id="whats-new" className="scroll-mt-6">
         <SectionHeading
           eyebrow="10 / ما الجديد"
