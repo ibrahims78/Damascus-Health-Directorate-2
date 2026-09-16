@@ -1,4 +1,4 @@
-import { dmePackageSummary, readDmeSyncPackageInWorker, writeDmeSyncPackage } from './dme-sync-browser';
+﻿import { dmePackageSummary, readDmeSyncPackageInWorker, writeDmeSyncPackage } from './dme-sync-browser';
 import {
   type CatalogAnalysis,
   type CatalogEquipmentRow,
@@ -8,6 +8,7 @@ import {
   createCategoryLookup,
   createUnitLookup,
   DEFAULT_INVENTORY_UNITS,
+  INVENTORY_TEMPLATE_VERSION,
   normalizeHeader,
   validateCatalogEquipmentRows,
   validateCatalogItemRows,
@@ -66,6 +67,13 @@ type OfflineState = {
   centralReturns: Array<Record<string, unknown>>;
   alerts: Array<Record<string, unknown>>;
   auditLog: Array<Record<string, unknown>>;
+  units: Array<Record<string, unknown>>;
+  warehouses: Array<Record<string, unknown>>;
+  currentWarehouseId: number | null;
+  transfers: Array<Record<string, unknown>>;
+  transferLines: Array<Record<string, unknown>>;
+  importBatches: Array<Record<string, unknown>>;
+  documentSequences: Array<Record<string, unknown>>;
 };
 
 const DB_NAME = 'damascus-emergency-inventory-offline';
@@ -76,14 +84,14 @@ const PREVIEW_KEY = 'pending-restore-preview';
 const OFFLINE_HEADER = 'X-Damascus-Offline';
 const INDEXED_DB_TIMEOUT_MS = 15_000;
 const OFFLINE_REQUEST_TIMEOUT_MS = 20_000;
-const DEFAULT_ORG_NAME = 'مستودعات مديرية صحة دمشق';
+const DEFAULT_ORG_NAME = 'Ù…Ø³ØªÙˆØ¯Ø¹Ø§Øª Ù…Ø¯ÙŠØ±ÙŠØ© ØµØ­Ø© Ø¯Ù…Ø´Ù‚';
 
 function isLegacyOrgName(value: string): boolean {
   const normalized = value.trim();
   return (
     normalized !== DEFAULT_ORG_NAME &&
-    /^(منظومة|نظام)\s/u.test(normalized) &&
-    /(الإحالة|الاحالة|الإسعاف والطوارئ|الاسعاف والطوارئ)/u.test(normalized)
+    /^(Ù…Ù†Ø¸ÙˆÙ…Ø©|Ù†Ø¸Ø§Ù…)\s/u.test(normalized) &&
+    /(Ø§Ù„Ø¥Ø­Ø§Ù„Ø©|Ø§Ù„Ø§Ø­Ø§Ù„Ø©|Ø§Ù„Ø¥Ø³Ø¹Ø§Ù ÙˆØ§Ù„Ø·ÙˆØ§Ø±Ø¦|Ø§Ù„Ø§Ø³Ø¹Ø§Ù ÙˆØ§Ù„Ø·ÙˆØ§Ø±Ø¦)/u.test(normalized)
   );
 }
 
@@ -113,7 +121,7 @@ function initialState(): OfflineState {
   const timestamp = now();
   return {
     version: 2,
-    nextId: 1,
+    nextId: 2,
     currentUserId: null,
     nodeIdentity: {
       nodeId: crypto.randomUUID(),
@@ -142,16 +150,16 @@ function initialState(): OfflineState {
       updatedAt: timestamp,
     },
     categories: [
-      { id: 1, name: 'مواد طبية', type: 'consumable', createdAt: timestamp },
-      { id: 2, name: 'تجهيزات', type: 'equipment', createdAt: timestamp },
+      { id: 1, name: 'Ù…ÙˆØ§Ø¯ Ø·Ø¨ÙŠØ©', type: 'consumable', createdAt: timestamp },
+      { id: 2, name: 'ØªØ¬Ù‡ÙŠØ²Ø§Øª', type: 'equipment', createdAt: timestamp },
     ],
     items: [],
     equipment: [],
     recipients: [],
     exitReasons: [
-      { id: 1, name: 'صرف اعتيادي', isSystem: true, isActive: true, createdAt: timestamp },
-      { id: 2, name: 'تلف', isSystem: true, isActive: true, createdAt: timestamp },
-      { id: 3, name: 'إرجاع مركزي', isSystem: true, isActive: true, createdAt: timestamp },
+      { id: 1, name: 'ØµØ±Ù Ø§Ø¹ØªÙŠØ§Ø¯ÙŠ', isSystem: true, isActive: true, createdAt: timestamp },
+      { id: 2, name: 'ØªÙ„Ù', isSystem: true, isActive: true, createdAt: timestamp },
+      { id: 3, name: 'Ø¥Ø±Ø¬Ø§Ø¹ Ù…Ø±ÙƒØ²ÙŠ', isSystem: true, isActive: true, createdAt: timestamp },
     ],
     transactions: [],
     inventoryBatches: [],
@@ -162,6 +170,24 @@ function initialState(): OfflineState {
     centralReturns: [],
     alerts: [],
     auditLog: [],
+    units: [],
+    warehouses: [
+      {
+        id: 1,
+        code: 'C',
+        name: 'Ø§Ù„Ù…Ø³ØªÙˆØ¯Ø¹ Ø§Ù„Ù…Ø±ÙƒØ²ÙŠ',
+        type: 'central',
+        notes: null,
+        isActive: true,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      },
+    ],
+    currentWarehouseId: 1,
+    transfers: [],
+    transferLines: [],
+    importBatches: [],
+    documentSequences: [],
   };
 }
 
@@ -212,10 +238,10 @@ function openDatabase(): Promise<IDBDatabase> {
         db.onversionchange = () => db.close();
         resolve(db);
       };
-      request.onerror = () => reject(request.error ?? new Error('تعذر فتح قاعدة البيانات المحلية'));
-      request.onblocked = () => reject(new Error('قاعدة البيانات المحلية مشغولة بعملية أخرى'));
+      request.onerror = () => reject(request.error ?? new Error('ØªØ¹Ø°Ø± ÙØªØ­ Ù‚Ø§Ø¹Ø¯Ø© Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ù…Ø­Ù„ÙŠØ©'));
+      request.onblocked = () => reject(new Error('Ù‚Ø§Ø¹Ø¯Ø© Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ù…Ø­Ù„ÙŠØ© Ù…Ø´ØºÙˆÙ„Ø© Ø¨Ø¹Ù…Ù„ÙŠØ© Ø£Ø®Ø±Ù‰'));
     }),
-    'انتهت مهلة فتح قاعدة البيانات المحلية',
+    'Ø§Ù†ØªÙ‡Øª Ù…Ù‡Ù„Ø© ÙØªØ­ Ù‚Ø§Ø¹Ø¯Ø© Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ù…Ø­Ù„ÙŠØ©',
   );
 }
 
@@ -229,10 +255,10 @@ async function loadState(): Promise<OfflineState> {
         const request = transaction.objectStore(STORE_NAME).get(STATE_KEY);
         request.onsuccess = () => resolve(request.result as OfflineState | undefined);
         request.onerror = () => reject(request.error);
-        transaction.onerror = () => reject(transaction.error ?? new Error('تعذر قراءة البيانات المحلية'));
-        transaction.onabort = () => reject(transaction.error ?? new Error('تم إلغاء قراءة البيانات المحلية'));
+        transaction.onerror = () => reject(transaction.error ?? new Error('ØªØ¹Ø°Ø± Ù‚Ø±Ø§Ø¡Ø© Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ù…Ø­Ù„ÙŠØ©'));
+        transaction.onabort = () => reject(transaction.error ?? new Error('ØªÙ… Ø¥Ù„ØºØ§Ø¡ Ù‚Ø±Ø§Ø¡Ø© Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ù…Ø­Ù„ÙŠØ©'));
       }),
-      'انتهت مهلة قراءة البيانات المحلية',
+      'Ø§Ù†ØªÙ‡Øª Ù…Ù‡Ù„Ø© Ù‚Ø±Ø§Ø¡Ø© Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ù…Ø­Ù„ÙŠØ©',
     );
   } finally {
     db.close();
@@ -265,6 +291,13 @@ async function loadState(): Promise<OfflineState> {
       custodyReturns: existing.custodyReturns ?? [],
       damageRecords: existing.damageRecords ?? [],
       centralReturns: existing.centralReturns ?? [],
+      units: existing.units ?? fresh.units,
+      warehouses: existing.warehouses ?? fresh.warehouses,
+      currentWarehouseId: existing.currentWarehouseId ?? fresh.currentWarehouseId,
+      transfers: existing.transfers ?? fresh.transfers,
+      transferLines: existing.transferLines ?? fresh.transferLines,
+      importBatches: existing.importBatches ?? fresh.importBatches,
+      documentSequences: existing.documentSequences ?? fresh.documentSequences,
     };
   }
   const fresh = initialState();
@@ -291,12 +324,12 @@ async function saveState(state: OfflineState) {
         } catch {
           // The transaction may already have completed or aborted.
         }
-        finish(new Error('انتهت مهلة حفظ البيانات المحلية'));
+        finish(new Error('Ø§Ù†ØªÙ‡Øª Ù…Ù‡Ù„Ø© Ø­ÙØ¸ Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ù…Ø­Ù„ÙŠØ©'));
       }, 15000);
       const clear = () => window.clearTimeout(timeout);
       request.onerror = () => {
         clear();
-        finish(request.error ?? new Error('تعذر حفظ البيانات المحلية'));
+        finish(request.error ?? new Error('ØªØ¹Ø°Ø± Ø­ÙØ¸ Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ù…Ø­Ù„ÙŠØ©'));
       };
       transaction.oncomplete = () => {
         clear();
@@ -304,11 +337,11 @@ async function saveState(state: OfflineState) {
       };
       transaction.onerror = () => {
         clear();
-        finish(transaction.error ?? new Error('تعذر حفظ البيانات المحلية'));
+        finish(transaction.error ?? new Error('ØªØ¹Ø°Ø± Ø­ÙØ¸ Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ù…Ø­Ù„ÙŠØ©'));
       };
       transaction.onabort = () => {
         clear();
-        finish(transaction.error ?? new Error('تم إلغاء حفظ البيانات المحلية'));
+        finish(transaction.error ?? new Error('ØªÙ… Ø¥Ù„ØºØ§Ø¡ Ø­ÙØ¸ Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ù…Ø­Ù„ÙŠØ©'));
       };
     });
   } finally {
@@ -323,12 +356,12 @@ async function savePendingPreview(preview: NonNullable<typeof pendingDmePreview>
       new Promise<void>((resolve, reject) => {
         const transaction = db.transaction(STORE_NAME, 'readwrite');
         const request = transaction.objectStore(STORE_NAME).put(preview, PREVIEW_KEY);
-        request.onerror = () => reject(request.error ?? new Error('تعذر حفظ نقطة الاستعادة المحلية'));
+        request.onerror = () => reject(request.error ?? new Error('ØªØ¹Ø°Ø± Ø­ÙØ¸ Ù†Ù‚Ø·Ø© Ø§Ù„Ø§Ø³ØªØ¹Ø§Ø¯Ø© Ø§Ù„Ù…Ø­Ù„ÙŠØ©'));
         transaction.oncomplete = () => resolve();
-        transaction.onerror = () => reject(transaction.error ?? new Error('تعذر حفظ نقطة الاستعادة المحلية'));
-        transaction.onabort = () => reject(transaction.error ?? new Error('تم إلغاء حفظ نقطة الاستعادة المحلية'));
+        transaction.onerror = () => reject(transaction.error ?? new Error('ØªØ¹Ø°Ø± Ø­ÙØ¸ Ù†Ù‚Ø·Ø© Ø§Ù„Ø§Ø³ØªØ¹Ø§Ø¯Ø© Ø§Ù„Ù…Ø­Ù„ÙŠØ©'));
+        transaction.onabort = () => reject(transaction.error ?? new Error('ØªÙ… Ø¥Ù„ØºØ§Ø¡ Ø­ÙØ¸ Ù†Ù‚Ø·Ø© Ø§Ù„Ø§Ø³ØªØ¹Ø§Ø¯Ø© Ø§Ù„Ù…Ø­Ù„ÙŠØ©'));
       }),
-      'انتهت مهلة حفظ نقطة الاستعادة المحلية',
+      'Ø§Ù†ØªÙ‡Øª Ù…Ù‡Ù„Ø© Ø­ÙØ¸ Ù†Ù‚Ø·Ø© Ø§Ù„Ø§Ø³ØªØ¹Ø§Ø¯Ø© Ø§Ù„Ù…Ø­Ù„ÙŠØ©',
     );
   } finally {
     db.close();
@@ -354,12 +387,12 @@ async function clearPendingPreview() {
       new Promise<void>((resolve, reject) => {
         const transaction = db.transaction(STORE_NAME, 'readwrite');
         const request = transaction.objectStore(STORE_NAME).delete(PREVIEW_KEY);
-        request.onerror = () => reject(request.error ?? new Error('تعذر حذف نقطة الاستعادة المحلية'));
+        request.onerror = () => reject(request.error ?? new Error('ØªØ¹Ø°Ø± Ø­Ø°Ù Ù†Ù‚Ø·Ø© Ø§Ù„Ø§Ø³ØªØ¹Ø§Ø¯Ø© Ø§Ù„Ù…Ø­Ù„ÙŠØ©'));
         transaction.oncomplete = () => resolve();
-        transaction.onerror = () => reject(transaction.error ?? new Error('تعذر حذف نقطة الاستعادة المحلية'));
-        transaction.onabort = () => reject(transaction.error ?? new Error('تم إلغاء حذف نقطة الاستعادة المحلية'));
+        transaction.onerror = () => reject(transaction.error ?? new Error('ØªØ¹Ø°Ø± Ø­Ø°Ù Ù†Ù‚Ø·Ø© Ø§Ù„Ø§Ø³ØªØ¹Ø§Ø¯Ø© Ø§Ù„Ù…Ø­Ù„ÙŠØ©'));
+        transaction.onabort = () => reject(transaction.error ?? new Error('ØªÙ… Ø¥Ù„ØºØ§Ø¡ Ø­Ø°Ù Ù†Ù‚Ø·Ø© Ø§Ù„Ø§Ø³ØªØ¹Ø§Ø¯Ø© Ø§Ù„Ù…Ø­Ù„ÙŠØ©'));
       }),
-      'انتهت مهلة حذف نقطة الاستعادة المحلية',
+      'Ø§Ù†ØªÙ‡Øª Ù…Ù‡Ù„Ø© Ø­Ø°Ù Ù†Ù‚Ø·Ø© Ø§Ù„Ø§Ø³ØªØ¹Ø§Ø¯Ø© Ø§Ù„Ù…Ø­Ù„ÙŠØ©',
     );
   } finally {
     db.close();
@@ -460,7 +493,7 @@ function syncVector(state: OfflineState): Record<string, number> {
 
 function applyOfflineRow(state: OfflineState, change: Record<string, unknown>) {
   const key = STATE_KEY_BY_ENTITY[text(change.entityType)];
-  if (!key || key === 'users') throw new Error(`نوع الكيان غير مدعوم: ${text(change.entityType)}`);
+  if (!key || key === 'users') throw new Error(`Ù†ÙˆØ¹ Ø§Ù„ÙƒÙŠØ§Ù† ØºÙŠØ± Ù…Ø¯Ø¹ÙˆÙ…: ${text(change.entityType)}`);
   const rows = (state as unknown as Record<string, unknown[]>)[key];
   const row = { ...((change.payload ?? {}) as Record<string, unknown>) };
   if (text(change.entityType) === 'item' && row.categoryGlobalId != null) {
@@ -483,16 +516,16 @@ function applyOfflineRow(state: OfflineState, change: Record<string, unknown>) {
 
 function applyOfflineTransactionBundle(state: OfflineState, change: Record<string, unknown>) {
   const bundle = (change.payload ?? {}) as { transaction?: Record<string, unknown>; effects?: Array<Record<string, unknown>> };
-  if (!bundle.transaction) throw new Error('حزمة حركة غير مكتملة');
+  if (!bundle.transaction) throw new Error('Ø­Ø²Ù…Ø© Ø­Ø±ÙƒØ© ØºÙŠØ± Ù…ÙƒØªÙ…Ù„Ø©');
   const txRow = { ...bundle.transaction };
   if (txRow.itemGlobalId != null) {
     const itemId = resolveGlobalId(state, 'item', String(txRow.itemGlobalId));
-    if (itemId == null) throw new Error('المادة المرجعية للحركة غير موجودة محلياً');
+    if (itemId == null) throw new Error('Ø§Ù„Ù…Ø§Ø¯Ø© Ø§Ù„Ù…Ø±Ø¬Ø¹ÙŠØ© Ù„Ù„Ø­Ø±ÙƒØ© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø© Ù…Ø­Ù„ÙŠØ§Ù‹');
     txRow.itemId = itemId;
   }
   if (txRow.equipmentGlobalId != null) {
     const equipmentId = resolveGlobalId(state, 'equipment', String(txRow.equipmentGlobalId));
-    if (equipmentId == null) throw new Error('المعدة المرجعية للحركة غير موجودة محلياً');
+    if (equipmentId == null) throw new Error('Ø§Ù„Ù…Ø¹Ø¯Ø© Ø§Ù„Ù…Ø±Ø¬Ø¹ÙŠØ© Ù„Ù„Ø­Ø±ÙƒØ© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø© Ù…Ø­Ù„ÙŠØ§Ù‹');
     txRow.equipmentId = equipmentId;
   }
   delete txRow.itemGlobalId;
@@ -593,7 +626,7 @@ function applyOfflineChanges(state: OfflineState, changes: unknown[]) {
         entityGlobalId: text(change.entityGlobalId),
         severity: 'medium',
         status: 'open',
-        message: error instanceof Error ? error.message : 'تعذر تطبيق التغيير',
+        message: error instanceof Error ? error.message : 'ØªØ¹Ø°Ø± ØªØ·Ø¨ÙŠÙ‚ Ø§Ù„ØªØºÙŠÙŠØ±',
         createdAt: now(),
       });
       state.nextId += 1;
@@ -753,6 +786,278 @@ function catalogSummary(
   };
 }
 
+function offlineWarehouseView(warehouse: Record<string, unknown> | null | undefined) {
+  if (!warehouse) return null;
+  return {
+    id: numberValue(warehouse.id),
+    code: text(warehouse.code),
+    name: text(warehouse.name),
+    type: text(warehouse.type, 'central'),
+  };
+}
+
+/** The installation's current warehouse: explicit choice, else the central one. */
+function offlineCurrentWarehouse(state: OfflineState) {
+  const chosen = state.warehouses.find(
+    (warehouse) => numberValue(warehouse.id) === numberValue(state.currentWarehouseId),
+  );
+  if (chosen) return offlineWarehouseView(chosen);
+  const central = state.warehouses.find((warehouse) => text(warehouse.type) === 'central');
+  if (central) return offlineWarehouseView(central);
+  return offlineWarehouseView(state.warehouses[0]);
+}
+
+function offlineWarehouseId(state: OfflineState): number {
+  return offlineCurrentWarehouse(state)?.id ?? numberValue(state.currentWarehouseId, 1);
+}
+
+/** `CODE-TYPE-YEAR-NNNNNN` per warehouse, mirroring the server counter. */
+function offlineNextDocumentNumber(
+  state: OfflineState,
+  docType: string,
+  year = new Date().getFullYear(),
+): string | null {
+  const warehouse = offlineCurrentWarehouse(state);
+  if (!warehouse) return null;
+  const existing = state.documentSequences.find(
+    (sequence) =>
+      numberValue(sequence.warehouseId) === warehouse.id &&
+      text(sequence.docType) === docType &&
+      numberValue(sequence.year) === year,
+  );
+  let n = 1;
+  if (existing) {
+    n = numberValue(existing.lastNumber) + 1;
+    existing.lastNumber = n;
+    existing.updatedAt = now();
+  } else {
+    state.documentSequences.push({
+      id: nextId(state),
+      warehouseId: warehouse.id,
+      docType,
+      year,
+      lastNumber: 1,
+      updatedAt: now(),
+    });
+  }
+  return `${warehouse.code}-${docType}-${year}-${String(n).padStart(6, '0')}`;
+}
+
+function offlineTransferSummary(state: OfflineState, id: number) {
+  const transfer = state.transfers.find((entry) => numberValue(entry.id) === id);
+  if (!transfer) return null;
+  const lines = state.transferLines
+    .filter((line) => numberValue(line.transferId) === id)
+    .map((line) => {
+      const item = state.items.find((entry) => numberValue(entry.id) === numberValue(line.itemId));
+      return {
+        ...line,
+        item: item
+          ? {
+              id: numberValue(item.id),
+              code: text(item.code) || null,
+              name: text(item.name),
+              unit: text(item.unit),
+            }
+          : null,
+      };
+    });
+  return { ...transfer, lines };
+}
+
+/** Outbound leg: consumes batches FEFO and lowers the cached stock. */
+/** Opens a batch for an inbound movement so the ledger stays the source of truth. */
+function offlineOpenBatch(
+  state: OfflineState,
+  itemId: number,
+  quantity: number,
+  warehouseId: number,
+  fields: {
+    batchNumber: string | null;
+    expiryDate: string | null;
+    supplier: string | null;
+    deliveryNoteNumber: string;
+    deliveryNoteDate: string;
+  },
+) {
+  const batch = {
+    id: nextId(state),
+    itemId,
+    warehouseId,
+    batchNumber: fields.batchNumber,
+    receivedQuantity: quantity,
+    remainingQuantity: quantity,
+    expiryDate: fields.expiryDate,
+    supplier: fields.supplier,
+    deliveryNoteNumber: fields.deliveryNoteNumber,
+    deliveryNoteDate: fields.deliveryNoteDate,
+    createdAt: now(),
+  };
+  state.inventoryBatches.push(batch);
+  return batch;
+}
+
+/** Consumes batches FEFO whenever stock leaves a warehouse. Returns the shortfall. */
+function offlineConsumeBatches(
+  state: OfflineState,
+  itemId: number,
+  quantity: number,
+  warehouseId: number,
+): number {
+  const batches = state.inventoryBatches
+    .filter(
+      (batch) =>
+        numberValue(batch.itemId) === itemId &&
+        numberValue(batch.warehouseId, warehouseId) === warehouseId &&
+        numberValue(batch.remainingQuantity) > 0,
+    )
+    .sort((a, b) =>
+      String(text(a.expiryDate) || '9999-12-31').localeCompare(String(text(b.expiryDate) || '9999-12-31')),
+    );
+  let remaining = quantity;
+  for (const batch of batches) {
+    if (remaining <= 0) break;
+    const available = numberValue(batch.remainingQuantity);
+    const take = Math.min(available, remaining);
+    if (take <= 0) continue;
+    batch.remainingQuantity = available - take;
+    remaining -= take;
+    state.transactionBatchAllocations.push({
+      id: nextId(state),
+      batchId: numberValue(batch.id),
+      itemId,
+      quantity: take,
+      transactionId: null,
+      createdAt: now(),
+    });
+    recordOfflineChange(state, 'inventory_batch', numberValue(batch.id), 'update', {
+      remainingQuantity: batch.remainingQuantity,
+    });
+  }
+  return remaining;
+}
+function offlineApplyTransferOut(
+  state: OfflineState,
+  itemId: number,
+  quantity: number,
+  warehouseId: number,
+  code: string,
+  date: string,
+  user: PublicUser | null,
+): { shortfall: number } {
+  const batches = state.inventoryBatches
+    .filter(
+      (batch) =>
+        numberValue(batch.itemId) === itemId &&
+        numberValue(batch.warehouseId, warehouseId) === warehouseId &&
+        numberValue(batch.remainingQuantity) > 0,
+    )
+    .sort((a, b) =>
+      String(text(a.expiryDate) || '9999-12-31').localeCompare(String(text(b.expiryDate) || '9999-12-31')),
+    );
+  let remaining = quantity;
+  for (const batch of batches) {
+    if (remaining <= 0) break;
+    const available = numberValue(batch.remainingQuantity);
+    const take = Math.min(available, remaining);
+    if (take <= 0) continue;
+    batch.remainingQuantity = available - take;
+    remaining -= take;
+    state.transactionBatchAllocations.push({
+      id: nextId(state),
+      batchId: numberValue(batch.id),
+      itemId,
+      quantity: take,
+      transactionId: null,
+      createdAt: now(),
+    });
+  }
+  const item = state.items.find((entry) => numberValue(entry.id) === itemId);
+  if (item) item.currentStock = numberValue(item.currentStock) - quantity;
+  const transaction = {
+    id: nextId(state),
+    type: 'out',
+    documentNumber: code,
+    transactionDate: date,
+    itemId,
+    quantity,
+    notes: `Ø¥Ø±Ø³Ø§Ù„ ØªØ­ÙˆÙŠÙ„ ${code}`,
+    createdBy: user?.id ?? null,
+    createdAt: now(),
+    warehouseId,
+  };
+  state.transactions.unshift(transaction);
+  recordOfflineChange(state, 'transaction', Number(transaction.id), 'create', {
+    type: 'out',
+    documentNumber: code,
+    itemId,
+    quantity,
+  });
+  if (item) {
+    recordOfflineChange(state, 'item', numberValue(item.id), 'update', {
+      name: text(item.name),
+      quantity: numberValue(item.currentStock),
+    });
+  }
+  return { shortfall: remaining };
+}
+
+/** Inbound leg: opens a batch in the destination warehouse. */
+function offlineApplyTransferIn(
+  state: OfflineState,
+  itemId: number,
+  quantity: number,
+  warehouseId: number,
+  deliveryNoteNumber: string,
+  date: string,
+  batchNumber: string | null,
+  expiryDate: string | null,
+  user: PublicUser | null,
+): void {
+  const batch = {
+    id: nextId(state),
+    itemId,
+    warehouseId,
+    batchNumber: batchNumber ?? `TRF-${deliveryNoteNumber}`,
+    receivedQuantity: quantity,
+    remainingQuantity: quantity,
+    expiryDate: expiryDate ?? null,
+    supplier: null,
+    deliveryNoteNumber,
+    deliveryNoteDate: date,
+    createdAt: now(),
+  };
+  state.inventoryBatches.push(batch);
+  const item = state.items.find((entry) => numberValue(entry.id) === itemId);
+  if (item) item.currentStock = numberValue(item.currentStock) + quantity;
+  const transaction = {
+    id: nextId(state),
+    type: 'in',
+    documentNumber: deliveryNoteNumber,
+    transactionDate: date,
+    itemId,
+    quantity,
+    notes: `Ø§Ø³ØªÙ„Ø§Ù… ØªØ­ÙˆÙŠÙ„ ${deliveryNoteNumber}`,
+    createdBy: user?.id ?? null,
+    createdAt: now(),
+    warehouseId,
+  };
+  state.transactions.unshift(transaction);
+  recordOfflineChange(state, 'inventory_batch', Number(batch.id), 'create', { ...batch });
+  recordOfflineChange(state, 'transaction', Number(transaction.id), 'create', {
+    type: 'in',
+    documentNumber: deliveryNoteNumber,
+    itemId,
+    quantity,
+  });
+  if (item) {
+    recordOfflineChange(state, 'item', numberValue(item.id), 'update', {
+      name: text(item.name),
+      quantity: numberValue(item.currentStock),
+    });
+  }
+}
+
 function readBody(init?: RequestInit): any {
   const body = init?.body;
   if (!body || typeof body !== 'string') return {};
@@ -856,7 +1161,7 @@ function addAudit(state: OfflineState, user: PublicUser | null, action: string, 
   state.auditLog.unshift({
     id: nextId(state),
     userId: user?.id ?? null,
-    userNameSnap: user?.fullName ?? 'محلي',
+    userNameSnap: user?.fullName ?? 'Ù…Ø­Ù„ÙŠ',
     action,
     entityType,
     entityId: entityId ?? null,
@@ -874,7 +1179,7 @@ function itemFromInput(state: OfflineState, body: Record<string, unknown>, exist
     name: text(body.name, text(existing?.name)),
     categoryId: body.categoryId ?? existing?.categoryId ?? null,
     itemType: text(body.itemType, text(existing?.itemType, 'consumable')),
-    unit: text(body.unit, text(existing?.unit, 'قطعة')),
+    unit: text(body.unit, text(existing?.unit, 'Ù‚Ø·Ø¹Ø©')),
     currentStock: numberValue(body.currentStock, numberValue(existing?.currentStock)),
     minStock: numberValue(body.minStock, numberValue(existing?.minStock)),
     expiryDate: body.expiryDate ?? existing?.expiryDate ?? null,
@@ -953,7 +1258,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     return mutate(async (state) => {
       const user = state.users.find((entry) => entry.username === text(body.username) && entry.isActive);
       if (!user || !(await verifyPassword(text(body.password), user.passwordSalt, user.passwordHash))) {
-        return failure(401, 'اسم المستخدم أو كلمة المرور غير صحيحة');
+        return failure(401, 'Ø§Ø³Ù… Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù… Ø£Ùˆ ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ± ØºÙŠØ± ØµØ­ÙŠØ­Ø©');
       }
       // Upgrade legacy SHA-256 hashes to PBKDF2 on successful login.
       if (!user.passwordHash.startsWith('pbkdf2$')) {
@@ -985,7 +1290,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     return read((state) => json(state.categories.map(({ id, name, type }) => ({ id, name, type }))));
   }
   if (pathname === '/api/categories' && method === 'POST') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
     return mutate((state) => {
       const body = readBody(init);
       const name = text(body.name);
@@ -998,10 +1303,10 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
   }
   const categoryId = idFrom(pathname, 'categories');
   if (categoryId && pathname === `/api/categories/${categoryId}` && method === 'PUT') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
     return mutate((state) => {
       const category = state.categories.find((entry) => entry.id === categoryId);
-      if (!category) return failure(404, 'التصنيف غير موجود');
+      if (!category) return failure(404, 'Ø§Ù„ØªØµÙ†ÙŠÙ ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯');
       const body = readBody(init);
       category.name = text(body.name, category.name);
       category.type = text(body.type, category.type);
@@ -1011,7 +1316,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     });
   }
   if (categoryId && pathname === `/api/categories/${categoryId}` && method === 'DELETE') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
     return mutate((state) => {
       state.categories = state.categories.filter((entry) => entry.id !== categoryId);
       recordOfflineChange(state, 'category', categoryId, 'delete', {});
@@ -1036,7 +1341,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     });
   }
   if (pathname === '/api/items' && method === 'POST') {
-    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'ليس لديك صلاحية');
+    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
     return mutate((state) => {
       const item = itemFromInput(state, readBody(init));
       state.items.push(item);
@@ -1053,24 +1358,24 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
   if (itemId && pathname === `/api/items/${itemId}` && method === 'GET') {
     return read((state) => {
       const item = state.items.find((entry) => entry.id === itemId && entry.isActive !== false);
-      return item ? json(itemWithCategory(state, item)) : failure(404, 'المادة غير موجودة');
+      return item ? json(itemWithCategory(state, item)) : failure(404, 'Ø§Ù„Ù…Ø§Ø¯Ø© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø©');
     });
   }
   if (itemId && pathname === `/api/items/${itemId}` && method === 'PUT') {
-    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'ليس لديك صلاحية');
+    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
     return mutate((state) => {
       const index = state.items.findIndex((entry) => entry.id === itemId);
-      if (index < 0) return failure(404, 'المادة غير موجودة');
+      if (index < 0) return failure(404, 'Ø§Ù„Ù…Ø§Ø¯Ø© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø©');
       state.items[index] = itemFromInput(state, readBody(init), state.items[index]);
       addAudit(state, currentUser, 'update', 'item', itemId);
       return json(itemWithCategory(state, state.items[index]));
     });
   }
   if (itemId && pathname === `/api/items/${itemId}` && method === 'DELETE') {
-    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'ليس لديك صلاحية');
+    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
     return mutate((state) => {
       const item = state.items.find((entry) => entry.id === itemId);
-      if (!item) return failure(404, 'المادة غير موجودة');
+      if (!item) return failure(404, 'Ø§Ù„Ù…Ø§Ø¯Ø© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø©');
       item.isActive = false;
       item.updatedAt = now();
       addAudit(state, currentUser, 'delete', 'item', itemId);
@@ -1081,7 +1386,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     const historyItemId = Number(searchParams.get('itemId'));
     return read((state) => {
       const rawItem = state.items.find((item) => numberValue(item.id) === historyItemId && item.isActive !== false);
-      if (!rawItem) return failure(404, 'المادة غير موجودة');
+      if (!rawItem) return failure(404, 'Ø§Ù„Ù…Ø§Ø¯Ø© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø©');
       const item = itemWithCategory(state, rawItem);
       const allMovements = state.transactions
         .filter((transaction) => numberValue(transaction.itemId) === historyItemId)
@@ -1116,10 +1421,10 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
         item: {
           id: historyItemId,
           code: text(item.code) || null,
-          name: text(item.name, '—'),
+          name: text(item.name, 'â€”'),
           categoryName: text(item.categoryName) || null,
           itemType: text(item.itemType, 'item'),
-          unit: text(item.unit, 'قطعة'),
+          unit: text(item.unit, 'Ù‚Ø·Ø¹Ø©'),
           currentStock: numberValue(item.currentStock),
           minStock: numberValue(item.minStock),
           expiryDate: text(item.expiryDate) || null,
@@ -1231,7 +1536,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     });
   }
   if (pathname === '/api/items/bulk-import' && method === 'POST') {
-    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'ليس لديك صلاحية');
+    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
     return mutate((state) => {
       const body = readBody(init);
       const input = Array.isArray(body) ? body : Array.isArray((body as { items?: unknown }).items) ? (body as { items: unknown[] }).items : [];
@@ -1275,12 +1580,12 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
         .filter((decision) => decision.state === 'error');
       if (preflightErrors.length > 0) {
         return json({
-          error: 'لا يمكن تنفيذ الاستيراد قبل معالجة الأخطاء الحرجة',
+          error: 'Ù„Ø§ ÙŠÙ…ÙƒÙ† ØªÙ†ÙÙŠØ° Ø§Ù„Ø§Ø³ØªÙŠØ±Ø§Ø¯ Ù‚Ø¨Ù„ Ù…Ø¹Ø§Ù„Ø¬Ø© Ø§Ù„Ø£Ø®Ø·Ø§Ø¡ Ø§Ù„Ø­Ø±Ø¬Ø©',
           valid: false,
           errors: preflightErrors.map((decision) => ({
             row: decision.row.rowNumber,
-            name: decision.row.code || `صف ${decision.row.rowNumber}`,
-            error: decision.errors.map((issue) => issue.message).join('؛ '),
+            name: decision.row.code || `ØµÙ ${decision.row.rowNumber}`,
+            error: decision.errors.map((issue) => issue.message).join('Ø› '),
           })),
         }, 422);
       }
@@ -1291,7 +1596,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
       const warnings: Array<{ row: number; name: string; warning: string }> = [];
       for (const decision of decisions) {
         const row = decision.row;
-        const name = row.name || `صف ${row.rowNumber}`;
+        const name = row.name || `ØµÙ ${row.rowNumber}`;
         if (decision.state === 'empty') continue;
         for (const warning of decision.warnings) {
           warnings.push({ row: row.rowNumber, name, warning: warning.message });
@@ -1300,7 +1605,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
           errors.push({
             row: row.rowNumber,
             name,
-            error: decision.errors.map((issue) => issue.message).join('؛ '),
+            error: decision.errors.map((issue) => issue.message).join('Ø› '),
           });
           continue;
         }
@@ -1345,7 +1650,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
               remainingQuantity: row.currentStock,
               expiryDate: row.expiryDate,
               supplier: row.supplier,
-              deliveryNoteNumber: `افتتاحي-${item.id}`,
+              deliveryNoteNumber: `Ø§ÙØªØªØ§Ø­ÙŠ-${item.id}`,
               deliveryNoteDate: now().slice(0, 10),
             };
             state.inventoryBatches.push(batch);
@@ -1363,7 +1668,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
       for (const decision of batchDecisions) {
         if (decision.state === 'empty') continue;
         const item = state.items.find((entry) => text(entry.code) === decision.row.code);
-        if (!item) return failure(400, `المادة ذات الرمز ${decision.row.code} غير موجودة`);
+        if (!item) return failure(400, `Ø§Ù„Ù…Ø§Ø¯Ø© Ø°Ø§Øª Ø§Ù„Ø±Ù…Ø² ${decision.row.code} ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø©`);
         const quantity = numberValue(decision.row.quantity);
         const batch = {
           id: nextId(state),
@@ -1373,7 +1678,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
           remainingQuantity: quantity,
           expiryDate: decision.row.expiryDate,
           supplier: decision.row.supplier,
-          deliveryNoteNumber: decision.row.deliveryNoteNumber ?? `استيراد-دفعة-${item.id}-${decision.row.rowNumber}`,
+          deliveryNoteNumber: decision.row.deliveryNoteNumber ?? `Ø§Ø³ØªÙŠØ±Ø§Ø¯-Ø¯ÙØ¹Ø©-${item.id}-${decision.row.rowNumber}`,
           deliveryNoteDate: decision.row.deliveryNoteDate ?? now().slice(0, 10),
         };
         item.currentStock = numberValue(item.currentStock) + quantity;
@@ -1417,7 +1722,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     });
   }
   if (pathname === '/api/equipment' && method === 'POST') {
-    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'ليس لديك صلاحية');
+    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
     return mutate((state) => {
       const equipment = equipmentFromInput(state, readBody(init));
       state.equipment.push(equipment);
@@ -1434,18 +1739,18 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
   if (equipmentId && pathname === `/api/equipment/${equipmentId}` && method === 'GET') {
     return read((state) => {
       const equipment = state.equipment.find((entry) => entry.id === equipmentId);
-      return equipment ? json(equipment) : failure(404, 'التجهيز غير موجود');
+      return equipment ? json(equipment) : failure(404, 'Ø§Ù„ØªØ¬Ù‡ÙŠØ² ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯');
     });
   }
   if (equipmentId && pathname === `/api/equipment/${equipmentId}` && method === 'PUT') {
-    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'ليس لديك صلاحية');
+    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
     return mutate((state) => {
       const index = state.equipment.findIndex((entry) => entry.id === equipmentId);
-      if (index < 0) return failure(404, 'التجهيز غير موجود');
+      if (index < 0) return failure(404, 'Ø§Ù„ØªØ¬Ù‡ÙŠØ² ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯');
       const body = readBody(init);
       const existing = state.equipment[index];
       if (body.quantity !== undefined && Number(body.quantity) !== numberValue(existing.quantity)) {
-        return failure(409, 'لا يمكن تعديل كمية التجهيز مباشرة — استخدم تسوية الجرد (الرصيد يُدار عبر سندات الحركة)' );
+        return failure(409, 'Ù„Ø§ ÙŠÙ…ÙƒÙ† ØªØ¹Ø¯ÙŠÙ„ ÙƒÙ…ÙŠØ© Ø§Ù„ØªØ¬Ù‡ÙŠØ² Ù…Ø¨Ø§Ø´Ø±Ø© â€” Ø§Ø³ØªØ®Ø¯Ù… ØªØ³ÙˆÙŠØ© Ø§Ù„Ø¬Ø±Ø¯ (Ø§Ù„Ø±ØµÙŠØ¯ ÙŠÙØ¯Ø§Ø± Ø¹Ø¨Ø± Ø³Ù†Ø¯Ø§Øª Ø§Ù„Ø­Ø±ÙƒØ©)' );
       }
       state.equipment[index] = equipmentFromInput(state, body, existing);
       addAudit(state, currentUser, 'update', 'equipment', equipmentId);
@@ -1453,7 +1758,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     });
   }
   if (equipmentId && pathname === `/api/equipment/${equipmentId}` && method === 'DELETE') {
-    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'ليس لديك صلاحية');
+    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
     return mutate((state) => {
       state.equipment = state.equipment.filter((entry) => entry.id !== equipmentId);
       addAudit(state, currentUser, 'delete', 'equipment', equipmentId);
@@ -1461,7 +1766,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     });
   }
   if (pathname === '/api/equipment/bulk-import' && method === 'POST') {
-    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'ليس لديك صلاحية');
+    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
     return mutate((state) => {
       const body = readBody(init);
       const input = Array.isArray(body) ? body : Array.isArray((body as { equipment?: unknown }).equipment) ? (body as { equipment: unknown[] }).equipment : [];
@@ -1472,7 +1777,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
         const value = (entry ?? {}) as Record<string, unknown>;
         const name = text(value.name);
         if (!name) {
-          errors.push({ row: index + 2, name: '', error: 'اسم التجهيز مطلوب' });
+          errors.push({ row: index + 2, name: '', error: 'Ø§Ø³Ù… Ø§Ù„ØªØ¬Ù‡ÙŠØ² Ù…Ø·Ù„ÙˆØ¨' });
           continue;
         }
         const serial = text(value.serialNumber);
@@ -1492,7 +1797,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
   }
 
   if (pathname === '/api/catalog/import/preview' && method === 'POST') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية لاستيراد الكتالوج');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ© Ù„Ø§Ø³ØªÙŠØ±Ø§Ø¯ Ø§Ù„ÙƒØªØ§Ù„ÙˆØ¬');
     return read((state) => {
       const body = (readBody(init) ?? {}) as { mode?: unknown; items?: unknown; equipment?: unknown };
       const mode = catalogMode(body.mode);
@@ -1508,7 +1813,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     });
   }
   if (pathname === '/api/catalog/import' && method === 'POST') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية لاستيراد الكتالوج');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ© Ù„Ø§Ø³ØªÙŠØ±Ø§Ø¯ Ø§Ù„ÙƒØªØ§Ù„ÙˆØ¬');
     return mutate((state) => {
       const body = (readBody(init) ?? {}) as { mode?: unknown; items?: unknown; equipment?: unknown };
       const mode = catalogMode(body.mode);
@@ -1518,7 +1823,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
       const summary = catalogSummary(items, equipment);
       if (summary.totals.error > 0) {
         return json({
-          error: 'لا يمكن التنفيذ مع وجود أخطاء في الملف. صحّح الأخطاء ثم أعد المحاولة.',
+          error: 'Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø§Ù„ØªÙ†ÙÙŠØ° Ù…Ø¹ ÙˆØ¬ÙˆØ¯ Ø£Ø®Ø·Ø§Ø¡ ÙÙŠ Ø§Ù„Ù…Ù„Ù. ØµØ­Ù‘Ø­ Ø§Ù„Ø£Ø®Ø·Ø§Ø¡ Ø«Ù… Ø£Ø¹Ø¯ Ø§Ù„Ù…Ø­Ø§ÙˆÙ„Ø©.',
           code: 'CATALOG_IMPORT_HAS_ERRORS',
           summary,
         }, 409);
@@ -1567,7 +1872,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
       for (const decision of equipment.rows) {
         if (decision.action === 'skip' || decision.action === 'error') continue;
         const row = decision.data;
-        const notes = [row.company ? `الشركة: ${row.company}` : null, row.notes].filter(Boolean).join(' | ') || null;
+        const notes = [row.company ? `Ø§Ù„Ø´Ø±ÙƒØ©: ${row.company}` : null, row.notes].filter(Boolean).join(' | ') || null;
         const existing = decision.action === 'update'
           ? state.equipment.find((entry) => (row.serialNumber
             ? text(entry.serialNumber) === row.serialNumber
@@ -1619,7 +1924,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     return read((state) => json(state.recipients.filter((entry) => searchParams.get('includeInactive') === 'true' || entry.isActive !== false)));
   }
   if (pathname === '/api/recipients' && method === 'POST') {
-    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'ليس لديك صلاحية');
+    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
     return mutate((state) => {
       const body = readBody(init);
       const recipient = { id: nextId(state), name: text(body.name), notes: body.notes ?? null, isActive: true, createdAt: now() };
@@ -1630,20 +1935,20 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
   }
   const recipientId = idFrom(pathname, 'recipients');
   if (recipientId && pathname === `/api/recipients/${recipientId}` && method === 'PUT') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
     return mutate((state) => {
       const recipient = state.recipients.find((entry) => entry.id === recipientId);
-      if (!recipient) return failure(404, 'الجهة غير موجودة');
+      if (!recipient) return failure(404, 'Ø§Ù„Ø¬Ù‡Ø© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø©');
       const body = readBody(init);
       Object.assign(recipient, { name: text(body.name, text(recipient.name)), notes: body.notes ?? recipient.notes });
       return json(recipient);
     });
   }
   if (recipientId && pathname === `/api/recipients/${recipientId}/toggle` && method === 'PATCH') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
     return mutate((state) => {
       const recipient = state.recipients.find((entry) => entry.id === recipientId);
-      if (!recipient) return failure(404, 'الجهة غير موجودة');
+      if (!recipient) return failure(404, 'Ø§Ù„Ø¬Ù‡Ø© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø©');
       recipient.isActive = !recipient.isActive;
       return json(recipient);
     });
@@ -1653,7 +1958,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     return read((state) => json(state.exitReasons.filter((entry) => searchParams.get('includeInactive') === 'true' || entry.isActive !== false)));
   }
   if (pathname === '/api/exit-reasons' && method === 'POST') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
     return mutate((state) => {
       const body = readBody(init);
       const reason = { id: nextId(state), name: text(body.name), isSystem: false, isActive: true, createdAt: now() };
@@ -1663,20 +1968,20 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
   }
   const reasonId = idFrom(pathname, 'exit-reasons');
   if (reasonId && pathname === `/api/exit-reasons/${reasonId}` && method === 'PUT') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
     return mutate((state) => {
       const reason = state.exitReasons.find((entry) => entry.id === reasonId);
-      if (!reason) return failure(404, 'سبب الإخراج غير موجود');
+      if (!reason) return failure(404, 'Ø³Ø¨Ø¨ Ø§Ù„Ø¥Ø®Ø±Ø§Ø¬ ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯');
       reason.name = text(readBody(init).name, text(reason.name));
       return json(reason);
     });
   }
   if (reasonId && pathname === `/api/exit-reasons/${reasonId}/toggle` && method === 'PATCH') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
     return mutate((state) => {
       const reason = state.exitReasons.find((entry) => entry.id === reasonId);
-      if (!reason) return failure(404, 'سبب الإخراج غير موجود');
-      if (reason.isSystem) return failure(400, 'لا يمكن تعطيل الأسباب الافتراضية للنظام');
+      if (!reason) return failure(404, 'Ø³Ø¨Ø¨ Ø§Ù„Ø¥Ø®Ø±Ø§Ø¬ ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯');
+      if (reason.isSystem) return failure(400, 'Ù„Ø§ ÙŠÙ…ÙƒÙ† ØªØ¹Ø·ÙŠÙ„ Ø§Ù„Ø£Ø³Ø¨Ø§Ø¨ Ø§Ù„Ø§ÙØªØ±Ø§Ø¶ÙŠØ© Ù„Ù„Ù†Ø¸Ø§Ù…');
       reason.isActive = !reason.isActive;
       return json(reason);
     });
@@ -1693,7 +1998,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     });
   }
   if (pathname.startsWith('/api/transactions/') && method === 'POST') {
-    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'ليس لديك صلاحية');
+    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
     return mutate((state) => {
       const body = readBody(init);
       const requestedType = pathname.split('/').pop() ?? 'adjust';
@@ -1706,16 +2011,16 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
         : undefined;
       if (type === 'custody_out') {
         const requestedQuantity = numberValue(body.quantity, 1);
-        if (!custodyEquipment) return failure(404, 'التجهيز غير موجود');
+        if (!custodyEquipment) return failure(404, 'Ø§Ù„ØªØ¬Ù‡ÙŠØ² ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯');
         if (requestedQuantity < 1 || requestedQuantity > numberValue(custodyEquipment.quantity, 1)) {
-          return failure(400, 'كمية العهدة غير صالحة');
+          return failure(400, 'ÙƒÙ…ÙŠØ© Ø§Ù„Ø¹Ù‡Ø¯Ø© ØºÙŠØ± ØµØ§Ù„Ø­Ø©');
         }
       }
       if (type === 'custody_return') {
         const requestedQuantity = numberValue(body.quantity);
-        if (!custodyReturn) return failure(404, 'العهدة غير موجودة');
+        if (!custodyReturn) return failure(404, 'Ø§Ù„Ø¹Ù‡Ø¯Ø© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø©');
         if (requestedQuantity < 1 || requestedQuantity > numberValue(custodyReturn.quantity) - numberValue(custodyReturn.returnedQuantity)) {
-          return failure(400, 'كمية الإعادة تتجاوز المتبقي في العهدة');
+          return failure(400, 'ÙƒÙ…ÙŠØ© Ø§Ù„Ø¥Ø¹Ø§Ø¯Ø© ØªØªØ¬Ø§ÙˆØ² Ø§Ù„Ù…ØªØ¨Ù‚ÙŠ ÙÙŠ Ø§Ù„Ø¹Ù‡Ø¯Ø©');
         }
       }
       const transaction = {
@@ -1735,15 +2040,15 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
         const newStock = numberValue(body.newStock);
         if (body.itemType === 'equipment') {
           const equipment = state.equipment.find((entry) => entry.id === Number(body.equipmentId));
-          if (!equipment) return failure(404, 'التجهيز غير موجود');
+          if (!equipment) return failure(404, 'Ø§Ù„ØªØ¬Ù‡ÙŠØ² ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯');
           const previousStock = numberValue(equipment.quantity, 0);
-          if (newStock < previousStock && newStock < 0) return failure(400, 'الرصيد الجديد يجب أن يكون صفرًا أو أكبر');
+          if (newStock < previousStock && newStock < 0) return failure(400, 'Ø§Ù„Ø±ØµÙŠØ¯ Ø§Ù„Ø¬Ø¯ÙŠØ¯ ÙŠØ¬Ø¨ Ø£Ù† ÙŠÙƒÙˆÙ† ØµÙØ±Ù‹Ø§ Ø£Ùˆ Ø£ÙƒØ¨Ø±');
           equipment.quantity = newStock;
           transaction.quantity = Math.abs(newStock - previousStock);
           transaction.details = { previousStock, newStock, delta: newStock - previousStock, deltaType: newStock > previousStock ? 'increase' : 'decrease', openCustody: 0, availableBefore: previousStock, equipmentNameSnap: equipment.name, equipmentModelSnap: equipment.model ?? null, equipmentSerialSnap: equipment.serialNumber ?? null, equipmentConditionSnap: equipment.condition ?? null };
         } else {
           const item = state.items.find((entry) => entry.id === Number(body.itemId));
-          if (!item) return failure(404, 'المادة غير موجودة');
+          if (!item) return failure(404, 'Ø§Ù„Ù…Ø§Ø¯Ø© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø©');
           const previousStock = numberValue(item.currentStock, 0);
           item.currentStock = newStock;
           transaction.quantity = Math.abs(newStock - previousStock);
@@ -1751,9 +2056,30 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
         }
       }
       const target = state.items.find((item) => item.id === Number(body.itemId));
-      if (target && ['in'].includes(type)) target.currentStock = numberValue(target.currentStock) + numberValue(body.quantity);
+      const movementWarehouseId = offlineWarehouseId(state);
+      if (target && ['in'].includes(type)) {
+        target.currentStock = numberValue(target.currentStock) + numberValue(body.quantity);
+        const openedBatch = offlineOpenBatch(
+          state,
+          numberValue(target.id),
+          numberValue(body.quantity),
+          movementWarehouseId,
+          {
+            batchNumber: body.batchNumber ? text(body.batchNumber) : null,
+            expiryDate: body.expiryDate ? text(body.expiryDate) : null,
+            supplier: body.supplier ? text(body.supplier) : null,
+            deliveryNoteNumber: text(
+              body.deliveryNoteNumber,
+              text(body.internalDeliveryNoteNumber, text(transaction.documentNumber)),
+            ),
+            deliveryNoteDate: text(body.deliveryNoteDate, text(body.documentDate, now().slice(0, 10))),
+          },
+        );
+        recordOfflineChange(state, 'inventory_batch', Number(openedBatch.id), 'create', { ...openedBatch });
+      }
       if (target && ['out', 'damage', 'central-return', 'central_return'].includes(type)) {
         target.currentStock = Math.max(0, numberValue(target.currentStock) - numberValue(body.quantity));
+        offlineConsumeBatches(state, numberValue(target.id), numberValue(body.quantity), movementWarehouseId);
       }
       state.transactions.unshift(transaction);
       const transactionIdentity = recordOfflineChange(
@@ -1784,7 +2110,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
       if (type === 'custody_out') {
         const equipment = custodyEquipment;
         const quantity = numberValue(body.quantity, 1);
-        if (!equipment) return failure(404, 'التجهيز غير موجود');
+        if (!equipment) return failure(404, 'Ø§Ù„ØªØ¬Ù‡ÙŠØ² ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯');
         const custody = {
           id: nextId(state),
           equipmentId: equipment.id,
@@ -1817,10 +2143,10 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
       if (type === 'custody_return') {
         const custodyId = numberValue(body.custodyId);
         const custody = custodyReturn;
-        if (!custody) return failure(404, 'العهدة غير موجودة');
+        if (!custody) return failure(404, 'Ø§Ù„Ø¹Ù‡Ø¯Ø© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø©');
         const quantity = numberValue(body.quantity);
         const outstanding = numberValue(custody.quantity) - numberValue(custody.returnedQuantity);
-        if (quantity < 1 || quantity > outstanding) return failure(400, `كمية الإعادة تتجاوز المتبقي في العهدة (${outstanding})`);
+        if (quantity < 1 || quantity > outstanding) return failure(400, `ÙƒÙ…ÙŠØ© Ø§Ù„Ø¥Ø¹Ø§Ø¯Ø© ØªØªØ¬Ø§ÙˆØ² Ø§Ù„Ù…ØªØ¨Ù‚ÙŠ ÙÙŠ Ø§Ù„Ø¹Ù‡Ø¯Ø© (${outstanding})`);
         const condition = text(body.returnCondition, 'good');
         const returnRecord = {
           id: nextId(state),
@@ -1866,13 +2192,13 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
   if (transactionId && pathname === `/api/transactions/${transactionId}` && method === 'GET') {
     return read((state) => {
       const transaction = state.transactions.find((entry) => entry.id === transactionId);
-      return transaction ? json(transaction) : failure(404, 'السند غير موجود');
+      return transaction ? json(transaction) : failure(404, 'Ø§Ù„Ø³Ù†Ø¯ ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯');
     });
   }
   if (transactionId && pathname === `/api/transactions/${transactionId}/print` && method === 'GET') {
     return read((state) => {
       const transaction = state.transactions.find((entry) => entry.id === transactionId);
-      if (!transaction) return failure(404, 'السند غير موجود');
+      if (!transaction) return failure(404, 'Ø§Ù„Ø³Ù†Ø¯ ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯');
       const item = state.items.find((entry) => entry.id === Number(transaction.itemId));
       const equipment = state.equipment.find((entry) => entry.id === Number(transaction.equipmentId));
       return json({
@@ -1903,16 +2229,16 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
           return {
             id: numberValue(raw.id),
             equipmentId: numberValue(raw.equipmentId),
-            equipmentName: text(raw.equipmentName, text(equipment?.name, '—')),
+            equipmentName: text(raw.equipmentName, text(equipment?.name, 'â€”')),
             serialNumber: text(raw.serialNumber, text(equipment?.serialNumber)) || null,
             quantity,
             returnedQuantity,
             outstandingQuantity: Math.max(0, quantity - returnedQuantity),
             recipientId: raw.recipientId ?? null,
-            holderName: text(raw.holderName, text(raw.holderNameSnap, '—')),
-            deliveryNoteNumber: text(raw.deliveryNoteNumber, '—'),
+            holderName: text(raw.holderName, text(raw.holderNameSnap, 'â€”')),
+            deliveryNoteNumber: text(raw.deliveryNoteNumber, 'â€”'),
             deliveryDate: text(raw.deliveryDate, text(raw.custodyDate, now().slice(0, 10))),
-            location: text(raw.location, text(raw.custodyLocation, '—')),
+            location: text(raw.location, text(raw.custodyLocation, 'â€”')),
             status: text(raw.status, returnedQuantity >= quantity ? 'returned' : 'open'),
           };
         })
@@ -1926,7 +2252,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     return read((state) => {
       const raw = state.personalCustodies.find((entry) => numberValue(entry.id) === custodyId);
       const equipment = raw && state.equipment.find((entry) => numberValue(entry.id) === numberValue(raw.equipmentId));
-      if (!raw || !equipment) return failure(404, 'العهدة غير موجودة');
+      if (!raw || !equipment) return failure(404, 'Ø§Ù„Ø¹Ù‡Ø¯Ø© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø©');
       const quantity = numberValue(raw.quantity);
       const returnedQuantity = numberValue(raw.returnedQuantity);
       const outstandingQuantity = Math.max(0, quantity - returnedQuantity);
@@ -1943,7 +2269,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
         {
           id: `transaction-${source?.id ?? raw.id}`,
           kind: 'created',
-          label: 'إنشاء العهدة وتسليم التجهيز',
+          label: 'Ø¥Ù†Ø´Ø§Ø¡ Ø§Ù„Ø¹Ù‡Ø¯Ø© ÙˆØªØ³Ù„ÙŠÙ… Ø§Ù„ØªØ¬Ù‡ÙŠØ²',
           date: source?.transactionDate ?? raw.deliveryDate,
           quantity,
           documentNumber: raw.deliveryNoteNumber,
@@ -1957,7 +2283,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
           return {
             id: `return-${entry.id}`,
             kind: entry.condition === 'damaged' ? 'damaged' : 'returned',
-            label: returnedSoFar >= quantity ? 'إعادة كاملة' : 'إعادة جزئية',
+            label: returnedSoFar >= quantity ? 'Ø¥Ø¹Ø§Ø¯Ø© ÙƒØ§Ù…Ù„Ø©' : 'Ø¥Ø¹Ø§Ø¯Ø© Ø¬Ø²Ø¦ÙŠØ©',
             date: entry.returnDate,
             quantity: numberValue(entry.quantity),
             documentNumber: entry.documentNumber,
@@ -1972,7 +2298,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
         custody: {
           ...raw,
           id: custodyId,
-          holderName: text(raw.holderName, text(raw.holderNameSnap, '—')),
+          holderName: text(raw.holderName, text(raw.holderNameSnap, 'â€”')),
           recipientName: null,
           equipmentName: equipment.name,
           quantity,
@@ -1996,7 +2322,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     const historyEquipmentId = Number(pathname.split('/')[3]);
     return read((state) => {
       const rawEquipment = state.equipment.find((entry) => numberValue(entry.id) === historyEquipmentId);
-      if (!rawEquipment) return failure(404, 'التجهيز غير موجود');
+      if (!rawEquipment) return failure(404, 'Ø§Ù„ØªØ¬Ù‡ÙŠØ² ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯');
       const equipmentCustodies = state.personalCustodies.filter((entry) => numberValue(entry.equipmentId) === historyEquipmentId);
       const typeFilter = text(searchParams.get('type'));
       const from = text(searchParams.get('from'));
@@ -2032,14 +2358,14 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
         const returned = numberValue(custody.returnedQuantity);
         return {
           id: numberValue(custody.id),
-          holderName: text(custody.holderName, text(custody.holderNameSnap, '—')),
+          holderName: text(custody.holderName, text(custody.holderNameSnap, 'â€”')),
           recipientName: text(custody.recipientName) || null,
           quantity: total,
           returnedQuantity: returned,
           outstandingQuantity: Math.max(0, total - returned),
-          deliveryNoteNumber: text(custody.deliveryNoteNumber, '—'),
+          deliveryNoteNumber: text(custody.deliveryNoteNumber, 'â€”'),
           deliveryDate: text(custody.deliveryDate, text(custody.custodyDate)),
-          location: text(custody.location, '—'),
+          location: text(custody.location, 'â€”'),
           status: text(custody.status, 'open'),
         };
       });
@@ -2047,7 +2373,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
         equipment: {
           ...rawEquipment,
           id: historyEquipmentId,
-          name: text(rawEquipment.name, '—'),
+          name: text(rawEquipment.name, 'â€”'),
           equipmentType: text(rawEquipment.equipmentType) || null,
           model: text(rawEquipment.model) || null,
           serialNumber: text(rawEquipment.serialNumber) || null,
@@ -2101,7 +2427,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
           id: Number(tx.id),
           type: String(tx.type),
           documentNumber: tx.documentNumber ?? null,
-          name: state.items.find((item) => item.id === Number(tx.itemId))?.name ?? state.equipment.find((item) => item.id === Number(tx.equipmentId))?.name ?? '—',
+          name: state.items.find((item) => item.id === Number(tx.itemId))?.name ?? state.equipment.find((item) => item.id === Number(tx.equipmentId))?.name ?? 'â€”',
           quantity: tx.quantity ?? null,
           createdAt: tx.createdAt,
           createdByName: state.users.find((user) => user.id === Number(tx.createdBy))?.fullName ?? null,
@@ -2149,8 +2475,8 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
         if (item.isActive !== false && minimum > 0 && current <= minimum) {
           generated.push({
             id: `below_min-${item.id}`, dbId: numberValue(item.id), type: 'below_min',
-            entityId: numberValue(item.id), entityType: 'item', entityName: text(item.name, '—'),
-            itemName: text(item.name, '—'), message: `الرصيد ${current} أقل من أو يساوي الحد الأدنى ${minimum}`,
+            entityId: numberValue(item.id), entityType: 'item', entityName: text(item.name, 'â€”'),
+            itemName: text(item.name, 'â€”'), message: `Ø§Ù„Ø±ØµÙŠØ¯ ${current} Ø£Ù‚Ù„ Ù…Ù† Ø£Ùˆ ÙŠØ³Ø§ÙˆÙŠ Ø§Ù„Ø­Ø¯ Ø§Ù„Ø£Ø¯Ù†Ù‰ ${minimum}`,
             severity: current === 0 ? 'critical' : 'warning', isRead: false, createdAt: now(), updatedAt: now(),
           });
         }
@@ -2160,8 +2486,8 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
             const expired = expiry.getTime() <= Date.now();
             generated.push({
               id: `near_expiry-${item.id}`, dbId: numberValue(item.id), type: 'near_expiry',
-              entityId: numberValue(item.id), entityType: 'item', entityName: text(item.name, '—'),
-              itemName: text(item.name, '—'), message: expired ? 'المادة منتهية الصلاحية' : `تنتهي الصلاحية في ${String(item.expiryDate).slice(0, 10)}`,
+              entityId: numberValue(item.id), entityType: 'item', entityName: text(item.name, 'â€”'),
+              itemName: text(item.name, 'â€”'), message: expired ? 'Ø§Ù„Ù…Ø§Ø¯Ø© Ù…Ù†ØªÙ‡ÙŠØ© Ø§Ù„ØµÙ„Ø§Ø­ÙŠØ©' : `ØªÙ†ØªÙ‡ÙŠ Ø§Ù„ØµÙ„Ø§Ø­ÙŠØ© ÙÙŠ ${String(item.expiryDate).slice(0, 10)}`,
               severity: expired ? 'critical' : 'warning', isRead: false, createdAt: now(), updatedAt: now(),
             });
           }
@@ -2172,8 +2498,8 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
         if (['maintenance', 'broken', 'needs_inspection'].includes(condition)) {
           generated.push({
             id: `equipment_maintenance-${equipment.id}`, dbId: numberValue(equipment.id), type: 'equipment_maintenance',
-            entityId: numberValue(equipment.id), entityType: 'equipment', entityName: text(equipment.name, '—'),
-            message: condition === 'broken' ? 'التجهيز معطل ويحتاج إلى معالجة' : 'التجهيز يحتاج إلى صيانة أو فحص',
+            entityId: numberValue(equipment.id), entityType: 'equipment', entityName: text(equipment.name, 'â€”'),
+            message: condition === 'broken' ? 'Ø§Ù„ØªØ¬Ù‡ÙŠØ² Ù…Ø¹Ø·Ù„ ÙˆÙŠØ­ØªØ§Ø¬ Ø¥Ù„Ù‰ Ù…Ø¹Ø§Ù„Ø¬Ø©' : 'Ø§Ù„ØªØ¬Ù‡ÙŠØ² ÙŠØ­ØªØ§Ø¬ Ø¥Ù„Ù‰ ØµÙŠØ§Ù†Ø© Ø£Ùˆ ÙØ­Øµ',
             severity: condition === 'broken' ? 'critical' : 'warning', isRead: false, createdAt: now(), updatedAt: now(),
           });
         }
@@ -2198,7 +2524,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
   if (pathname === '/api/alerts/refresh' && method === 'POST') return json({ ok: true });
   if (pathname === '/api/alerts/stream' && method === 'GET') return new Response('', { status: 204, headers: { [OFFLINE_HEADER]: '1' } });
 
-  if (pathname.startsWith('/api/reports/')) {
+  if (pathname.startsWith('/api/reports/') && !['/api/reports/reconciliation', '/api/reports/stock-by-warehouse', '/api/reports/consolidated'].includes(pathname)) {
     return read((state) => {
       if (pathname === '/api/reports/stock') return json(state.items.filter((item) => item.isActive !== false).map((item) => itemWithCategory(state, item)));
       if (pathname === '/api/reports/equipment') return json(state.equipment);
@@ -2236,15 +2562,15 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
              return {
                id: numberValue(raw.id),
                equipmentId,
-               equipmentName: text(raw.equipmentName, text(equipment?.name, '—')),
+               equipmentName: text(raw.equipmentName, text(equipment?.name, 'â€”')),
                serialNumber: text(raw.serialNumber, text(equipment?.serialNumber)) || null,
-               holderName: text(raw.holderName, text(raw.holderNameSnap, '—')),
+               holderName: text(raw.holderName, text(raw.holderNameSnap, 'â€”')),
                quantity,
                returnedQuantity,
                outstandingQuantity,
-               deliveryNoteNumber: text(raw.deliveryNoteNumber, '—'),
+               deliveryNoteNumber: text(raw.deliveryNoteNumber, 'â€”'),
                deliveryDate,
-               location: text(raw.location, text(raw.custodyLocation, '—')),
+               location: text(raw.location, text(raw.custodyLocation, 'â€”')),
                status,
                overdue,
              };
@@ -2269,16 +2595,16 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
            },
          });
        }
-      return failure(404, 'التقرير غير موجود');
+      return failure(404, 'Ø§Ù„ØªÙ‚Ø±ÙŠØ± ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯');
     });
   }
 
   if (pathname === '/api/users' && method === 'GET') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
     return read((state) => json(state.users.map(publicUser)));
   }
   if (pathname === '/api/users' && method === 'POST') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
     return mutate(async (state) => {
       const body = readBody(init);
       const username = text(body.username);
@@ -2300,16 +2626,16 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
   }
   const userId = idFrom(pathname, 'users');
   if (userId && pathname === `/api/users/${userId}` && method === 'PUT') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
     return mutate((state) => {
       const user = state.users.find((entry) => entry.id === userId);
-      if (!user) return failure(404, 'المستخدم غير موجود');
+      if (!user) return failure(404, 'Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù… ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯');
       Object.assign(user, readBody(init));
       return json(publicUser(user));
     });
   }
   if (userId && pathname === `/api/users/${userId}` && method === 'DELETE') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
     return mutate((state) => {
       state.users = state.users.filter((entry) => entry.id !== userId);
       if (state.currentUserId === userId) state.currentUserId = null;
@@ -2319,7 +2645,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
 
   if (pathname === '/api/settings' && method === 'GET') return read((state) => json(state.settings));
   if (pathname === '/api/settings' && method === 'PUT') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
     return mutate((state) => {
       Object.assign(state.settings, readBody(init), { updatedAt: now() });
       return json(state.settings);
@@ -2328,7 +2654,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
   if (pathname === '/api/settings/profile' && method === 'PATCH') {
     return mutate((state) => {
       const user = state.users.find((entry) => entry.id === currentUser.id);
-      if (!user) return failure(404, 'المستخدم غير موجود');
+      if (!user) return failure(404, 'Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù… ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯');
       Object.assign(user, { fullName: text(readBody(init).fullName, user.fullName) });
       return json(publicUser(user));
     });
@@ -2336,7 +2662,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
   if (pathname === '/api/settings/change-password' && method === 'POST') {
     return mutate(async (state) => {
       const user = state.users.find((entry) => entry.id === currentUser.id);
-      if (!user) return failure(404, 'المستخدم غير موجود');
+      if (!user) return failure(404, 'Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù… ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯');
       const body = readBody(init);
       if (text(body.newPassword).length < 8) return failure(400, 'Password must be at least 8 characters');
       const salt = crypto.randomUUID();
@@ -2347,7 +2673,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
   }
   if (pathname === '/api/settings/my-activity' && method === 'GET') return read((state) => json(state.auditLog.filter((entry) => entry.userId === currentUser.id)));
   if (pathname === '/api/audit' && method === 'GET') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
     return read((state) => {
       const from = text(searchParams.get('from'));
       const to = text(searchParams.get('to'));
@@ -2374,7 +2700,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     headers: { 'content-type': 'application/json', 'content-disposition': 'attachment; filename="damascus-backup.json"', [OFFLINE_HEADER]: '1' },
   }));
   if (pathname === '/api/backups/export' && method === 'POST') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
     return read((state) => new Response(JSON.stringify({ version: 1, exportedAt: now(), data: state }, null, 2), {
       status: 200,
       headers: {
@@ -2390,7 +2716,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
       const pkg = await readDmeSyncPackageInWorker(Uint8Array.from(atob(text(body.packageBase64)), (character) => character.charCodeAt(0)), text(body.password));
       return json(dmePackageSummary(pkg));
     } catch (error) {
-      return failure(400, error instanceof Error ? error.message : 'تعذر فحص الحزمة');
+      return failure(400, error instanceof Error ? error.message : 'ØªØ¹Ø°Ø± ÙØ­Øµ Ø§Ù„Ø­Ø²Ù…Ø©');
     }
   }
   if (pathname === '/api/backups/dry-run' && method === 'POST') {
@@ -2433,15 +2759,15 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
       });
       return json({ token, report: { mode: pendingDmePreview.mode, packageHash: pkg.packageHash, packageType: pkg.manifest.packageType, counts: { total: records.length, applied: counts.applied ?? 0, duplicate: 0, rejected: 0, conflict: 0, skipped: counts.skipped ?? 0 }, records }, summary: dmePackageSummary(pkg) });
     } catch (error) {
-      return failure(400, error instanceof Error ? error.message : 'تعذر تنفيذ المعاينة');
+      return failure(400, error instanceof Error ? error.message : 'ØªØ¹Ø°Ø± ØªÙ†ÙÙŠØ° Ø§Ù„Ù…Ø¹Ø§ÙŠÙ†Ø©');
     }
   }
   if (pathname === '/api/backups/restore' && method === 'POST') {
     const body = readBody(init);
-    if (body.confirm !== true) return failure(400, 'يجب تأكيد الاستعادة بعد المعاينة');
+    if (body.confirm !== true) return failure(400, 'ÙŠØ¬Ø¨ ØªØ£ÙƒÙŠØ¯ Ø§Ù„Ø§Ø³ØªØ¹Ø§Ø¯Ø© Ø¨Ø¹Ø¯ Ø§Ù„Ù…Ø¹Ø§ÙŠÙ†Ø©');
     const preview = pendingDmePreview ?? await loadPendingPreview();
-    if (!preview || preview.token !== text(body.previewToken)) return failure(400, 'المعاينة غير موجودة أو منتهية');
-    if (preview.mode !== (text(body.mode) === 'full' ? 'full' : 'merge')) return failure(400, 'نمط الاستعادة لا يطابق المعاينة');
+    if (!preview || preview.token !== text(body.previewToken)) return failure(400, 'Ø§Ù„Ù…Ø¹Ø§ÙŠÙ†Ø© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø© Ø£Ùˆ Ù…Ù†ØªÙ‡ÙŠØ©');
+    if (preview.mode !== (text(body.mode) === 'full' ? 'full' : 'merge')) return failure(400, 'Ù†Ù…Ø· Ø§Ù„Ø§Ø³ØªØ¹Ø§Ø¯Ø© Ù„Ø§ ÙŠØ·Ø§Ø¨Ù‚ Ø§Ù„Ù…Ø¹Ø§ÙŠÙ†Ø©');
     return mutate((state) => {
        const entities: Record<string, keyof OfflineState> = {
         categories: 'categories',
@@ -2514,14 +2840,14 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
   }
 
   if (pathname === '/api/sync/node' && method === 'GET') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
     return read((state) => json({ nodeId: state.nodeIdentity.nodeId, vector: syncVector(state) }));
   }
   if (pathname === '/api/sync/export' && method === 'POST') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
     const body = readBody(init);
     const password = text(body.password);
-    if (password.length < 8) return failure(400, 'كلمة مرور الحزمة يجب أن تكون 8 أحرف على الأقل');
+    if (password.length < 8) return failure(400, 'ÙƒÙ„Ù…Ø© Ù…Ø±ÙˆØ± Ø§Ù„Ø­Ø²Ù…Ø© ÙŠØ¬Ø¨ Ø£Ù† ØªÙƒÙˆÙ† 8 Ø£Ø­Ø±Ù Ø¹Ù„Ù‰ Ø§Ù„Ø£Ù‚Ù„');
     return mutate(async (state) => {
       const changes = state.changeLog.filter((entry) => text(entry.status) !== 'rejected');
       const records: Array<{ entityType: string; localId: number; data: Record<string, unknown> }> = [];
@@ -2551,7 +2877,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     });
   }
   if (pathname === '/api/sync/import' && method === 'POST') {
-    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
     const body = readBody(init);
     let pkg;
     try {
@@ -2560,7 +2886,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
         text(body.password),
       );
     } catch (error) {
-      return failure(400, error instanceof Error ? error.message : 'تعذر فك تشفير الحزمة');
+      return failure(400, error instanceof Error ? error.message : 'ØªØ¹Ø°Ø± ÙÙƒ ØªØ´ÙÙŠØ± Ø§Ù„Ø­Ø²Ù…Ø©');
     }
     return mutate((state) => {
       const counts = applyOfflineChanges(state, pkg.changes);
@@ -2568,7 +2894,653 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     });
   }
 
-  return failure(404, 'المسار غير موجود في الوضع المحلي');
+  /* ------------------------------------------------------------------
+   * Parity block (Android on-device build).
+   *
+   * The endpoints below used to exist on the server only, which made the
+   * offline build a subset of the browser/desktop builds: units catalog,
+   * warehouses, the transfer cycle, import governance, the sync overview,
+   * the newer reports and the items export.
+   * ------------------------------------------------------------------ */
+
+  // ------------------------------- units -------------------------------
+  if (pathname === '/api/units' && method === 'GET') {
+    return read((state) => {
+      const includeArchived =
+        searchParams.get('includeArchived') === '1' && roleAllowed(currentUser, ['admin']);
+      const rows = state.units
+        .filter((unit) => includeArchived || unit.isActive !== false)
+        .sort(
+          (a, b) =>
+            numberValue(a.sortOrder) - numberValue(b.sortOrder) ||
+            text(a.name).localeCompare(text(b.name)),
+        );
+      return json(rows);
+    });
+  }
+  if (pathname === '/api/units/usage' && method === 'GET') {
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    return read((state) => {
+      const known = new Set(state.units.filter((unit) => unit.isActive !== false).map((unit) => text(unit.name)));
+      const counts = new Map<string, number>();
+      for (const item of state.items) {
+        const unit = text(item.unit);
+        if (!unit) continue;
+        counts.set(unit, (counts.get(unit) ?? 0) + 1);
+      }
+      const rows = [...counts.entries()]
+        .map(([unit, count]) => ({ unit, count, known: known.has(unit) }))
+        .sort((a, b) => Number(a.known) - Number(b.known) || b.count - a.count || a.unit.localeCompare(b.unit));
+      return json(rows);
+    });
+  }
+  if (pathname === '/api/units/seed-defaults' && method === 'POST') {
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    return mutate((state) => {
+      let created = 0;
+      for (const name of DEFAULT_INVENTORY_UNITS) {
+        if (state.units.some((unit) => text(unit.name) === name)) continue;
+        state.units.push({
+          id: nextId(state),
+          name,
+          symbol: null,
+          sortOrder: state.units.length,
+          isActive: true,
+          isSystem: false,
+          createdAt: now(),
+          updatedAt: now(),
+        });
+        created += 1;
+      }
+      addAudit(state, currentUser, 'seed_defaults', 'unit');
+      return json({ created });
+    });
+  }
+  if (pathname === '/api/units/normalize' && method === 'POST') {
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    return mutate((state) => {
+      const body = readBody(init) ?? {};
+      const from = text(body.from).trim();
+      const to = text(body.to).trim();
+      if (!from || !to) return failure(400, 'from Ùˆ to Ù…Ø·Ù„ÙˆØ¨Ø§Ù†');
+      if (from === to) return failure(400, 'Ø§Ù„ÙˆØ­Ø¯Ø© Ø§Ù„Ù…ØµØ¯Ø± ÙˆØ§Ù„Ù‡Ø¯Ù Ù…ØªØ·Ø§Ø¨Ù‚ØªØ§Ù†');
+      let updated = 0;
+      for (const item of state.items) {
+        if (text(item.unit) !== from) continue;
+        item.unit = to;
+        updated += 1;
+        recordOfflineChange(state, 'item', numberValue(item.id), 'update', { unit: to });
+      }
+      addAudit(state, currentUser, 'normalize_unit', 'unit');
+      return json({ updated });
+    });
+  }
+  if (pathname === '/api/units' && method === 'POST') {
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    return mutate((state) => {
+      const body = readBody(init) ?? {};
+      const name = text(body.name).trim();
+      if (!name) return failure(400, 'Ø§Ø³Ù… Ø§Ù„ÙˆØ­Ø¯Ø© Ù…Ø·Ù„ÙˆØ¨');
+      if (state.units.some((unit) => text(unit.name) === name)) {
+        return json({ error: 'ÙŠÙˆØ¬Ø¯ ÙˆØ­Ø¯Ø© Ù…Ø³Ø¬Ù‘Ù„Ø© Ø¨Ù†ÙØ³ Ø§Ù„Ø§Ø³Ù….', code: 'UNIT_NAME_DUPLICATE' }, 409);
+      }
+      const unit = {
+        id: nextId(state),
+        name,
+        symbol: body.symbol ? text(body.symbol).trim() : null,
+        sortOrder: Number.isFinite(Number(body.sortOrder)) ? Number(body.sortOrder) : state.units.length,
+        isActive: true,
+        isSystem: false,
+        createdAt: now(),
+        updatedAt: now(),
+      };
+      state.units.push(unit);
+      addAudit(state, currentUser, 'create', 'unit', Number(unit.id));
+      return json(unit, 201);
+    });
+  }
+  if (pathname.startsWith('/api/units/') && (method === 'PUT' || method === 'DELETE')) {
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    return mutate((state) => {
+      const id = Number.parseInt(pathname.split('/').pop() ?? '', 10);
+      if (!Number.isSafeInteger(id) || id <= 0) return failure(400, 'Ù…Ø¹Ø±Ù‘Ù Ø§Ù„ÙˆØ­Ø¯Ø© ØºÙŠØ± ØµØ§Ù„Ø­');
+      const unit = state.units.find((entry) => numberValue(entry.id) === id);
+      if (!unit) return failure(404, 'Ø§Ù„ÙˆØ­Ø¯Ø© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø©');
+      if (method === 'DELETE') {
+        const inUse = state.items.filter((item) => text(item.unit) === text(unit.name)).length;
+        if (inUse > 0) {
+          return json(
+            {
+              error: `Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø£Ø±Ø´ÙØ© ÙˆØ­Ø¯Ø© Ù…Ø³ØªØ®Ø¯Ù…Ø© ÙÙŠ ${inUse} ØµÙ†Ù. ÙˆØ­Ù‘Ø¯ Ø§Ù„ÙˆØ­Ø¯Ø§Øª Ø£Ùˆ Ø£Ø±Ø´Ù Ø§Ù„Ø£ØµÙ†Ø§Ù Ø£ÙˆÙ„Ù‹Ø§.`,
+              code: 'UNIT_IN_USE',
+              items: inUse,
+            },
+            409,
+          );
+        }
+        unit.isActive = false;
+        unit.updatedAt = now();
+        addAudit(state, currentUser, 'archive', 'unit', id);
+        return json(unit);
+      }
+      const body = readBody(init) ?? {};
+      if (body.name !== undefined) {
+        const name = text(body.name).trim();
+        if (!name) return failure(400, 'Ø§Ø³Ù… Ø§Ù„ÙˆØ­Ø¯Ø© Ù…Ø·Ù„ÙˆØ¨');
+        if (state.units.some((other) => text(other.name) === name && numberValue(other.id) !== id)) {
+          return json({ error: 'ÙŠÙˆØ¬Ø¯ ÙˆØ­Ø¯Ø© Ù…Ø³Ø¬Ù‘Ù„Ø© Ø¨Ù†ÙØ³ Ø§Ù„Ø§Ø³Ù….', code: 'UNIT_NAME_DUPLICATE' }, 409);
+        }
+        unit.name = name;
+      }
+      if (body.symbol !== undefined) unit.symbol = body.symbol ? text(body.symbol).trim() : null;
+      if (body.sortOrder !== undefined && Number.isFinite(Number(body.sortOrder))) unit.sortOrder = Number(body.sortOrder);
+      if (body.isActive !== undefined) unit.isActive = Boolean(body.isActive);
+      unit.updatedAt = now();
+      addAudit(state, currentUser, 'update', 'unit', id);
+      return json(unit);
+    });
+  }
+
+  // ----------------------------- warehouses ----------------------------
+  if (pathname === '/api/warehouses' && method === 'GET') {
+    return read((state) => {
+      const includeArchived =
+        searchParams.get('includeArchived') === '1' && roleAllowed(currentUser, ['admin']);
+      const rows = state.warehouses
+        .filter((warehouse) => includeArchived || warehouse.isActive !== false)
+        .sort(
+          (a, b) =>
+            text(a.type).localeCompare(text(b.type)) || text(a.name).localeCompare(text(b.name)),
+        );
+      return json(rows);
+    });
+  }
+  if (pathname === '/api/warehouses/current' && method === 'GET') {
+    return read((state) => json(offlineCurrentWarehouse(state)));
+  }
+  if (pathname === '/api/warehouses/current' && method === 'POST') {
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    return mutate((state) => {
+      const body = readBody(init) ?? {};
+      const id = numberValue(body.id);
+      const warehouse = state.warehouses.find((entry) => numberValue(entry.id) === id);
+      if (!warehouse) return failure(404, 'Ø§Ù„Ù…Ø³ØªÙˆØ¯Ø¹ ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯.');
+      state.currentWarehouseId = id;
+      addAudit(state, currentUser, 'set_current_warehouse', 'warehouse', id);
+      return json(offlineWarehouseView(warehouse));
+    });
+  }
+  if (pathname === '/api/warehouses/next-document-number' && method === 'GET') {
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    return mutate((state) => {
+      const type = text(searchParams.get('type')).trim();
+      if (!type) return failure(400, 'type Ù…Ø·Ù„ÙˆØ¨ (Ù…Ø«Ø§Ù„: in).');
+      const DOC_TYPES: Record<string, string> = {
+        IN: 'IN',
+        OUT: 'OUT',
+        CUSTODY_OUT: 'CUST',
+        CUSTODY_RETURN: 'CUST-RET',
+        DAMAGE: 'DMG',
+        CENTRAL_RETURN: 'RET',
+        ADJUST: 'ADJ',
+      };
+      const normalized = type.toUpperCase().replace(/\s+/g, '_');
+      const documentNumber = offlineNextDocumentNumber(state, DOC_TYPES[normalized] ?? normalized);
+      return json({ documentNumber });
+    });
+  }
+  if (pathname === '/api/warehouses' && method === 'POST') {
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    return mutate((state) => {
+      const body = readBody(init) ?? {};
+      const code = text(body.code).trim().toUpperCase();
+      const name = text(body.name).trim();
+      if (!code || !name) return failure(400, 'Ø§Ù„Ø±Ù…Ø² ÙˆØ§Ù„Ø§Ø³Ù… Ù…Ø·Ù„ÙˆØ¨Ø§Ù†.');
+      if (state.warehouses.some((warehouse) => text(warehouse.code) === code)) {
+        return json({ error: 'Ø±Ù…Ø² Ø§Ù„Ù…Ø³ØªÙˆØ¯Ø¹ Ù…Ø³Ø¬Ù‘Ù„ Ù…Ø³Ø¨Ù‚Ù‹Ø§.', code: 'WAREHOUSE_CODE_DUPLICATE' }, 409);
+      }
+      const warehouse = {
+        id: nextId(state),
+        code,
+        name,
+        type: text(body.type) === 'central' ? 'central' : 'branch',
+        notes: body.notes ? text(body.notes).trim() : null,
+        isActive: true,
+        createdAt: now(),
+        updatedAt: now(),
+      };
+      state.warehouses.push(warehouse);
+      addAudit(state, currentUser, 'create', 'warehouse', Number(warehouse.id));
+      return json(warehouse, 201);
+    });
+  }
+  if (pathname.startsWith('/api/warehouses/') && method === 'PUT') {
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    return mutate((state) => {
+      const id = Number.parseInt(pathname.split('/').pop() ?? '', 10);
+      if (!Number.isSafeInteger(id) || id <= 0) return failure(400, 'Ù…Ø¹Ø±Ù‘Ù Ø§Ù„Ù…Ø³ØªÙˆØ¯Ø¹ ØºÙŠØ± ØµØ§Ù„Ø­.');
+      const warehouse = state.warehouses.find((entry) => numberValue(entry.id) === id);
+      if (!warehouse) return failure(404, 'Ø§Ù„Ù…Ø³ØªÙˆØ¯Ø¹ ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯.');
+      const body = readBody(init) ?? {};
+      if (body.name !== undefined) {
+        const name = text(body.name).trim();
+        if (!name) return failure(400, 'Ø§Ù„Ø§Ø³Ù… Ù…Ø·Ù„ÙˆØ¨.');
+        warehouse.name = name;
+      }
+      if (body.notes !== undefined) warehouse.notes = body.notes ? text(body.notes).trim() : null;
+      if (body.type !== undefined) warehouse.type = text(body.type) === 'central' ? 'central' : 'branch';
+      if (body.isActive !== undefined) warehouse.isActive = Boolean(body.isActive);
+      warehouse.updatedAt = now();
+      addAudit(state, currentUser, 'update', 'warehouse', id);
+      return json(warehouse);
+    });
+  }
+
+  // ------------------------------ transfers ----------------------------
+  if (pathname === '/api/transfers' && method === 'GET') {
+    return read((state) => {
+      const status = text(searchParams.get('status')).trim();
+      const limit = Math.min(500, Math.max(1, numberValue(searchParams.get('limit'), 100)));
+      const rows = state.transfers
+        .filter((transfer) => !status || text(transfer.status) === status)
+        .sort((a, b) => text(b.createdAt).localeCompare(text(a.createdAt)))
+        .slice(0, limit);
+      return json(rows);
+    });
+  }
+  if (pathname.startsWith('/api/transfers/') && method === 'POST') {
+    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    return mutate((state) => {
+      const segments = pathname.split('/').filter(Boolean);
+      const rawId = segments[2];
+      const action = segments[3] ?? '';
+      const id = Number.parseInt(rawId ?? '', 10);
+      if (!Number.isSafeInteger(id) || id <= 0) return failure(400, 'Ù…Ø¹Ø±Ù‘Ù Ø§Ù„ØªØ­ÙˆÙŠÙ„ ØºÙŠØ± ØµØ§Ù„Ø­.');
+      const transfer = state.transfers.find((entry) => numberValue(entry.id) === id);
+      if (!transfer) return failure(404, 'Ø§Ù„ØªØ­ÙˆÙŠÙ„ ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯.');
+      const body = readBody(init) ?? {};
+      const status = text(transfer.status);
+      const openStatuses = ['requested', 'issued'];
+      const today = now().slice(0, 10);
+
+      if (action === 'issue') {
+        if (status !== 'requested') {
+          return json({ error: `Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø§Ù„Ø¥Ø±Ø³Ø§Ù„. Ø§Ù„Ø­Ø§Ù„Ø© Ø§Ù„Ø­Ø§Ù„ÙŠØ© Â«${status}Â».`, code: 'INVALID_TRANSITION' }, 409);
+        }
+        const lines = state.transferLines.filter((line) => numberValue(line.transferId) === id);
+        const fromWarehouseId = numberValue(transfer.fromWarehouseId, offlineWarehouseId(state));
+        for (const line of lines) {
+          offlineApplyTransferOut(
+            state,
+            numberValue(line.itemId),
+            numberValue(line.quantity),
+            fromWarehouseId,
+            text(transfer.code),
+            today,
+            currentUser,
+          );
+        }
+        transfer.status = 'issued';
+        transfer.issuedAt = now();
+        transfer.updatedAt = now();
+        addAudit(state, currentUser, 'issue', 'transfer', id);
+        return json(offlineTransferSummary(state, id));
+      }
+
+      if (action === 'receive') {
+        const provisional = Boolean(body.provisional);
+        if (status !== 'issued' && !provisional) {
+          return json({ error: 'Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø§Ù„Ø§Ø³ØªÙ„Ø§Ù…. ÙŠØ¬Ø¨ Ø§Ù„Ø¥Ø±Ø³Ø§Ù„ Ø£ÙˆÙ„Ù‹Ø§.', code: 'INVALID_TRANSITION' }, 409);
+        }
+        if (status === 'received' || status === 'closed') {
+          return json({ error: 'ØªÙ… Ø§Ø³ØªÙ„Ø§Ù… Ù‡Ø°Ø§ Ø§Ù„ØªØ­ÙˆÙŠÙ„ Ù…Ø³Ø¨Ù‚Ù‹Ø§.', code: 'ALREADY_RECEIVED' }, 409);
+        }
+        const deliveryNoteNumber = text(body.deliveryNoteNumber, text(transfer.deliveryNoteNumber, text(transfer.code)));
+        const toWarehouseId = numberValue(transfer.toWarehouseId, offlineWarehouseId(state));
+        const lines = state.transferLines.filter((line) => numberValue(line.transferId) === id);
+        for (const line of lines) {
+          offlineApplyTransferIn(
+            state,
+            numberValue(line.itemId),
+            numberValue(line.quantity),
+            toWarehouseId,
+            deliveryNoteNumber,
+            today,
+            line.batchNumber ? text(line.batchNumber) : null,
+            line.expiryDate ? text(line.expiryDate) : null,
+            currentUser,
+          );
+        }
+        transfer.status = 'received';
+        transfer.receivedAt = now();
+        transfer.closedAt = now();
+        transfer.deliveryNoteNumber = deliveryNoteNumber;
+        transfer.provisional = provisional;
+        transfer.updatedAt = now();
+        addAudit(state, currentUser, 'receive', 'transfer', id);
+        return json(offlineTransferSummary(state, id));
+      }
+
+      if (action === 'reject') {
+        if (!openStatuses.includes(status)) {
+          return json({ error: 'Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø±ÙØ¶ Ø§Ù„ØªØ­ÙˆÙŠÙ„ ÙÙŠ Ø­Ø§Ù„ØªÙ‡.', code: 'INVALID_TRANSITION' }, 409);
+        }
+        transfer.status = 'rejected';
+        transfer.rejectionReason = body.reason ? text(body.reason).trim() : null;
+        transfer.updatedAt = now();
+        addAudit(state, currentUser, 'reject', 'transfer', id);
+        return json(offlineTransferSummary(state, id));
+      }
+
+      if (action === 'cancel') {
+        if (!openStatuses.includes(status)) {
+          return json({ error: 'Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø¥Ù„ØºØ§Ø¡ Ø§Ù„ØªØ­ÙˆÙŠÙ„ ÙÙŠ Ø­Ø§Ù„ØªÙ‡.', code: 'INVALID_TRANSITION' }, 409);
+        }
+        transfer.status = 'cancelled';
+        transfer.updatedAt = now();
+        addAudit(state, currentUser, 'cancel', 'transfer', id);
+        return json(offlineTransferSummary(state, id));
+      }
+
+      return failure(404, 'Ø¥Ø¬Ø±Ø§Ø¡ Ø§Ù„ØªØ­ÙˆÙŠÙ„ ØºÙŠØ± Ù…Ø¹Ø±ÙˆÙ.');
+    });
+  }
+  if (pathname === '/api/transfers' && method === 'POST') {
+    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    return mutate((state) => {
+      const body = readBody(init) ?? {};
+      const current = offlineCurrentWarehouse(state);
+      if (!current) return json({ error: 'Ù„Ø§ ÙŠÙˆØ¬Ø¯ Ù…Ø³ØªÙˆØ¯Ø¹ Ù…Ø±ÙƒØ²ÙŠ Ù…Ø¹Ø±Ù‘Ù.', code: 'NO_WAREHOUSE' }, 409);
+      const rawItems = Array.isArray(body.items) ? body.items : [];
+      if (rawItems.length === 0) return failure(400, 'ÙŠØ¬Ø¨ Ø¥Ø¶Ø§ÙØ© Ø¨Ù†Ø¯ ÙˆØ§Ø­Ø¯ Ø¹Ù„Ù‰ Ø§Ù„Ø£Ù‚Ù„.');
+      const toWarehouseId = numberValue(body.toWarehouseId, current.id);
+      const fromWarehouseId = numberValue(body.fromWarehouseId, current.id);
+      if (toWarehouseId === fromWarehouseId) return failure(400, 'Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø§Ù„ØªØ­ÙˆÙŠÙ„ Ø¥Ù„Ù‰ Ù†ÙØ³ Ø§Ù„Ù…Ø³ØªÙˆØ¯Ø¹.');
+      const transfer = {
+        id: nextId(state),
+        code: offlineNextDocumentNumber(state, 'TRF') ?? `TRF-${Date.now()}`,
+        status: 'requested',
+        fromWarehouseId,
+        toWarehouseId,
+        requestedByUserId: currentUser?.id ?? null,
+        requestedByName: currentUser?.fullName ?? null,
+        notes: body.notes ? text(body.notes).trim() : null,
+        rejectionReason: null,
+        deliveryNoteNumber: null,
+        provisional: false,
+        issuedAt: null,
+        receivedAt: null,
+        closedAt: null,
+        createdAt: now(),
+        updatedAt: now(),
+      };
+      for (const line of rawItems as Array<Record<string, unknown>>) {
+        const itemId = numberValue(line?.itemId);
+        const quantity = numberValue(line?.quantity);
+        if (itemId <= 0 || quantity <= 0) return failure(400, 'Ø¨ÙŠØ§Ù†Ø§Øª Ø¨Ù†Ø¯ ØºÙŠØ± ØµØ­ÙŠØ­Ø©: Ø§Ù„ÙƒÙ…ÙŠØ© ÙˆØ±Ù‚Ù… Ø§Ù„ØµÙ†Ù Ù…Ø·Ù„ÙˆØ¨Ø§Ù†.');
+        state.transferLines.push({
+          id: nextId(state),
+          transferId: transfer.id,
+          itemId,
+          quantity,
+          unit: line?.unit ? text(line.unit) : null,
+          batchNumber: line?.batchNumber ? text(line.batchNumber) : null,
+          expiryDate: line?.expiryDate ? text(line.expiryDate) : null,
+          notes: line?.notes ? text(line.notes) : null,
+        });
+      }
+      state.transfers.push(transfer);
+      recordOfflineChange(state, 'transfer', Number(transfer.id), 'create', { code: transfer.code, status: transfer.status });
+      addAudit(state, currentUser, 'create', 'transfer', Number(transfer.id));
+      return json(offlineTransferSummary(state, Number(transfer.id)), 201);
+    });
+  }
+  if (pathname.startsWith('/api/transfers/') && method === 'GET') {
+    return read((state) => {
+      const id = Number.parseInt(pathname.split('/').pop() ?? '', 10);
+      if (!Number.isSafeInteger(id) || id <= 0) return failure(400, 'Ù…Ø¹Ø±Ù‘Ù Ø§Ù„ØªØ­ÙˆÙŠÙ„ ØºÙŠØ± ØµØ§Ù„Ø­.');
+      const summary = offlineTransferSummary(state, id);
+      return summary ? json(summary) : failure(404, 'Ø§Ù„ØªØ­ÙˆÙŠÙ„ ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯.');
+    });
+  }
+
+  // -------------------------- import governance ------------------------
+  if (pathname === '/api/import-batches' && method === 'GET') {
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    return read((state) => {
+      const limit = Math.min(500, Math.max(1, numberValue(searchParams.get('limit'), 100)));
+      const rows = [...state.importBatches]
+        .sort((a, b) => text(b.createdAt).localeCompare(text(a.createdAt)))
+        .slice(0, limit);
+      return json(rows);
+    });
+  }
+  if (pathname.startsWith('/api/import-batches/') && pathname.endsWith('/rollback') && method === 'POST') {
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    return mutate((state) => {
+      const id = Number.parseInt(pathname.split('/')[3] ?? '', 10);
+      if (!Number.isSafeInteger(id) || id <= 0) return failure(400, 'Ù…Ø¹Ø±Ù‘Ù Ø¯ÙØ¹Ø© Ø§Ù„Ø§Ø³ØªÙŠØ±Ø§Ø¯ ØºÙŠØ± ØµØ§Ù„Ø­.');
+      const batch = state.importBatches.find((entry) => numberValue(entry.id) === id);
+      if (!batch) return failure(404, 'Ø¯ÙØ¹Ø© Ø§Ù„Ø§Ø³ØªÙŠØ±Ø§Ø¯ ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø©.');
+      if (batch.rolledBack) return json({ error: 'ØªÙ… Ø§Ù„ØªØ±Ø§Ø¬Ø¹ Ø¹Ù† Ù‡Ø°Ù‡ Ø§Ù„Ø¯ÙØ¹Ø© Ù…Ø³Ø¨Ù‚Ù‹Ø§.', code: 'ALREADY_ROLLED_BACK' }, 409);
+      const createdKeys = Array.isArray(batch.createdItemKeys) ? (batch.createdItemKeys as string[]) : [];
+      let removed = 0;
+      for (const key of createdKeys) {
+        const code = key.startsWith('code:') ? key.slice(5) : null;
+        const name = code ? null : key.replace(/^name:/, '').split('|unit:')[0];
+        const item = state.items.find((entry) =>
+          code ? text(entry.code) === code : text(entry.name) === name && key.endsWith(`unit:${text(entry.unit)}`),
+        );
+        if (!item) continue;
+        state.tombstones.push({ entityType: 'item', localId: numberValue(item.id), deletedAt: now(), reason: 'import-rollback' });
+        recordOfflineChange(state, 'item', numberValue(item.id), 'delete', { name: text(item.name) });
+        item.isActive = false;
+        removed += 1;
+      }
+      batch.rolledBack = true;
+      batch.rolledBackAt = now();
+      addAudit(state, currentUser, 'rollback', 'import_batch', id);
+      return json({ ok: true, removed });
+    });
+  }
+
+  // ------------------------------ sync overview ------------------------
+  if (pathname === '/api/sync/overview' && method === 'GET') {
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    return read((state) => {
+      const pending = state.outbox.filter((entry) => text(entry.status) === 'pending').length;
+      const exported = state.outbox.filter((entry) => text(entry.status) === 'exported').length;
+      const openConflicts = state.conflictQueue.filter((entry) => text(entry.status) === 'open').length;
+      const rejected = state.inbox.filter((entry) => text(entry.status) === 'rejected').length;
+      return json({
+        node: {
+          nodeId: state.nodeIdentity.nodeId ?? null,
+          installationId: state.nodeIdentity.installationId ?? null,
+          nodeType: state.nodeIdentity.nodeType ?? null,
+        },
+        warehouse: offlineCurrentWarehouse(state),
+        peers: {
+          trusted: 0,
+          cursors: state.syncCursors.map((cursor) => ({
+            peerNodeId: cursor.peerNodeId ?? null,
+            vector: cursor.vector ?? null,
+            updatedAt: cursor.updatedAt ?? null,
+          })),
+        },
+        outbox: { pending, exported },
+        conflicts: { open: openConflicts },
+        inbox: { rejected },
+        generatedAt: now(),
+      });
+    });
+  }
+
+  // ------------------------------ reports ------------------------------
+  if (pathname === '/api/reports/reconciliation' && method === 'GET') {
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    return read((state) => {
+      const rows = state.items
+        .filter((item) => item.isActive !== false)
+        .map((item) => {
+          const batches = state.inventoryBatches.filter(
+            (batch) => numberValue(batch.itemId) === numberValue(item.id) && numberValue(batch.remainingQuantity) > 0,
+          );
+          const batchTotal = batches.reduce((sum, batch) => sum + numberValue(batch.remainingQuantity), 0);
+          const currentStock = numberValue(item.currentStock);
+          return {
+            id: numberValue(item.id),
+            code: text(item.code) || null,
+            name: text(item.name),
+            unit: text(item.unit),
+            currentStock,
+            batchTotal,
+            batchCount: batches.length,
+            delta: currentStock - batchTotal,
+          };
+        });
+      const mismatches = rows.filter((row) => row.delta !== 0).sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+      return json({ checked: rows.length, mismatches: mismatches.length, items: mismatches, generatedAt: now() });
+    });
+  }
+  if (pathname === '/api/reports/stock-by-warehouse' && method === 'GET') {
+    return read((state) => {
+      const itemsById = new Map(state.items.map((item) => [numberValue(item.id), item]));
+      const warehousesById = new Map(state.warehouses.map((warehouse) => [numberValue(warehouse.id), warehouse]));
+      const fallbackWarehouseId = offlineWarehouseId(state);
+      const grouped = new Map<string, { warehouseId: number; itemId: number; quantity: number }>();
+      for (const batch of state.inventoryBatches) {
+        const quantity = numberValue(batch.remainingQuantity);
+        if (quantity === 0) continue;
+        const warehouseId = numberValue(batch.warehouseId, fallbackWarehouseId);
+        const itemId = numberValue(batch.itemId);
+        const key = `${warehouseId}:${itemId}`;
+        const entry = grouped.get(key) ?? { warehouseId, itemId, quantity: 0 };
+        entry.quantity += quantity;
+        grouped.set(key, entry);
+      }
+      const positions = [...grouped.values()]
+        .map((entry) => ({
+          warehouseId: entry.warehouseId,
+          warehouse: offlineWarehouseView(warehousesById.get(entry.warehouseId)),
+          itemId: entry.itemId,
+          item: (() => {
+            const item = itemsById.get(entry.itemId);
+            return item
+              ? { id: numberValue(item.id), code: text(item.code) || null, name: text(item.name), unit: text(item.unit) }
+              : null;
+          })(),
+          quantity: entry.quantity,
+        }))
+        .filter((row) => row.item && row.quantity !== 0)
+        .sort(
+          (a, b) =>
+            String(a.warehouse?.code ?? '').localeCompare(String(b.warehouse?.code ?? '')) ||
+            String(a.item?.name ?? '').localeCompare(String(b.item?.name ?? '')),
+        );
+      const byWarehouse = [...positions
+        .reduce((acc, row) => {
+          const entry = acc.get(row.warehouseId) ?? {
+            warehouseId: row.warehouseId,
+            warehouse: row.warehouse,
+            lines: 0,
+            quantity: 0,
+          };
+          entry.lines += 1;
+          entry.quantity += row.quantity;
+          acc.set(row.warehouseId, entry);
+          return acc;
+        }, new Map<number, { warehouseId: number; warehouse: unknown; lines: number; quantity: number }>())
+        .values()];
+      return json({ positions, byWarehouse, generatedAt: now() });
+    });
+  }
+  if (pathname === '/api/reports/consolidated' && method === 'GET') {
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    return read((state) => {
+      const minById = new Map(
+        state.items.filter((item) => item.isActive !== false).map((item) => [numberValue(item.id), numberValue(item.minStock)]),
+      );
+      const fallbackWarehouseId = offlineWarehouseId(state);
+      const perWarehouse = new Map<number, { warehouseId: number; warehouse: unknown; lines: number; quantity: number; belowMin: number }>();
+      for (const warehouse of state.warehouses) {
+        perWarehouse.set(numberValue(warehouse.id), {
+          warehouseId: numberValue(warehouse.id),
+          warehouse: offlineWarehouseView(warehouse),
+          lines: 0,
+          quantity: 0,
+          belowMin: 0,
+        });
+      }
+      for (const batch of state.inventoryBatches) {
+        const quantity = numberValue(batch.remainingQuantity);
+        if (quantity === 0) continue;
+        const warehouseId = numberValue(batch.warehouseId, fallbackWarehouseId);
+        const entry =
+          perWarehouse.get(warehouseId) ??
+          { warehouseId, warehouse: null, lines: 0, quantity: 0, belowMin: 0 };
+        entry.lines += 1;
+        entry.quantity += quantity;
+        const min = minById.get(numberValue(batch.itemId)) ?? 0;
+        if (min > 0 && quantity < min) entry.belowMin += 1;
+        perWarehouse.set(warehouseId, entry);
+      }
+      const warehouses = [...perWarehouse.values()].sort((a, b) =>
+        String((a.warehouse as { code?: string } | null)?.code ?? '').localeCompare(
+          String((b.warehouse as { code?: string } | null)?.code ?? ''),
+        ),
+      );
+      return json({
+        totals: {
+          items: state.items.filter((item) => item.isActive !== false).length,
+          equipment: state.equipment.length,
+          quantity: warehouses.reduce((sum, warehouse) => sum + warehouse.quantity, 0),
+          belowMin: warehouses.reduce((sum, warehouse) => sum + warehouse.belowMin, 0),
+          warehouses: warehouses.length,
+        },
+        warehouses,
+        generatedAt: now(),
+      });
+    });
+  }
+
+  // ---------------------------- items export ---------------------------
+  if (pathname === '/api/items/export' && method === 'GET') {
+    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
+    return read((state) => {
+      const categoryById = new Map(state.categories.map((category) => [numberValue(category.id), text(category.name)]));
+      return json({
+        version: INVENTORY_TEMPLATE_VERSION,
+        exportedAt: now(),
+        items: state.items
+          .filter((item) => item.isActive !== false)
+          .map((item) => ({
+            code: text(item.code) || '',
+            name: text(item.name),
+            unit: text(item.unit),
+            categoryName: item.categoryId ? categoryById.get(numberValue(item.categoryId)) ?? '' : '',
+            minStock: numberValue(item.minStock),
+            location: text(item.location) || '',
+            notes: text(item.notes) || '',
+          })),
+        openingBatches: state.inventoryBatches
+          .filter((batch) => numberValue(batch.remainingQuantity) > 0)
+          .map((batch) => {
+            const item = state.items.find((entry) => numberValue(entry.id) === numberValue(batch.itemId));
+            return {
+              code: item ? text(item.code) || '' : '',
+              quantity: numberValue(batch.remainingQuantity),
+              batchNumber: text(batch.batchNumber) || '',
+              expiryDate: text(batch.expiryDate) || '',
+              supplier: text(batch.supplier) || '',
+              deliveryNoteNumber: text(batch.deliveryNoteNumber) || '',
+              deliveryNoteDate: text(batch.deliveryNoteDate) || '',
+            };
+          }),
+      });
+    });
+  }
+
+  return failure(404, 'Ø§Ù„Ù…Ø³Ø§Ø± ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯ ÙÙŠ Ø§Ù„ÙˆØ¶Ø¹ Ø§Ù„Ù…Ø­Ù„ÙŠ');
 }
 
 export function installOfflineApi() {
@@ -2580,13 +3552,13 @@ export function installOfflineApi() {
       const method = init?.method ?? (input instanceof Request ? input.method : 'GET');
       const response = await withTimeout(
         route(url.pathname, url.searchParams, method, init),
-        'انتهت مهلة تنفيذ العملية المحلية',
+        'Ø§Ù†ØªÙ‡Øª Ù…Ù‡Ù„Ø© ØªÙ†ÙÙŠØ° Ø§Ù„Ø¹Ù…Ù„ÙŠØ© Ø§Ù„Ù…Ø­Ù„ÙŠØ©',
         OFFLINE_REQUEST_TIMEOUT_MS,
       );
       return response;
     } catch (error) {
       console.error('Offline API error:', error);
-      return failure(500, error instanceof Error ? error.message : 'تعذر تنفيذ العملية المحلية');
+      return failure(500, error instanceof Error ? error.message : 'ØªØ¹Ø°Ø± ØªÙ†ÙÙŠØ° Ø§Ù„Ø¹Ù…Ù„ÙŠØ© Ø§Ù„Ù…Ø­Ù„ÙŠØ©');
     }
   };
 }
