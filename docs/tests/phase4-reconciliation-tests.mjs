@@ -102,10 +102,11 @@ try {
   check("adjustment applied (200)", adjust.status >= 200 && adjust.status < 300, `status=${adjust.status}`);
 
   const afterAdjust = await req(admin, "GET", "/api/reports/reconciliation");
-  const mismatch = Array.isArray(afterAdjust.data?.items) ? afterAdjust.data.items.find((m) => m.id === itemId) : null;
-  check("adjustment is reported as a mismatch", Boolean(mismatch), `mismatches=${afterAdjust.data?.mismatches}`);
-  check("mismatch delta is correct (-3)", mismatch?.delta === -3, `delta=${mismatch?.delta}`);
-  check("mismatch exposes both sides", mismatch?.currentStock === 7 && mismatch?.batchTotal === 10, `stock=${mismatch?.currentStock} batches=${mismatch?.batchTotal}`);
+  const adjustedRow = Array.isArray(afterAdjust.data?.items) ? afterAdjust.data.items.find((m) => m.id === itemId) : null;
+  // Since the audit fix an adjustment maintains the batch ledger, so it must NOT create a mismatch.
+  check("adjustment keeps the ledger coherent (no mismatch)", Number(afterAdjust.data?.mismatches) === 0 && !adjustedRow, `mismatches=${afterAdjust.data?.mismatches}`);
+  check("reconciliation reports how many items it checked", Number(afterAdjust.data?.checked) >= 1, `checked=${afterAdjust.data?.checked}`);
+  check("reconciliation stamps the report", typeof afterAdjust.data?.generatedAt === "string");
 
   // ---- field-level audit -------------------------------------------------
   const update = await req(admin, "PUT", `/api/items/${itemId}`, { name: "مادة ترصيد (معدّل)", minStock: 5 });

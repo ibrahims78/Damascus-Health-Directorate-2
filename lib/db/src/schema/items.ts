@@ -25,6 +25,10 @@ export const itemsTable = pgTable(
     unit: text("unit").notNull(),
     currentStock: integer("current_stock").notNull().default(0),
     minStock: integer("min_stock").notNull().default(0),
+  reorderPoint: integer("reorder_point"),
+  maxStock: integer("max_stock"),
+  safetyStock: integer("safety_stock"),
+  binCode: text("bin_code"),
     // Phase 2 policy flags. False preserves the legacy behavior until an
     // item or category is explicitly classified as requiring tracking.
     requiresExpiryTracking: boolean("requires_expiry_tracking").notNull().default(false),

@@ -1098,6 +1098,30 @@ async function createAdjustment(
       .update(itemsTable)
       .set({ currentStock: newStock, updatedAt: new Date() })
       .where(eq(itemsTable.id, itemId));
+    // adjustment keeps the batch ledger coherent (audit P0): an increase opens a
+    // batch, a decrease consumes batches FEFO up to what the ledger actually holds.
+    if (delta > 0) {
+      const batchWarehouseId = parseOptionalId(input.warehouseId) ?? (await currentWarehouseId(tx));
+      await tx.insert(inventoryBatchesTable).values({
+        itemId,
+        warehouseId: batchWarehouseId,
+        batchNumber: null,
+        receivedQuantity: delta,
+        remainingQuantity: delta,
+        expiryDate: null,
+        supplier: null,
+        deliveryNoteNumber: documentNumber,
+        deliveryNoteDate: today(),
+        sourceTransactionId: transaction.id,
+      });
+    } else {
+      const batches = await getBatchesForUpdate(tx, itemId);
+      const available = batches.reduce((sum, batch) => sum + batch.remainingQuantity, 0);
+      const consumable = Math.min(Math.abs(delta), available);
+      if (consumable > 0) {
+        await allocateAndDecrementBatches(tx, itemId, consumable, transaction.id);
+      }
+    }
     return transaction;
   }
 

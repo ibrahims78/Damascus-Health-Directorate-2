@@ -206,6 +206,19 @@ router.post("/:id/receive", requireAuth, requireRole("admin", "warehouse_manager
     const today = new Date().toISOString().slice(0, 10);
     const deliveryNoteNumber = String(req.body?.deliveryNoteNumber ?? loaded.transfer.deliveryNoteNumber ?? loaded.transfer.code);
 
+    const rawReceived = Array.isArray(req.body?.lines) ? (req.body.lines as Array<Record<string, unknown>>) : [];
+    const receivedByLine = new Map<number, { quantity: number; reason: string | null }>();
+    for (const entry of rawReceived) {
+      const lineId = Number(entry?.lineId);
+      if (!Number.isSafeInteger(lineId) || lineId <= 0) continue;
+      const quantity = Number(entry?.receivedQuantity);
+      if (!Number.isSafeInteger(quantity) || quantity < 0) continue;
+      receivedByLine.set(lineId, {
+        quantity,
+        reason: entry?.varianceReason ? String(entry.varianceReason).trim() : null,
+      });
+    }
+
     await db.transaction(async (tx) => {
       for (const line of loaded.lines) {
         await createInventoryMovementInTransaction(
@@ -214,7 +227,7 @@ router.post("/:id/receive", requireAuth, requireRole("admin", "warehouse_manager
             kind: "in",
             itemType: "item",
             itemId: line.itemId,
-            quantity: line.quantity,
+            quantity: receivedByLine.get(line.id)?.quantity ?? line.quantity,
             supplySource: "central_warehouses",
             deliveryNoteNumber,
             deliveryNoteDate: today,
@@ -227,6 +240,18 @@ router.post("/:id/receive", requireAuth, requireRole("admin", "warehouse_manager
           context,
           node,
         );
+      }
+      for (const line of loaded.lines) {
+        const counted = receivedByLine.get(line.id);
+        if (!counted) continue;
+        await tx
+          .update(transferLinesTable)
+          .set({
+            receivedQuantity: counted.quantity,
+            variance: counted.quantity - Number(line.quantity),
+            varianceReason: counted.reason,
+          })
+          .where(eq(transferLinesTable.id, line.id));
       }
       await tx
         .update(transfersTable)

@@ -1,4 +1,4 @@
-import { Router, type Request, type Response } from "express";
+﻿import { Router, type Request, type Response } from "express";
 import {
   db,
   equipmentTable,
@@ -9,12 +9,13 @@ import {
 } from "@workspace/db";
 import { and, eq, gte, ilike, lte, or, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
+import { auditLog } from "../middlewares/audit";
 import { runAlertWorker } from "../lib/alert-worker";
 import {
   createInventoryMovement,
   movementContextFromRequest,
 } from "../lib/inventory-movement-service";
-import { InventoryMovementError } from "../lib/inventory-movement-core";
+import { InventoryMovementError, assertMeaningfulReason } from "../lib/inventory-movement-core";
 
 const router = Router();
 
@@ -27,7 +28,7 @@ function movementFailureResponse(
       ? error
       : new InventoryMovementError(
           "INTERNAL_MOVEMENT_ERROR",
-          "تعذر تنفيذ الحركة بسبب خطأ داخلي",
+          "ØªØ¹Ø°Ø± ØªÙ†ÙÙŠØ° Ø§Ù„Ø­Ø±ÙƒØ© Ø¨Ø³Ø¨Ø¨ Ø®Ø·Ø£ Ø¯Ø§Ø®Ù„ÙŠ",
           500,
         );
 
@@ -103,6 +104,8 @@ router.get("/", requireAuth, async (req, res) => {
           notes: transactionsTable.notes,
           createdByName: usersTable.fullName,
           createdAt: transactionsTable.createdAt,
+          reversedById: transactionsTable.reversedById,
+          reversedAt: transactionsTable.reversedAt,
         })
         .from(transactionsTable)
         .leftJoin(itemsTable, eq(transactionsTable.itemId, itemsTable.id))
@@ -229,6 +232,103 @@ async function getTransaction(id: number) {
     .then((rows) => rows[0]);
 }
 
+// POST /api/transactions/:id/reverse - compensating document, never an edit
+router.post("/:id/reverse", requireAuth, requireRole("admin"), async (req, res) => {
+  try {
+    const id = Number.parseInt(String(req.params.id), 10);
+    if (!Number.isSafeInteger(id) || id <= 0) {
+      res.status(400).json({ error: "Ù…Ø¹Ø±Ù‘Ù Ø§Ù„Ø­Ø±ÙƒØ© ØºÙŠØ± ØµØ§Ù„Ø­." });
+      return;
+    }
+    const [original] = await db.select().from(transactionsTable).where(eq(transactionsTable.id, id)).limit(1);
+    if (!original) {
+      res.status(404).json({ error: "Ø§Ù„Ø­Ø±ÙƒØ© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø©." });
+      return;
+    }
+    if (original.reversedById) {
+      res.status(409).json({ error: "ØªÙ… Ø¹ÙƒØ³ Ù‡Ø°Ù‡ Ø§Ù„Ø­Ø±ÙƒØ© Ù…Ø³Ø¨Ù‚Ù‹Ø§.", code: "ALREADY_REVERSED" });
+      return;
+    }
+    if (original.reversalOfId) {
+      res.status(409).json({ error: "Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø¹ÙƒØ³ Ù‚ÙŠØ¯ Ø¹ÙƒØ³ÙŠ.", code: "CANNOT_REVERSE_REVERSAL" });
+      return;
+    }
+    if (String(original.type).startsWith("custody")) {
+      res.status(409).json({
+        error: "Ø­Ø±ÙƒØ§Øª Ø§Ù„Ø¹Ù‡Ø¯Ø© ØªÙØ¯Ø§Ø± Ø¹Ø¨Ø± Ø¯ÙˆØ±Ø© Ø§Ù„Ø¹Ù‡Ø¯Ø© (Ø¥Ø±Ø¬Ø§Ø¹) Ù„Ø§ Ø¹Ø¨Ø± Ù‚ÙŠØ¯ Ø¹ÙƒØ³ÙŠ.",
+        code: "CUSTODY_USE_RETURN_FLOW",
+      });
+      return;
+    }
+    const reason = assertMeaningfulReason(req.body?.reason, "reason");
+    const details = (original.details ?? {}) as Record<string, unknown>;
+    const previousStock = details.previousStock;
+    const outgoing = ["out", "damage", "central_return", "central-return"].includes(String(original.type));
+    const quantity = Number(original.quantity ?? 0);
+
+    let newStock: number | null =
+      previousStock !== undefined && previousStock !== null ? Number(previousStock) : null;
+    if (newStock === null) {
+      if (original.itemType === "item" && original.itemId) {
+        const [item] = await db
+          .select({ currentStock: itemsTable.currentStock })
+          .from(itemsTable)
+          .where(eq(itemsTable.id, original.itemId))
+          .limit(1);
+        const current = Number(item?.currentStock ?? 0);
+        newStock = outgoing ? current + quantity : Math.max(current - quantity, 0);
+      } else if (original.itemType === "equipment" && original.equipmentId) {
+        const [equipment] = await db
+          .select({ quantity: equipmentTable.quantity })
+          .from(equipmentTable)
+          .where(eq(equipmentTable.id, original.equipmentId))
+          .limit(1);
+        const current = Number(equipment?.quantity ?? 0);
+        newStock = outgoing ? current + quantity : Math.max(current - quantity, 0);
+      }
+    }
+    if (newStock === null) {
+      res.status(409).json({
+        error: "Ù„Ø§ ÙŠÙ…ÙƒÙ† ØªØ­Ø¯ÙŠØ¯ Ø§Ù„Ø±ØµÙŠØ¯ Ø§Ù„Ù…Ø±Ø¬Ø¹ÙŠ Ù„Ù‡Ø°Ù‡ Ø§Ù„Ø­Ø±ÙƒØ©Ø› Ø§Ø³ØªØ®Ø¯Ù… ØªØ³ÙˆÙŠØ© ÙŠØ¯ÙˆÙŠØ© Ù…ÙˆØ«Ù‘Ù‚Ø©.",
+        code: "REVERSAL_NOT_SUPPORTED",
+      });
+      return;
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    const reversal = await createInventoryMovement(
+      {
+        kind: "adjust",
+        itemType: original.itemType,
+        itemId: original.itemId,
+        equipmentId: original.equipmentId,
+        newStock,
+        documentDate: today,
+        documentNumber: "REV-" + original.documentNumber,
+        reason: "Ù‚ÙŠØ¯ Ø¹ÙƒØ³ÙŠ Ù„Ù„Ù…Ø³ØªÙ†Ø¯ " + original.documentNumber + ": " + reason,
+        warehouseId: original.warehouseId ?? undefined,
+      } as never,
+      movementContextFromRequest(req),
+    );
+
+    await db
+      .update(transactionsTable)
+      .set({ reversedById: reversal.id, reversedAt: new Date(), reversalReason: reason })
+      .where(eq(transactionsTable.id, id));
+    await auditLog({
+      req,
+      action: "reverse",
+      entityType: "transaction",
+      entityId: id,
+      details: { documentNumber: original.documentNumber, reversalId: reversal.id, reason },
+    });
+    res.json({ ok: true, reversal });
+  } catch (error) {
+    console.error("[reversal]", error);
+    movementFailureResponse(res, error);
+  }
+});
+
 router.get("/:id", requireAuth, async (req, res) => {
   try {
     const transaction = await getTransaction(Number.parseInt(String(req.params.id), 10));
@@ -254,7 +354,7 @@ router.get("/:id/print", requireAuth, async (req, res) => {
     res.json({
       transaction,
       organizationName:
-        settings?.orgName ?? "مستودعات مديرية صحة دمشق",
+        settings?.orgName ?? "Ù…Ø³ØªÙˆØ¯Ø¹Ø§Øª Ù…Ø¯ÙŠØ±ÙŠØ© ØµØ­Ø© Ø¯Ù…Ø´Ù‚",
       orgSubtitle: settings?.orgSubtitle ?? null,
       printedAt: new Date().toISOString(),
     });

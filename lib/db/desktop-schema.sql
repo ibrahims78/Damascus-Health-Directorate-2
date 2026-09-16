@@ -4,6 +4,7 @@ CREATE TABLE "users" (
 	"password_hash" text NOT NULL,
 	"full_name" text NOT NULL,
 	"role" text NOT NULL,
+	"warehouse_id" integer,
 	"is_active" boolean DEFAULT true NOT NULL,
 	"must_change_password" boolean DEFAULT false NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
@@ -232,6 +233,9 @@ CREATE TABLE "transfer_lines" (
 	"batch_number" text,
 	"expiry_date" text,
 	"notes" text,
+	"received_quantity" integer,
+	"variance" integer,
+	"variance_reason" text,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
@@ -303,6 +307,10 @@ CREATE TABLE "items" (
 	"unit" text NOT NULL,
 	"current_stock" integer DEFAULT 0 NOT NULL,
 	"min_stock" integer DEFAULT 0 NOT NULL,
+	"reorder_point" integer,
+	"max_stock" integer,
+	"safety_stock" integer,
+	"bin_code" text,
 	"requires_expiry_tracking" boolean DEFAULT false NOT NULL,
 	"requires_batch_tracking" boolean DEFAULT false NOT NULL,
 	"expiry_date" date,
@@ -396,6 +404,10 @@ CREATE TABLE "transactions" (
 	"details" jsonb,
 	"notes" text,
 	"created_by" integer,
+	"reversal_of_id" integer,
+	"reversed_by_id" integer,
+	"reversed_at" timestamp with time zone,
+	"reversal_reason" text,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "transactions_document_number_unique" UNIQUE("document_number"),
 	CONSTRAINT "transactions_type_valid" CHECK ("transactions"."type" IN ('in', 'out', 'init', 'adjust', 'custody_out', 'custody_return', 'damage', 'central_return')),
@@ -745,3 +757,53 @@ CREATE TABLE "license_state" (
 "license" text,
 "activated_at" timestamp with time zone
 );
+
+--> statement-breakpoint
+CREATE TABLE "count_sessions" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"code" text NOT NULL,
+	"status" text DEFAULT 'open' NOT NULL,
+	"warehouse_id" integer NOT NULL,
+	"scope" text DEFAULT 'full' NOT NULL,
+	"category_id" integer,
+	"blind_count" boolean DEFAULT true NOT NULL,
+	"notes" text,
+	"created_by_user_id" integer,
+	"created_by_name" text,
+	"approved_by_user_id" integer,
+	"approved_by_name" text,
+	"lines_count" integer DEFAULT 0 NOT NULL,
+	"counted_lines" integer DEFAULT 0 NOT NULL,
+	"variance_lines" integer DEFAULT 0 NOT NULL,
+	"total_variance" integer DEFAULT 0 NOT NULL,
+	"started_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"approved_at" timestamp with time zone,
+	"cancelled_at" timestamp with time zone,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "count_sessions_code_unique" UNIQUE("code")
+);
+--> statement-breakpoint
+CREATE INDEX "count_sessions_status_idx" ON "count_sessions" ("status");
+--> statement-breakpoint
+CREATE INDEX "count_sessions_warehouse_idx" ON "count_sessions" ("warehouse_id","status");
+--> statement-breakpoint
+CREATE TABLE "count_lines" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"session_id" integer NOT NULL,
+	"item_id" integer NOT NULL,
+	"item_code" text,
+	"item_name" text NOT NULL,
+	"unit" text NOT NULL,
+	"bin_code" text,
+	"batch_number" text,
+	"system_quantity" integer DEFAULT 0 NOT NULL,
+	"counted_quantity" integer,
+	"variance" integer,
+	"variance_reason" text,
+	"counted_by_name" text,
+	"counted_at" timestamp with time zone,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE INDEX "count_lines_session_idx" ON "count_lines" ("session_id");

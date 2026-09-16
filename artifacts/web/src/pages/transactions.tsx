@@ -1,10 +1,12 @@
 ﻿import { useState, useEffect } from 'react';
 import { useRoute, useLocation, Link } from 'wouter';
-import { useListTransactions, type Transaction } from '@workspace/api-client-react';
+import { useListTransactions,
+  useGetCurrentUser, type Transaction } from '@workspace/api-client-react';
 import {
   ChevronRight,
   ChevronLeft,
   Printer,
+  RotateCcw,
   PackagePlus,
   PackageMinus,
   Search,
@@ -104,6 +106,8 @@ function typeBadge(type: string) {
 
 function TransactionsList() {
   const [, setLocation] = useLocation();
+  const { data: currentUser } = useGetCurrentUser();
+  const isAdmin = currentUser?.role === 'admin';
   const [page, setPage] = useState(1);
   const initialParams = new URLSearchParams(window.location.search);
   const [typeFilter, setTypeFilter] = useState<TypeFilter>(() => {
@@ -136,6 +140,28 @@ function TransactionsList() {
     const query = params.toString();
     window.history.replaceState(null, '', query ? `/transactions?${query}` : '/transactions');
   }, [typeFilter, itemTypeFilter, fromDate, toDate, searchInput]);
+
+  async function reverseTransaction(id: number, documentNumber: string) {
+    const reason = window.prompt('سبب القيد العكسي للمستند ' + documentNumber + ' (5 أحرف على الأقل):');
+    if (!reason || reason.trim().length < 5) return;
+    if (!window.confirm('تأكيد ترحيل قيد عكسي؟ لا يمكن عكس الحركة مرتين.')) return;
+    try {
+      const res = await fetch('/api/transactions/' + id + '/reverse', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: reason.trim() }),
+      });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok) {
+        window.alert(payload?.error ?? 'تعذّر ترحيل القيد العكسي');
+        return;
+      }
+      window.location.reload();
+    } catch {
+      window.alert('تعذّر الاتصال بالخادم');
+    }
+  }
 
   const { data, isLoading } = useListTransactions(
     {
@@ -345,6 +371,7 @@ function TransactionsList() {
                 data.transactions.map((tx: Transaction) => {
                   const itemName =
                     tx.itemType === 'equipment' ? tx.equipmentName : tx.itemName;
+                  const reversedById = (tx as { reversedById?: number | null }).reversedById ?? null;
 
                   return (
                     <TableRow key={tx.id} className="hover:bg-muted/40 cursor-default">
@@ -355,6 +382,20 @@ function TransactionsList() {
                           <Link href={`/print/${tx.id}`} aria-label="Ø·Ø¨Ø§Ø¹Ø© Ø§Ù„Ù…Ø³ØªÙ†Ø¯" title="Ø·Ø¨Ø§Ø¹Ø© Ø§Ù„Ù…Ø³ØªÙ†Ø¯" className="text-muted-foreground hover:text-primary">
                             <Printer className="h-3.5 w-3.5" />
                           </Link>
+                          {isAdmin && !reversedById && !String(tx.type).startsWith('custody') && (
+                            <button
+                              type="button"
+                              aria-label="reverse"
+                              title="reverse"
+                              className="text-muted-foreground hover:text-destructive"
+                              onClick={() => void reverseTransaction(tx.id, tx.documentNumber)}
+                            >
+                              <RotateCcw className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                          {reversedById && (
+                            <span className="text-[10px] font-medium text-destructive">R</span>
+                          )}
                         </span>
                       </TableCell>
                       <TableCell className="text-sm whitespace-nowrap">

@@ -74,6 +74,8 @@ type OfflineState = {
   transferLines: Array<Record<string, unknown>>;
   importBatches: Array<Record<string, unknown>>;
   documentSequences: Array<Record<string, unknown>>;
+  countSessions: Array<Record<string, unknown>>;
+  countLines: Array<Record<string, unknown>>;
 };
 
 const DB_NAME = 'damascus-emergency-inventory-offline';
@@ -188,6 +190,8 @@ function initialState(): OfflineState {
     transferLines: [],
     importBatches: [],
     documentSequences: [],
+    countSessions: [],
+    countLines: [],
   };
 }
 
@@ -298,6 +302,8 @@ async function loadState(): Promise<OfflineState> {
       transferLines: existing.transferLines ?? fresh.transferLines,
       importBatches: existing.importBatches ?? fresh.importBatches,
       documentSequences: existing.documentSequences ?? fresh.documentSequences,
+      countSessions: existing.countSessions ?? fresh.countSessions,
+      countLines: existing.countLines ?? fresh.countLines,
     };
   }
   const fresh = initialState();
@@ -1067,6 +1073,27 @@ function offlineApplyTransferIn(
       quantity: numberValue(item.currentStock),
     });
   }
+}
+
+function offlineCountSession(state: OfflineState, id: number) {
+  const session = state.countSessions.find((entry) => numberValue(entry.id) === id);
+  if (!session) return null;
+  return {
+    ...session,
+    lines: state.countLines
+      .filter((line) => numberValue(line.sessionId) === id)
+      .map((line) => ({ ...line })),
+  };
+}
+
+function offlineRefreshCount(state: OfflineState, id: number) {
+  const session = state.countSessions.find((entry) => numberValue(entry.id) === id);
+  if (!session) return;
+  const lines = state.countLines.filter((line) => numberValue(line.sessionId) === id);
+  session.countedLines = lines.filter((line) => line.countedQuantity !== null && line.countedQuantity !== undefined).length;
+  session.varianceLines = lines.filter((line) => numberValue(line.variance) !== 0).length;
+  session.totalVariance = lines.reduce((sum, line) => sum + numberValue(line.variance), 0);
+  session.updatedAt = now();
 }
 
 function readBody(init?: RequestInit): any {
@@ -2038,7 +2065,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
       return json({ transactions: page.rows, total: page.total, page: page.page, limit: page.limit });
     });
   }
-  if (pathname.startsWith('/api/transactions/') && method === 'POST') {
+  if (pathname.startsWith('/api/transactions/') && !pathname.endsWith('/reverse') && method === 'POST') {
     if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ©');
     return mutate((state) => {
       const body = readBody(init);
@@ -2579,7 +2606,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
   if (pathname === '/api/alerts/refresh' && method === 'POST') return json({ ok: true });
   if (pathname === '/api/alerts/stream' && method === 'GET') return new Response('', { status: 204, headers: { [OFFLINE_HEADER]: '1' } });
 
-  if (pathname.startsWith('/api/reports/') && !['/api/reports/reconciliation', '/api/reports/stock-by-warehouse', '/api/reports/consolidated'].includes(pathname)) {
+  if (pathname.startsWith('/api/reports/') && !['/api/reports/reconciliation', '/api/reports/stock-by-warehouse', '/api/reports/consolidated', '/api/reports/reorder-suggestions', '/api/reports/kpi', '/api/reports/abc', '/api/reports/transfer-variance'].includes(pathname)) {
     return read((state) => {
       if (pathname === '/api/reports/stock') return json(state.items.filter((item) => item.isActive !== false).map((item) => itemWithCategory(state, item)));
       if (pathname === '/api/reports/equipment') return json(state.equipment);
@@ -3274,11 +3301,25 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
         const deliveryNoteNumber = text(body.deliveryNoteNumber, text(transfer.deliveryNoteNumber, text(transfer.code)));
         const toWarehouseId = numberValue(transfer.toWarehouseId, offlineWarehouseId(state));
         const lines = state.transferLines.filter((line) => numberValue(line.transferId) === id);
+        const rawReceived = Array.isArray(body?.lines) ? (body.lines as Array<Record<string, unknown>>) : [];
+        const receivedByLine = new Map<number, { quantity: number; reason: string | null }>();
+        for (const entry of rawReceived) {
+          const lineId = numberValue(entry?.lineId);
+          const quantity = numberValue(entry?.receivedQuantity, -1);
+          if (lineId <= 0 || quantity < 0) continue;
+          receivedByLine.set(lineId, { quantity, reason: entry?.varianceReason ? text(entry.varianceReason).trim() : null });
+        }
         for (const line of lines) {
+          const counted = receivedByLine.get(numberValue(line.id));
+          if (counted) {
+            line.receivedQuantity = counted.quantity;
+            line.variance = counted.quantity - numberValue(line.quantity);
+            line.varianceReason = counted.reason;
+          }
           offlineApplyTransferIn(
             state,
             numberValue(line.itemId),
-            numberValue(line.quantity),
+            receivedByLine.get(numberValue(line.id))?.quantity ?? numberValue(line.quantity),
             toWarehouseId,
             deliveryNoteNumber,
             today,
@@ -3635,6 +3676,423 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     });
   }
 
+  /* ---------------- audit P0/P1: counting, reversal, variance, KPIs ---------------- */
+
+  // -------- cycle counting --------
+  if (pathname === '/api/counts' && method === 'GET') {
+    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'ليس لديك صلاحية');
+    return read((state) => {
+      const limit = Math.min(200, Math.max(1, numberValue(searchParams.get('limit'), 100)));
+      const rows = [...state.countSessions]
+        .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+        .slice(0, limit)
+        .map((session) => ({ ...session, lines: undefined }));
+      return json(rows);
+    });
+  }
+  if (pathname === '/api/counts' && method === 'POST') {
+    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'ليس لديك صلاحية');
+    return mutate((state) => {
+      const body = readBody(init) ?? {};
+      const warehouse = offlineCurrentWarehouse(state);
+      if (!warehouse) return json({ error: 'لا يوجد مستودع معرّف.', code: 'NO_WAREHOUSE' }, 409);
+      const rows = state.items.filter((item) => item.isActive !== false && text(item.itemType, 'item') === 'item');
+      if (rows.length === 0) return json({ error: 'لا توجد أصناف للجرد.', code: 'COUNT_NO_ITEMS' }, 409);
+      const session = {
+        id: nextId(state),
+        code: offlineNextDocumentNumber(state, 'CNT') ?? `CNT-${Date.now()}`,
+        status: 'open',
+        warehouseId: warehouse.id,
+        scope: text(body.scope, 'full'),
+        blindCount: body.blindCount === undefined ? true : Boolean(body.blindCount),
+        notes: body.notes ? text(body.notes).trim() : null,
+        createdByUserId: currentUser?.id ?? null,
+        createdByName: currentUser?.fullName ?? null,
+        approvedByUserId: null,
+        approvedByName: null,
+        linesCount: rows.length,
+        countedLines: 0,
+        varianceLines: 0,
+        totalVariance: 0,
+        startedAt: now(),
+        approvedAt: null,
+        cancelledAt: null,
+        createdAt: now(),
+        updatedAt: now(),
+      };
+      state.countSessions.unshift(session);
+      for (const item of rows) {
+        state.countLines.push({
+          id: nextId(state),
+          sessionId: session.id,
+          itemId: numberValue(item.id),
+          itemCode: text(item.code) || null,
+          itemName: text(item.name),
+          unit: text(item.unit),
+          binCode: text(item.binCode) || null,
+          systemQuantity: numberValue(item.currentStock),
+          countedQuantity: null,
+          variance: null,
+          varianceReason: null,
+          countedByName: null,
+          countedAt: null,
+          createdAt: now(),
+        });
+      }
+      addAudit(state, currentUser, 'create', 'count_session', Number(session.id));
+      return json(offlineCountSession(state, Number(session.id)), 201);
+    });
+  }
+  if (pathname.startsWith('/api/counts/') && pathname.endsWith('/entries') && method === 'POST') {
+    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'ليس لديك صلاحية');
+    return mutate((state) => {
+      const id = Number.parseInt(pathname.split('/')[3] ?? '', 10);
+      const session = state.countSessions.find((entry) => numberValue(entry.id) === id);
+      if (!session) return failure(404, 'جلسة الجرد غير موجودة.');
+      if (text(session.status) !== 'open') return json({ error: 'الجلسة ليست مفتوحة.', code: 'COUNT_NOT_OPEN' }, 409);
+      const body = readBody(init) ?? {};
+      const entries = Array.isArray(body.entries) ? body.entries : [];
+      for (const entry of entries as Array<Record<string, unknown>>) {
+        const line = state.countLines.find(
+          (candidate) => numberValue(candidate.id) === numberValue(entry?.lineId) && numberValue(candidate.sessionId) === id,
+        );
+        if (!line) continue;
+        const counted = entry?.countedQuantity === null || entry?.countedQuantity === undefined || entry?.countedQuantity === ''
+          ? null
+          : Math.max(0, Math.trunc(numberValue(entry.countedQuantity)));
+        line.countedQuantity = counted;
+        line.variance = counted === null ? null : counted - numberValue(line.systemQuantity);
+        if (entry?.varianceReason) line.varianceReason = text(entry.varianceReason).trim();
+        line.countedByName = currentUser?.fullName ?? null;
+        line.countedAt = now();
+      }
+      offlineRefreshCount(state, id);
+      return json(offlineCountSession(state, id));
+    });
+  }
+  if (pathname.startsWith('/api/counts/') && pathname.endsWith('/approve') && method === 'POST') {
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
+    return mutate((state) => {
+      const id = Number.parseInt(pathname.split('/')[3] ?? '', 10);
+      const session = state.countSessions.find((entry) => numberValue(entry.id) === id);
+      if (!session) return failure(404, 'جلسة الجرد غير موجودة.');
+      if (text(session.status) !== 'open') return json({ error: 'الجلسة ليست مفتوحة.', code: 'COUNT_NOT_OPEN' }, 409);
+      const lines = state.countLines.filter((line) => numberValue(line.sessionId) === id);
+      const uncounted = lines.filter((line) => line.countedQuantity === null || line.countedQuantity === undefined);
+      if (uncounted.length > 0) {
+        return json({ error: `لا يمكن الاعتماد: ${uncounted.length} سطرًا لم يُجرَد بعد.`, code: 'COUNT_INCOMPLETE' }, 409);
+      }
+      const missing = lines.find((line) => numberValue(line.variance) !== 0 && !text(line.varianceReason).trim());
+      if (missing) {
+        return json(
+          { error: `يجب تسجيل سبب لكل فرق (الصنف: ${text(missing.itemName)}).`, code: 'COUNT_VARIANCE_REASON_REQUIRED' },
+          409,
+        );
+      }
+      let posted = 0;
+      for (const line of lines) {
+        const variance = numberValue(line.variance);
+        if (variance === 0) continue;
+        const item = state.items.find((candidate) => numberValue(candidate.id) === numberValue(line.itemId));
+        if (!item) continue;
+        const warehouseId = numberValue(session.warehouseId, offlineWarehouseId(state));
+        const delta = variance;
+        item.currentStock = Math.max(0, numberValue(item.currentStock) + delta);
+        if (delta > 0) {
+          const batch = offlineOpenBatch(state, numberValue(item.id), delta, warehouseId, {
+            batchNumber: null,
+            expiryDate: null,
+            supplier: null,
+            deliveryNoteNumber: text(session.code),
+            deliveryNoteDate: now().slice(0, 10),
+          });
+          recordOfflineChange(state, 'inventory_batch', Number(batch.id), 'create', { ...batch });
+        } else {
+          offlineConsumeBatches(state, numberValue(item.id), Math.abs(delta), warehouseId);
+        }
+        const transaction = {
+          id: nextId(state),
+          type: 'adjust',
+          documentNumber: `${text(session.code)}-${numberValue(line.id)}`,
+          transactionDate: now().slice(0, 10),
+          itemId: numberValue(item.id),
+          quantity: Math.abs(delta),
+          notes: `جرد دوري ${text(session.code)}: ${text(line.varianceReason)}`,
+          reason: text(line.varianceReason),
+          createdBy: currentUser?.id ?? null,
+          createdAt: now(),
+          warehouseId,
+          details: { previousStock: numberValue(line.systemQuantity), newStock: numberValue(line.countedQuantity), delta },
+        };
+        state.transactions.unshift(transaction);
+        recordOfflineChange(state, 'transaction', Number(transaction.id), 'create', {
+          type: 'adjust',
+          documentNumber: transaction.documentNumber,
+          itemId: transaction.itemId,
+          quantity: transaction.quantity,
+        });
+        recordOfflineChange(state, 'item', numberValue(item.id), 'update', {
+          name: text(item.name),
+          quantity: numberValue(item.currentStock),
+        });
+        posted += 1;
+      }
+      session.status = 'approved';
+      session.approvedAt = now();
+      session.approvedByUserId = currentUser?.id ?? null;
+      session.approvedByName = currentUser?.fullName ?? null;
+      session.updatedAt = now();
+      addAudit(state, currentUser, 'approve', 'count_session', id);
+      return json({ ok: true, posted, session: offlineCountSession(state, id) });
+    });
+  }
+  if (pathname.startsWith('/api/counts/') && pathname.endsWith('/cancel') && method === 'POST') {
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
+    return mutate((state) => {
+      const id = Number.parseInt(pathname.split('/')[3] ?? '', 10);
+      const session = state.countSessions.find((entry) => numberValue(entry.id) === id);
+      if (!session) return failure(404, 'جلسة الجرد غير موجودة.');
+      if (text(session.status) !== 'open') return json({ error: 'الجلسة ليست مفتوحة.', code: 'COUNT_NOT_OPEN' }, 409);
+      session.status = 'cancelled';
+      session.cancelledAt = now();
+      session.updatedAt = now();
+      addAudit(state, currentUser, 'cancel', 'count_session', id);
+      return json(session);
+    });
+  }
+  if (pathname.startsWith('/api/counts/') && method === 'GET') {
+    return read((state) => {
+      const id = Number.parseInt(pathname.split('/').pop() ?? '', 10);
+      const session = offlineCountSession(state, id);
+      return session ? json(session) : failure(404, 'جلسة الجرد غير موجودة.');
+    });
+  }
+
+  // -------- reversal --------
+  if (/^\/api\/transactions\/\d+\/reverse$/.test(pathname) && method === 'POST') {
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
+    return mutate((state) => {
+      const id = Number.parseInt(pathname.split('/')[3] ?? '', 10);
+      const original = state.transactions.find((entry) => numberValue(entry.id) === id);
+      if (!original) return failure(404, 'الحركة غير موجودة.');
+      if (original.reversedById) return json({ error: 'تم عكس هذه الحركة مسبقًا.', code: 'ALREADY_REVERSED' }, 409);
+      if (original.reversalOfId) return json({ error: 'لا يمكن عكس قيد عكسي.', code: 'CANNOT_REVERSE_REVERSAL' }, 409);
+      if (text(original.type).startsWith('custody')) {
+        return json({ error: 'حركات العهدة تُدار عبر دورة الإرجاع.', code: 'CUSTODY_USE_RETURN_FLOW' }, 409);
+      }
+      const body = readBody(init) ?? {};
+      const reason = text(body.reason).trim();
+      if (reason.length < 5) return failure(400, 'سبب القيد العكسي مطلوب (5 أحرف على الأقل).');
+      const itemId = numberValue(original.itemId);
+      const item = state.items.find((entry) => numberValue(entry.id) === itemId);
+      if (!item) return json({ error: 'لا يمكن تحديد الرصيد المرجعي لهذه الحركة.', code: 'REVERSAL_NOT_SUPPORTED' }, 409);
+      const details = (original.details ?? {}) as Record<string, unknown>;
+      const previousStock = details.previousStock;
+      const outgoing = ['out', 'damage', 'central_return', 'central-return'].includes(text(original.type));
+      const quantity = numberValue(original.quantity);
+      const target = previousStock !== undefined && previousStock !== null
+        ? numberValue(previousStock)
+        : outgoing
+          ? numberValue(item.currentStock) + quantity
+          : Math.max(numberValue(item.currentStock) - quantity, 0);
+      const delta = target - numberValue(item.currentStock);
+      const warehouseId = numberValue(original.warehouseId, offlineWarehouseId(state));
+      item.currentStock = target;
+      if (delta > 0) {
+        const batch = offlineOpenBatch(state, itemId, delta, warehouseId, {
+          batchNumber: null,
+          expiryDate: null,
+          supplier: null,
+          deliveryNoteNumber: `REV-${text(original.documentNumber)}`,
+          deliveryNoteDate: now().slice(0, 10),
+        });
+        recordOfflineChange(state, 'inventory_batch', Number(batch.id), 'create', { ...batch });
+      } else if (delta < 0) {
+        offlineConsumeBatches(state, itemId, Math.abs(delta), warehouseId);
+      }
+      const reversal = {
+        id: nextId(state),
+        type: 'adjust',
+        documentNumber: `REV-${text(original.documentNumber)}`,
+        transactionDate: now().slice(0, 10),
+        itemId,
+        quantity: Math.abs(delta),
+        notes: `قيد عكسي للمستند ${text(original.documentNumber)}: ${reason}`,
+        reason,
+        createdBy: currentUser?.id ?? null,
+        createdAt: now(),
+        warehouseId,
+        reversalOfId: id,
+      };
+      state.transactions.unshift(reversal);
+      original.reversedById = numberValue(reversal.id);
+      original.reversedAt = now();
+      original.reversalReason = reason;
+      recordOfflineChange(state, 'transaction', Number(reversal.id), 'create', {
+        type: 'adjust',
+        documentNumber: reversal.documentNumber,
+        itemId,
+        quantity: reversal.quantity,
+      });
+      addAudit(state, currentUser, 'reverse', 'transaction', id);
+      return json({ ok: true, reversal });
+    });
+  }
+
+  // -------- reports: reorder suggestions, KPI, ABC, transfer variance --------
+  if (pathname === '/api/reports/reorder-suggestions' && method === 'GET') {
+    return read((state) => {
+      const items = state.items
+        .filter((item) => item.isActive !== false)
+        .map((item) => {
+          const current = numberValue(item.currentStock);
+          const reorderPoint = item.reorderPoint === null || item.reorderPoint === undefined
+            ? numberValue(item.minStock)
+            : numberValue(item.reorderPoint);
+          const maxLevel = item.maxStock === null || item.maxStock === undefined ? reorderPoint * 2 : numberValue(item.maxStock);
+          return {
+            id: numberValue(item.id),
+            code: text(item.code) || null,
+            name: text(item.name),
+            unit: text(item.unit),
+            currentStock: current,
+            minStock: numberValue(item.minStock),
+            reorderPoint,
+            maxLevel,
+            safetyStock: item.safetyStock === null || item.safetyStock === undefined ? null : numberValue(item.safetyStock),
+            binCode: text(item.binCode) || null,
+            shortfall: Math.max(reorderPoint - current, 0),
+            suggestedQuantity: Math.max(maxLevel - current, 0),
+            urgent: current === 0,
+          };
+        })
+        .filter((row) => row.currentStock <= row.reorderPoint)
+        .sort((a, b) => a.currentStock - b.currentStock);
+      return json({ count: items.length, urgent: items.filter((row) => row.urgent).length, items, generatedAt: now() });
+    });
+  }
+  if (pathname === '/api/reports/kpi' && method === 'GET') {
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
+    return read((state) => {
+      const since = Date.now() - 90 * 24 * 60 * 60 * 1000;
+      const stale = Date.now() - 180 * 24 * 60 * 60 * 1000;
+      const outbound = state.transactions.filter(
+        (entry) => text(entry.type) === 'out' && new Date(text(entry.createdAt)).getTime() >= since,
+      );
+      const consumed = outbound.reduce((sum, entry) => sum + numberValue(entry.quantity), 0);
+      const active = state.items.filter((item) => item.isActive !== false);
+      const totalStock = active.reduce((sum, item) => sum + numberValue(item.currentStock), 0);
+      const movedItems = new Set(
+        state.transactions
+          .filter((entry) => text(entry.type) === 'out' && new Date(text(entry.createdAt)).getTime() >= stale)
+          .map((entry) => numberValue(entry.itemId)),
+      );
+      const countedLines = state.countLines.filter((line) => line.countedQuantity !== null && line.countedQuantity !== undefined);
+      const varianceLines = countedLines.filter((line) => numberValue(line.variance) !== 0);
+      return json({
+        window: { consumptionDays: 90, deadStockDays: 180 },
+        turnover: totalStock > 0 ? Math.round((consumed / totalStock) * 100) / 100 : null,
+        daysOfCover: consumed > 0 ? Math.round((totalStock / (consumed / 90)) * 10) / 10 : null,
+        consumptionQuantity: consumed,
+        averageStock: totalStock,
+        items: active.length,
+        movedItems: movedItems.size,
+        deadStockItems: Math.max(active.length - movedItems.size, 0),
+        deadStockRatio: active.length > 0 ? Math.round(((active.length - movedItems.size) / active.length) * 1000) / 10 : null,
+        stockouts: active.filter((item) => numberValue(item.currentStock) === 0 && numberValue(item.minStock) > 0).length,
+        belowMin: active.filter((item) => numberValue(item.currentStock) > 0 && numberValue(item.currentStock) <= numberValue(item.minStock)).length,
+        countAccuracy: countedLines.length > 0 ? Math.round(((countedLines.length - varianceLines.length) / countedLines.length) * 1000) / 10 : null,
+        countSessions: state.countSessions.length,
+        generatedAt: now(),
+      });
+    });
+  }
+  if (pathname === '/api/reports/abc' && method === 'GET') {
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
+    return read((state) => {
+      const since = Date.now() - 90 * 24 * 60 * 60 * 1000;
+      const totals = new Map<number, number>();
+      for (const entry of state.transactions) {
+        if (text(entry.type) !== 'out' || new Date(text(entry.createdAt)).getTime() < since) continue;
+        const key = numberValue(entry.itemId);
+        totals.set(key, (totals.get(key) ?? 0) + numberValue(entry.quantity));
+      }
+      const rows = [...totals.entries()]
+        .map(([itemId, consumed]) => {
+          const item = state.items.find((candidate) => numberValue(candidate.id) === itemId);
+          return {
+            itemId,
+            name: item ? text(item.name) : null,
+            code: item ? text(item.code) || null : null,
+            unit: item ? text(item.unit) : null,
+            currentStock: item ? numberValue(item.currentStock) : 0,
+            consumed,
+          };
+        })
+        .filter((row) => row.consumed > 0 && row.itemId > 0)
+        .sort((a, b) => b.consumed - a.consumed);
+      const total = rows.reduce((sum, row) => sum + row.consumed, 0);
+      let running = 0;
+      const items = rows.map((row) => {
+        running += row.consumed;
+        const share = total > 0 ? (running / total) * 100 : 0;
+        return {
+          ...row,
+          share: Math.round((row.consumed / (total || 1)) * 1000) / 10,
+          cumulativeShare: Math.round(share * 10) / 10,
+          class: share <= 80 ? 'A' : share <= 95 ? 'B' : 'C',
+        };
+      });
+      return json({
+        totalQuantity: total,
+        counts: {
+          A: items.filter((row) => row.class === 'A').length,
+          B: items.filter((row) => row.class === 'B').length,
+          C: items.filter((row) => row.class === 'C').length,
+        },
+        items,
+        generatedAt: now(),
+      });
+    });
+  }
+  if (pathname === '/api/reports/transfer-variance' && method === 'GET') {
+    return read((state) => {
+      const rows = state.transferLines
+        .filter((line) => line.variance !== null && line.variance !== undefined && numberValue(line.variance) !== 0)
+        .map((line) => {
+          const transfer = state.transfers.find((entry) => numberValue(entry.id) === numberValue(line.transferId));
+          const item = state.items.find((entry) => numberValue(entry.id) === numberValue(line.itemId));
+          return {
+            transferId: numberValue(line.transferId),
+            code: transfer ? text(transfer.code) : null,
+            status: transfer ? text(transfer.status) : null,
+            fromWarehouseId: transfer ? numberValue(transfer.fromWarehouseId) : null,
+            toWarehouseId: transfer ? numberValue(transfer.toWarehouseId) : null,
+            receivedAt: transfer ? transfer.receivedAt ?? null : null,
+            lineId: numberValue(line.id),
+            itemId: numberValue(line.itemId),
+            itemName: item ? text(item.name) : null,
+            itemCode: item ? text(item.code) || null : null,
+            unit: text(line.unit) || null,
+            shipped: numberValue(line.quantity),
+            received: line.receivedQuantity === null || line.receivedQuantity === undefined ? null : numberValue(line.receivedQuantity),
+            variance: numberValue(line.variance),
+            varianceReason: text(line.varianceReason) || null,
+          };
+        })
+        .map((row) => ({
+          ...row,
+          variancePercent: row.shipped > 0 ? Math.round((row.variance / row.shipped) * 1000) / 10 : null,
+        }));
+      return json({
+        count: rows.length,
+        totalVariance: rows.reduce((sum, row) => sum + row.variance, 0),
+        items: rows,
+        generatedAt: now(),
+      });
+    });
+  }
+
   return failure(404, 'Ø§Ù„Ù…Ø³Ø§Ø± ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯ ÙÙŠ Ø§Ù„ÙˆØ¶Ø¹ Ø§Ù„Ù…Ø­Ù„ÙŠ');
 }
 
@@ -3657,4 +4115,5 @@ export function installOfflineApi() {
     }
   };
 }
+
 

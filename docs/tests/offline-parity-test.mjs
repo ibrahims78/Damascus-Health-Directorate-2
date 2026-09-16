@@ -233,6 +233,37 @@ const rollback = await api("POST", `/import-batches/${Number(catalogBatch?.id)}/
 check("governance: rollback reports the removed rows", rollback.status === 200 && Number(rollback.data?.removed) === 1, `removed=${rollback.data?.removed}`);
 const afterRollback = await api("GET", "/items?limit=5000");
 check("governance: rollback archives the imported item", !(afterRollback.data?.items ?? []).some((entry) => entry.code === "ROLL-1" && entry.isActive !== false));
+// --------------------- audit P0/P1 on the device ---------------------
+const countSession = await api("POST", "/counts", { blindCount: true });
+const countId = Number(countSession.data?.id);
+check("counts: session created on the device", countSession.status === 201 && Array.isArray(countSession.data?.lines), `lines=${countSession.data?.lines?.length}`);
+const countLineP = (countSession.data?.lines ?? []).find((line) => Number(line.itemId) === itemId);
+const incomplete = await api("POST", `/counts/${countId}/approve`, {});
+check("counts: partial approval refused", incomplete.status === 409 && incomplete.data?.code === "COUNT_INCOMPLETE", `status=${incomplete.status}`);
+await api("POST", `/counts/${countId}/entries`, { entries: [{ lineId: Number(countLineP?.id), countedQuantity: 7, varianceReason: "فرق جرد تجريبي" }] });
+const countApproved = await api("POST", `/counts/${countId}/approve`, {});
+check("counts: approval posts the difference", countApproved.status === 200 && Number(countApproved.data?.posted) >= 1, `posted=${countApproved.data?.posted}`);
+const itemAfterCount = await api("GET", `/items/${itemId}`);
+check("counts: stock matches the counted quantity", Number(itemAfterCount.data?.currentStock) === 7, `stock=${itemAfterCount.data?.currentStock}`);
+const reconAfterCount = await api("GET", "/reports/reconciliation");
+check("counts: ledger reconciles after the count", Number(reconAfterCount.data?.mismatches) === 0, `mismatches=${reconAfterCount.data?.mismatches}`);
+
+const countTx = ((await api("GET", "/transactions?limit=50")).data?.transactions ?? []).find((t) => t.type === "adjust" && Number(t.itemId) === itemId);
+const reversed = await api("POST", `/transactions/${Number(countTx?.id)}/reverse`, { reason: "عكس تسوية الجرد للاختبار" });
+check("reversal: compensating document posted on the device", reversed.status === 200 && Boolean(reversed.data?.reversal?.id), `status=${reversed.status}`);
+const itemAfterReversal = await api("GET", `/items/${itemId}`);
+check("reversal: stock restored", Number(itemAfterReversal.data?.currentStock) === 8, `stock=${itemAfterReversal.data?.currentStock}`);
+const twiceOnDevice = await api("POST", `/transactions/${Number(countTx?.id)}/reverse`, { reason: "محاولة ثانية للاختبار" });
+check("reversal: a second reversal is refused", twiceOnDevice.status === 409, `status=${twiceOnDevice.status}`);
+
+const reorderOnDevice = await api("GET", "/reports/reorder-suggestions");
+check("reports: reorder suggestions respond on the device", reorderOnDevice.status === 200 && Array.isArray(reorderOnDevice.data?.items));
+const kpiOnDevice = await api("GET", "/reports/kpi");
+check("reports: KPI report responds on the device", kpiOnDevice.status === 200 && kpiOnDevice.data?.countSessions >= 1);
+const abcOnDevice = await api("GET", "/reports/abc");
+check("reports: ABC report responds on the device", abcOnDevice.status === 200 && Boolean(abcOnDevice.data?.counts));
+const varianceOnDevice = await api("GET", "/reports/transfer-variance");
+check("reports: transfer variance responds on the device", varianceOnDevice.status === 200 && typeof varianceOnDevice.data?.totalVariance === "number");
 const failed = checks.filter((c) => !c.ok);
 console.log(`\n${checks.length - failed.length}/${checks.length} checks passed`);
 fs.writeFileSync(new URL("./.offline-parity/results.txt", import.meta.url), checks.map((c) => `${c.ok ? "PASS" : "FAIL"}  ${c.name}`).join("\n") + "\n", "utf8");

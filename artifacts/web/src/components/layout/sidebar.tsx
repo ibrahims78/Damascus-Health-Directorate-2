@@ -1,7 +1,6 @@
-import { Link, useLocation } from 'wouter';
+﻿import { Link, useLocation } from 'wouter';
 import { useGetCurrentUser } from '@workspace/api-client-react';
-import {
-  LayoutDashboard,
+import {LayoutDashboard,
   Package,
   Stethoscope,
   BookOpen,
@@ -26,6 +25,7 @@ import {
   ArrowDownToLine,
   ArrowUpFromLine,
   ClipboardList,
+  ClipboardCheck,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEffect, useRef, useState } from 'react';
@@ -40,12 +40,12 @@ import {
 } from '@/components/ui/tooltip';
 
 const APP_VERSION = import.meta.env.VITE_APP_VERSION ?? "v4.4.0";
-const DESIGNER_NAME = 'إبراهيم الصيداوي';
+const DESIGNER_NAME = 'Ø¥Ø¨Ø±Ø§Ù‡ÙŠÙ… Ø§Ù„ØµÙŠØ¯Ø§ÙˆÙŠ';
 const DESIGNER_PHONE = '0933706403';
 
 const navItems = [
-  { href: '/',               label: 'لوحة المعلومات',  icon: LayoutDashboard },
-  { href: '/inventory',      label: 'مركز المخزون',     icon: Boxes },
+  { href: '/',               label: 'Ù„ÙˆØ­Ø© Ø§Ù„Ù…Ø¹Ù„ÙˆÙ…Ø§Øª',  icon: LayoutDashboard },
+  { href: '/inventory',      label: 'Ù…Ø±ÙƒØ² Ø§Ù„Ù…Ø®Ø²ÙˆÙ†',     icon: Boxes },
 ];
 
 type NavGroup = {
@@ -64,56 +64,65 @@ type NavGroup = {
 const navGroups: NavGroup[] = [
   {
     id: 'stock',
-    title: 'المخزون والتحويلات',
+    title: 'Ø§Ù„Ù…Ø®Ø²ÙˆÙ† ÙˆØ§Ù„ØªØ­ÙˆÙŠÙ„Ø§Øª',
     icon: Package,
     items: [
-      { href: '/items',        label: 'المواد',         icon: Package },
-      { href: '/equipment',    label: 'التجهيزات',      icon: Stethoscope },
-      { href: '/transfers',    label: 'التحويلات',      icon: Truck },
-      { href: '/transactions', label: 'سجل الحركات',    icon: ArrowRightLeft },
+      { href: '/items',        label: 'Ø§Ù„Ù…ÙˆØ§Ø¯',         icon: Package },
+      { href: '/equipment',    label: 'Ø§Ù„ØªØ¬Ù‡ÙŠØ²Ø§Øª',      icon: Stethoscope },
+      { href: '/transfers',    label: 'Ø§Ù„ØªØ­ÙˆÙŠÙ„Ø§Øª',      icon: Truck },
+      { href: '/transactions', label: 'Ø³Ø¬Ù„ Ø§Ù„Ø­Ø±ÙƒØ§Øª',    icon: ArrowRightLeft },
     ],
   },
   {
     id: 'ops',
-    title: 'العمليات اليومية',
+    title: 'Ø§Ù„Ø¹Ù…Ù„ÙŠØ§Øª Ø§Ù„ÙŠÙˆÙ…ÙŠØ©',
     icon: ClipboardList,
     roles: ['admin', 'warehouse_manager'],
     items: [
-      { href: '/transactions/in/new',   label: 'إدخال مواد',    icon: ArrowDownToLine },
-      { href: '/transactions/out/new',  label: 'إخراج مواد',    icon: ArrowUpFromLine },
-      { href: '/custody/out/new',       label: 'تسليم عهدة',    icon: UserRoundCheck },
-      { href: '/custody/return/new',    label: 'إعادة عهدة',    icon: RotateCcw },
-      { href: '/damage/new',            label: 'تسجيل تلف',     icon: FileWarning },
-      { href: '/central-return/new',    label: 'مرتجع مركزي',   icon: ArchiveRestore },
+      { href: '/transactions/in/new',   label: 'Ø¥Ø¯Ø®Ø§Ù„ Ù…ÙˆØ§Ø¯',    icon: ArrowDownToLine },
+      { href: '/transactions/out/new',  label: 'Ø¥Ø®Ø±Ø§Ø¬ Ù…ÙˆØ§Ø¯',    icon: ArrowUpFromLine },
+      { href: '/custody/out/new',       label: 'ØªØ³Ù„ÙŠÙ… Ø¹Ù‡Ø¯Ø©',    icon: UserRoundCheck },
+      { href: '/custody/return/new',    label: 'Ø¥Ø¹Ø§Ø¯Ø© Ø¹Ù‡Ø¯Ø©',    icon: RotateCcw },
+      { href: '/damage/new',            label: 'ØªØ³Ø¬ÙŠÙ„ ØªÙ„Ù',     icon: FileWarning },
+      { href: '/central-return/new',    label: 'Ù…Ø±ØªØ¬Ø¹ Ù…Ø±ÙƒØ²ÙŠ',   icon: ArchiveRestore },
+    ],
+  },
+  {
+    id: 'counts',
+    title: 'Ø§Ù„Ø¬Ø±Ø¯ Ø§Ù„Ø¯ÙˆØ±ÙŠ',
+    icon: ClipboardCheck,
+    roles: ['admin', 'warehouse_manager'],
+    items: [
+      { href: '/counts', label: 'Ø§Ù„Ø¬Ø±Ø¯ Ø§Ù„Ø¯ÙˆØ±ÙŠ', icon: ClipboardCheck },
     ],
   },
   {
     id: 'catalog',
-    title: 'الكتالوج والبيانات',
+    title: 'Ø§Ù„ÙƒØªØ§Ù„ÙˆØ¬ ÙˆØ§Ù„Ø¨ÙŠØ§Ù†Ø§Øª',
     icon: BookOpen,
     roles: ['admin', 'warehouse_manager'],
     items: [
-      { href: '/catalog', label: 'الكتالوج والوحدات', icon: BookOpen },
+      { href: '/catalog', label: 'Ø§Ù„ÙƒØªØ§Ù„ÙˆØ¬ ÙˆØ§Ù„ÙˆØ­Ø¯Ø§Øª', icon: BookOpen },
     ],
   },
   {
     id: 'reports',
-    title: 'التقارير',
+    title: 'Ø§Ù„ØªÙ‚Ø§Ø±ÙŠØ±',
     icon: FileText,
     items: [
-      { href: '/reports', label: 'التقارير التفصيلية', icon: FileText },
+      { href: '/reports', label: 'Ø§Ù„ØªÙ‚Ø§Ø±ÙŠØ± Ø§Ù„ØªÙØµÙŠÙ„ÙŠØ©', icon: FileText },
     ],
   },
   {
     id: 'admin',
-    title: 'الإدارة',
+    title: 'Ø§Ù„Ø¥Ø¯Ø§Ø±Ø©',
     icon: Settings,
     roles: ['admin'],
     items: [
-      { href: '/users',    label: 'المستخدمون',    icon: Users },
-      { href: '/audit',    label: 'سجل التدقيق',   icon: ShieldCheck },
-      { href: '/sync',     label: 'المزامنة والربط', icon: Network },
-      { href: '/settings', label: 'الإعدادات',      icon: Settings },
+      { href: '/users',    label: 'Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…ÙˆÙ†',    icon: Users },
+      { href: '/audit',    label: 'Ø³Ø¬Ù„ Ø§Ù„ØªØ¯Ù‚ÙŠÙ‚',   icon: ShieldCheck },
+      { href: '/sync',     label: 'Ø§Ù„Ù…Ø²Ø§Ù…Ù†Ø© ÙˆØ§Ù„Ø±Ø¨Ø·', icon: Network },
+      { href: '/settings', label: 'Ø§Ù„Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª',      icon: Settings },
     ],
   },
 ];
@@ -165,7 +174,7 @@ export function Sidebar() {
         type="button"
         aria-expanded={isMobileOpen}
         aria-controls="primary-navigation"
-        aria-label={isMobileOpen ? 'إغلاق القائمة الجانبية' : 'فتح القائمة الجانبية'}
+        aria-label={isMobileOpen ? 'Ø¥ØºÙ„Ø§Ù‚ Ø§Ù„Ù‚Ø§Ø¦Ù…Ø© Ø§Ù„Ø¬Ø§Ù†Ø¨ÙŠØ©' : 'ÙØªØ­ Ø§Ù„Ù‚Ø§Ø¦Ù…Ø© Ø§Ù„Ø¬Ø§Ù†Ø¨ÙŠØ©'}
       >
         {isMobileOpen ? <X size={22} aria-hidden="true" /> : <Menu size={22} aria-hidden="true" />}
       </button>
@@ -183,7 +192,7 @@ export function Sidebar() {
       <aside
         ref={sidebarRef}
         id="primary-navigation"
-        aria-label="التنقل الرئيسي"
+        aria-label="Ø§Ù„ØªÙ†Ù‚Ù„ Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠ"
         className={cn(
           'fixed md:static inset-y-0 right-0 z-40 border-l bg-card flex flex-col',
           'transition-all duration-300 ease-in-out',
@@ -200,7 +209,7 @@ export function Sidebar() {
         >
           <img
             src={logoUrl}
-            alt="شعار مستودعات مديرية صحة دمشق"
+            alt="Ø´Ø¹Ø§Ø± Ù…Ø³ØªÙˆØ¯Ø¹Ø§Øª Ù…Ø¯ÙŠØ±ÙŠØ© ØµØ­Ø© Ø¯Ù…Ø´Ù‚"
             className={cn(
               'object-contain rounded-full border shadow-sm flex-shrink-0 transition-all duration-300',
               collapsed ? 'w-9 h-9' : 'w-12 h-12',
@@ -209,7 +218,7 @@ export function Sidebar() {
           {!collapsed && (
             <div className="min-w-0">
               <h1 className="font-bold text-sm text-foreground leading-snug">
-                مستودعات مديرية صحة دمشق
+                Ù…Ø³ØªÙˆØ¯Ø¹Ø§Øª Ù…Ø¯ÙŠØ±ÙŠØ© ØµØ­Ø© Ø¯Ù…Ø´Ù‚
               </h1>
             </div>
           )}
@@ -225,8 +234,8 @@ export function Sidebar() {
             'transition-colors absolute -left-3.5 top-[68px] z-10',
             'bg-card border shadow-sm',
           )}
-          title={collapsed ? 'توسيع الشريط الجانبي' : 'طي الشريط الجانبي'}
-          aria-label={collapsed ? 'توسيع الشريط الجانبي' : 'طي الشريط الجانبي'}
+          title={collapsed ? 'ØªÙˆØ³ÙŠØ¹ Ø§Ù„Ø´Ø±ÙŠØ· Ø§Ù„Ø¬Ø§Ù†Ø¨ÙŠ' : 'Ø·ÙŠ Ø§Ù„Ø´Ø±ÙŠØ· Ø§Ù„Ø¬Ø§Ù†Ø¨ÙŠ'}
+          aria-label={collapsed ? 'ØªÙˆØ³ÙŠØ¹ Ø§Ù„Ø´Ø±ÙŠØ· Ø§Ù„Ø¬Ø§Ù†Ø¨ÙŠ' : 'Ø·ÙŠ Ø§Ù„Ø´Ø±ÙŠØ· Ø§Ù„Ø¬Ø§Ù†Ø¨ÙŠ'}
           aria-expanded={!collapsed}
         >
           {collapsed
@@ -353,7 +362,7 @@ export function Sidebar() {
               <TooltipContent side="left">
                 <div className="text-center leading-relaxed">
                   <div>{APP_VERSION}</div>
-                  <div className="opacity-80">تصميم: {DESIGNER_NAME}</div>
+                  <div className="opacity-80">ØªØµÙ…ÙŠÙ…: {DESIGNER_NAME}</div>
                   <div className="opacity-60 font-mono">{DESIGNER_PHONE}</div>
                 </div>
               </TooltipContent>
@@ -365,14 +374,14 @@ export function Sidebar() {
                   {APP_VERSION}
                 </span>
                 <span className="text-[10px] text-muted-foreground/40 select-none">
-                  نظام إدارة المستودعات
+                  Ù†Ø¸Ø§Ù… Ø¥Ø¯Ø§Ø±Ø© Ø§Ù„Ù…Ø³ØªÙˆØ¯Ø¹Ø§Øª
                 </span>
               </div>
               <div className="flex items-center gap-1.5 pt-0.5 border-t border-dashed border-border/40">
                 <Code2 className="w-3 h-3 text-muted-foreground/30 flex-shrink-0" />
                 <div className="min-w-0">
                   <div className="text-[10px] text-muted-foreground/50 leading-tight truncate">
-                    تصميم: {DESIGNER_NAME}
+                    ØªØµÙ…ÙŠÙ…: {DESIGNER_NAME}
                   </div>
                   <a
                     href={`tel:${DESIGNER_PHONE}`}
@@ -390,3 +399,4 @@ export function Sidebar() {
     </TooltipProvider>
   );
 }
+

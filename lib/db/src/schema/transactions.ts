@@ -79,6 +79,10 @@ export const transactionsTable = pgTable(
     details: jsonb("details"),
     notes: text("notes"),
     createdBy: integer("created_by").references(() => usersTable.id),
+  reversalOfId: integer("reversal_of_id"),
+  reversedById: integer("reversed_by_id"),
+  reversedAt: timestamp("reversed_at", { withTimezone: true }),
+  reversalReason: text("reversal_reason"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [

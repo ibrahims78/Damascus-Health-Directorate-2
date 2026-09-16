@@ -41,6 +41,12 @@ import {
 } from "../lib/inventory-movement-service";
 import { eq, and, ne, ilike, or, lte, sql, isNotNull, asc, desc, type AnyColumn } from "drizzle-orm";
 
+/** Optional non-negative integer (audit P1: reorder / max / safety stock). */
+function optionalNonNullNegative(value: unknown): number | null {
+  if (value === undefined || value === null || value === "") return null;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : null;
+}
 const router = Router();
 
 function isValidIsoDate(value: string) {
@@ -94,7 +100,8 @@ function isImportInput(value: unknown): value is ImportInput {
 }
 
 async function analyzeImport(body: unknown, mode: "insert" | "upsert"): Promise<ImportAnalysis> {
-  const { items, openingBatches } = importArrays(body);
+  const {
+ items, openingBatches } = importArrays(body);
   const [allCategories, existing, existingBatches] = await Promise.all([
     db.select({ id: categoriesTable.id, name: categoriesTable.name }).from(categoriesTable),
     db
@@ -340,6 +347,10 @@ router.post(
         unit,
         currentStock = 0,
         minStock = 0,
+  reorderPoint = null,
+  maxStock = null,
+  safetyStock = null,
+  binCode = null,
         expiryDate,
         batchNumber,
         location,
@@ -397,6 +408,10 @@ router.post(
             unit: normalizedUnit,
             currentStock: parsedStock,
             minStock: parsedMinStock,
+        reorderPoint: optionalNonNullNegative(reorderPoint),
+        maxStock: optionalNonNullNegative(maxStock),
+        safetyStock: optionalNonNullNegative(safetyStock),
+        binCode: binCode ? String(binCode).trim() : null,
             expiryDate: normalizedExpiryDate || null,
             batchNumber: typeof batchNumber === "string" ? batchNumber.trim() || null : null,
             location: typeof location === "string" ? location.trim() || null : null,
@@ -1073,6 +1088,13 @@ router.put(
           return;
         }
         updates.minStock = parsedMinStock;
+      updates.reorderPoint = optionalNonNullNegative((req.body as Record<string, unknown>)?.reorderPoint);
+      updates.maxStock = optionalNonNullNegative((req.body as Record<string, unknown>)?.maxStock);
+      updates.safetyStock = optionalNonNullNegative((req.body as Record<string, unknown>)?.safetyStock);
+      if ((req.body as Record<string, unknown>)?.binCode !== undefined) {
+        const rawBin = (req.body as Record<string, unknown>).binCode;
+        updates.binCode = rawBin ? String(rawBin).trim() : null;
+      }
       }
       if (expiryDate !== undefined) {
         if (normalizedExpiryDate && !isValidIsoDate(normalizedExpiryDate)) {

@@ -11,9 +11,12 @@ import {
   inventoryBatchesTable,
   damageRecordsTable,
   warehousesTable,
+  transfersTable,
+  transferLinesTable,
+  countSessionsTable,
 } from "@workspace/db";
 import { requireAuth, requireRole } from "../middlewares/auth";
-import { eq, and, lte, gte, sql, desc } from "drizzle-orm";
+import { eq, and, lte, gte, sql, desc, asc } from "drizzle-orm";
 
 const router = Router();
 
@@ -678,6 +681,233 @@ router.get("/consolidated", requireAuth, requireRole("admin"), async (_req, res)
         warehouses: warehousesOut.length,
       },
       warehouses: warehousesOut,
+      generatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+
+// GET /api/reports/transfer-variance
+// P0 (audit): shipped versus received quantities per transfer line. Any
+// difference is a documented variance that must be explained by the receiving
+// site (short shipment, damage in transit, counting error).
+router.get("/transfer-variance", requireAuth, async (_req, res) => {
+  try {
+    const rows = await db
+      .select({
+        transferId: transfersTable.id,
+        code: transfersTable.code,
+        status: transfersTable.status,
+        fromWarehouseId: transfersTable.fromWarehouseId,
+        toWarehouseId: transfersTable.toWarehouseId,
+        receivedAt: transfersTable.receivedAt,
+        lineId: transferLinesTable.id,
+        itemId: transferLinesTable.itemId,
+        itemName: itemsTable.name,
+        itemCode: itemsTable.code,
+        unit: transferLinesTable.unit,
+        shipped: transferLinesTable.quantity,
+        received: transferLinesTable.receivedQuantity,
+        variance: transferLinesTable.variance,
+        varianceReason: transferLinesTable.varianceReason,
+      })
+      .from(transferLinesTable)
+      .innerJoin(transfersTable, eq(transferLinesTable.transferId, transfersTable.id))
+      .leftJoin(itemsTable, eq(transferLinesTable.itemId, itemsTable.id))
+      .where(sql`${transferLinesTable.variance} is not null and ${transferLinesTable.variance} <> 0`)
+      .orderBy(sql`${transfersTable.receivedAt} DESC NULLS LAST`);
+
+    const items = rows.map((row) => ({
+      ...row,
+      shipped: Number(row.shipped ?? 0),
+      received: row.received === null ? null : Number(row.received),
+      variance: Number(row.variance ?? 0),
+      variancePercent: Number(row.shipped ?? 0) > 0
+        ? Math.round((Number(row.variance ?? 0) / Number(row.shipped)) * 1000) / 10
+        : null,
+    }));
+    res.json({
+      count: items.length,
+      totalVariance: items.reduce((sum, row) => sum + row.variance, 0),
+      items,
+      generatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/reports/reorder-suggestions
+// P1 (audit): items at or below their reorder point, with a suggested order
+// quantity derived from the maximum level (falls back to twice the minimum).
+router.get("/reorder-suggestions", requireAuth, async (_req, res) => {
+  try {
+    const rows = await db
+      .select({
+        id: itemsTable.id,
+        code: itemsTable.code,
+        name: itemsTable.name,
+        unit: itemsTable.unit,
+        currentStock: itemsTable.currentStock,
+        minStock: itemsTable.minStock,
+        reorderPoint: itemsTable.reorderPoint,
+        maxStock: itemsTable.maxStock,
+        safetyStock: itemsTable.safetyStock,
+        binCode: itemsTable.binCode,
+      })
+      .from(itemsTable)
+      .where(eq(itemsTable.isActive, true))
+      .orderBy(asc(itemsTable.name));
+
+    const suggestions = rows
+      .map((row) => {
+        const current = Number(row.currentStock ?? 0);
+        const reorderPoint = row.reorderPoint === null ? Number(row.minStock ?? 0) : Number(row.reorderPoint);
+        const maxLevel = row.maxStock === null ? reorderPoint * 2 : Number(row.maxStock);
+        const required = Math.max(maxLevel - current, 0);
+        return {
+          ...row,
+          currentStock: current,
+          reorderPoint,
+          maxLevel,
+          shortfall: Math.max(reorderPoint - current, 0),
+          suggestedQuantity: required,
+          urgent: current === 0,
+        };
+      })
+      .filter((row) => row.currentStock <= row.reorderPoint)
+      .sort((a, b) => a.currentStock - b.currentStock || String(a.name).localeCompare(String(b.name)));
+
+    res.json({
+      count: suggestions.length,
+      urgent: suggestions.filter((row) => row.urgent).length,
+      items: suggestions,
+      generatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/reports/kpi - the management indicators the audit asked for
+router.get("/kpi", requireAuth, requireRole("admin"), async (_req, res) => {
+  try {
+    const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+    const staleSince = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString();
+
+    const [outbound] = await db
+      .select({ quantity: sql<number>`coalesce(sum(${transactionsTable.quantity}), 0)` })
+      .from(transactionsTable)
+      .where(and(eq(transactionsTable.type, "out"), gte(transactionsTable.createdAt, new Date(since))));
+
+    const [stock] = await db
+      .select({
+        items: sql<number>`count(*)`,
+        quantity: sql<number>`coalesce(sum(${itemsTable.currentStock}), 0)`,
+        stockouts: sql<number>`count(*) filter (where ${itemsTable.currentStock} = 0 and ${itemsTable.minStock} > 0)`,
+        belowMin: sql<number>`count(*) filter (where ${itemsTable.currentStock} > 0 and ${itemsTable.currentStock} <= ${itemsTable.minStock})`,
+      })
+      .from(itemsTable)
+      .where(eq(itemsTable.isActive, true));
+
+    const [moved] = await db
+      .select({ items: sql<number>`count(distinct ${transactionsTable.itemId})` })
+      .from(transactionsTable)
+      .where(and(eq(transactionsTable.type, "out"), gte(transactionsTable.createdAt, new Date(staleSince))));
+
+    const [counts] = await db
+      .select({
+        sessions: sql<number>`count(*)`,
+        lines: sql<number>`coalesce(sum(${countSessionsTable.countedLines}), 0)`,
+        varianceLines: sql<number>`coalesce(sum(${countSessionsTable.varianceLines}), 0)`,
+      })
+      .from(countSessionsTable);
+
+    const produced = Number(outbound?.quantity ?? 0);
+    const avgStock = Number(stock?.quantity ?? 0);
+    const activeItems = Number(stock?.items ?? 0);
+    const movedItems = Number(moved?.items ?? 0);
+    const countedLines = Number(counts?.lines ?? 0);
+    const varianceLines = Number(counts?.varianceLines ?? 0);
+
+    res.json({
+      window: { consumptionDays: 90, deadStockDays: 180 },
+      turnover: avgStock > 0 ? Math.round((produced / avgStock) * 100) / 100 : null,
+      daysOfCover: produced > 0 ? Math.round((avgStock / (produced / 90)) * 10) / 10 : null,
+      consumptionQuantity: produced,
+      averageStock: avgStock,
+      items: activeItems,
+      movedItems,
+      deadStockItems: Math.max(activeItems - movedItems, 0),
+      deadStockRatio: activeItems > 0 ? Math.round(((activeItems - movedItems) / activeItems) * 1000) / 10 : null,
+      stockouts: Number(stock?.stockouts ?? 0),
+      belowMin: Number(stock?.belowMin ?? 0),
+      countAccuracy: countedLines > 0 ? Math.round(((countedLines - varianceLines) / countedLines) * 1000) / 10 : null,
+      countSessions: Number(counts?.sessions ?? 0),
+      generatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/reports/abc - classification by 90-day consumption volume (80/15/5)
+router.get("/abc", requireAuth, requireRole("admin"), async (_req, res) => {
+  try {
+    const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+    const rows = await db
+      .select({
+        itemId: transactionsTable.itemId,
+        quantity: sql<number>`coalesce(sum(${transactionsTable.quantity}), 0)`,
+        name: itemsTable.name,
+        code: itemsTable.code,
+        unit: itemsTable.unit,
+        currentStock: itemsTable.currentStock,
+      })
+      .from(transactionsTable)
+      .leftJoin(itemsTable, eq(transactionsTable.itemId, itemsTable.id))
+      .where(and(eq(transactionsTable.type, "out"), gte(transactionsTable.createdAt, since)))
+      .groupBy(transactionsTable.itemId, itemsTable.name, itemsTable.code, itemsTable.unit, itemsTable.currentStock);
+
+    const sorted = rows
+      .map((row) => ({
+        itemId: row.itemId,
+        name: row.name,
+        code: row.code,
+        unit: row.unit,
+        currentStock: Number(row.currentStock ?? 0),
+        consumed: Number(row.quantity ?? 0),
+      }))
+      .filter((row) => row.itemId && row.consumed > 0)
+      .sort((a, b) => b.consumed - a.consumed);
+
+    const total = sorted.reduce((sum, row) => sum + row.consumed, 0);
+    let running = 0;
+    const items = sorted.map((row) => {
+      running += row.consumed;
+      const share = total > 0 ? (running / total) * 100 : 0;
+      return {
+        ...row,
+        share: Math.round((row.consumed / (total || 1)) * 1000) / 10,
+        cumulativeShare: Math.round(share * 10) / 10,
+        class: share <= 80 ? "A" : share <= 95 ? "B" : "C",
+      };
+    });
+
+    res.json({
+      totalQuantity: total,
+      counts: {
+        A: items.filter((row) => row.class === "A").length,
+        B: items.filter((row) => row.class === "B").length,
+        C: items.filter((row) => row.class === "C").length,
+      },
+      items,
       generatedAt: new Date().toISOString(),
     });
   } catch (err) {

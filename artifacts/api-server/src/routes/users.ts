@@ -33,7 +33,8 @@ router.get("/", requireAuth, requireRole("admin"), async (_req, res) => {
 // POST /api/users
 router.post("/", requireAuth, requireRole("admin"), async (req, res) => {
   try {
-    const { username, password, fullName, role } = req.body;
+    const { username, password, fullName, role, warehouseId } = req.body;
+
     if (!username || !password || !fullName || !role) {
       res.status(400).json({ error: "username, password, fullName, and role are required" });
       return;
@@ -57,7 +58,7 @@ router.post("/", requireAuth, requireRole("admin"), async (req, res) => {
     const passwordHash = await bcrypt.hash(password, 10);
     const [user] = await db
       .insert(usersTable)
-      .values({ username: normalizedUsername, passwordHash, fullName: String(fullName).trim(), role })
+      .values({ username: normalizedUsername, passwordHash, fullName: String(fullName).trim(), role, warehouseId: warehouseId ? Number(warehouseId) : null })
       .returning({
         id: usersTable.id,
         username: usersTable.username,
@@ -86,7 +87,7 @@ router.put("/:id", requireAuth, requireRole("admin"), async (req, res) => {
   try {
     const id = parseInt(String(req.params.id), 10);
     if (isNaN(id)) { res.status(400).json({ error: "Invalid user id" }); return; }
-    const { fullName, role, password, isActive } = req.body;
+    const { fullName, role, password, isActive, warehouseId } = req.body;
     if (res.locals.user.id === id && isActive === false) {
       res.status(400).json({ error: "لا يمكن تعطيل حسابك الحالي" });
       return;
