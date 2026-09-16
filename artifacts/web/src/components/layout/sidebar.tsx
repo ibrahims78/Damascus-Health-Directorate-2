@@ -26,6 +26,7 @@ import {LayoutDashboard,
   ArrowUpFromLine,
   ClipboardList,
   ClipboardCheck,
+  Tag,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEffect, useRef, useState } from 'react';
