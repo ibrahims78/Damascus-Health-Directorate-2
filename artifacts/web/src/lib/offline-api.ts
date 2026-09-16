@@ -77,6 +77,7 @@ type OfflineState = {
   countSessions: Array<Record<string, unknown>>;
   countLines: Array<Record<string, unknown>>;
   receipts: Array<Record<string, unknown>>;
+  bins: Array<Record<string, unknown>>;
   receiptLines: Array<Record<string, unknown>>;
 };
 
@@ -195,6 +196,7 @@ function initialState(): OfflineState {
     countSessions: [],
     countLines: [],
     receipts: [],
+    bins: [],
     receiptLines: [],
   };
 }
@@ -309,6 +311,7 @@ async function loadState(): Promise<OfflineState> {
       countSessions: existing.countSessions ?? fresh.countSessions,
       countLines: existing.countLines ?? fresh.countLines,
       receipts: existing.receipts ?? fresh.receipts,
+      bins: existing.bins ?? fresh.bins,
       receiptLines: existing.receiptLines ?? fresh.receiptLines,
     };
   }
@@ -1235,6 +1238,28 @@ function itemFromInput(state: OfflineState, body: Record<string, unknown>, exist
     unit: text(body.unit, text(existing?.unit, 'Ù‚Ø·Ø¹Ø©')),
     currentStock: numberValue(body.currentStock, numberValue(existing?.currentStock)),
     minStock: numberValue(body.minStock, numberValue(existing?.minStock)),
+    reorderPoint:
+      body.reorderPoint === undefined
+        ? existing?.reorderPoint ?? null
+        : body.reorderPoint === null || body.reorderPoint === ''
+          ? null
+          : numberValue(body.reorderPoint),
+    maxStock:
+      body.maxStock === undefined
+        ? existing?.maxStock ?? null
+        : body.maxStock === null || body.maxStock === ''
+          ? null
+          : numberValue(body.maxStock),
+    safetyStock:
+      body.safetyStock === undefined
+        ? existing?.safetyStock ?? null
+        : body.safetyStock === null || body.safetyStock === ''
+          ? null
+          : numberValue(body.safetyStock),
+    binCode:
+      body.binCode === undefined
+        ? existing?.binCode ?? null
+        : body.binCode ? text(body.binCode).trim() : null,
     expiryDate: body.expiryDate ?? existing?.expiryDate ?? null,
     batchNumber: body.batchNumber ?? existing?.batchNumber ?? null,
     location: body.location ?? existing?.location ?? null,
@@ -4299,6 +4324,105 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
     });
   }
 
+  /* ---------------- P1-6: storage locations (bins) ---------------- */
+  if (pathname === '/api/bins' && method === 'GET') {
+    return read((state) => {
+      const includeArchived = searchParams.get('includeArchived') === '1' && roleAllowed(currentUser, ['admin']);
+      const rows = state.bins
+        .filter((bin) => includeArchived || bin.isActive !== false)
+        .map((bin) => {
+          const warehouse = state.warehouses.find((entry) => numberValue(entry.id) === numberValue(bin.warehouseId));
+          return {
+            ...bin,
+            warehouseCode: warehouse ? text(warehouse.code) : null,
+            warehouseName: warehouse ? text(warehouse.name) : null,
+          };
+        })
+        .sort((a: Record<string, unknown>, b: Record<string, unknown>) => text(a.code).localeCompare(text(b.code)));
+      return json(rows);
+    });
+  }
+  if (pathname === '/api/bins/usage' && method === 'GET') {
+    return read((state) => {
+      const known = new Set(state.bins.filter((bin) => bin.isActive !== false).map((bin) => text(bin.code)));
+      const counts = new Map<string, number>();
+      for (const item of state.items) {
+        if (item.isActive === false) continue;
+        const code = text(item.binCode);
+        if (!code) continue;
+        counts.set(code, (counts.get(code) ?? 0) + 1);
+      }
+      return json(
+        [...counts.entries()]
+          .map(([binCode, items]) => ({ binCode, items, known: known.has(binCode) }))
+          .sort((a, b) => Number(a.known) - Number(b.known) || a.binCode.localeCompare(b.binCode)),
+      );
+    });
+  }
+  if (pathname === '/api/bins' && method === 'POST') {
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
+    return mutate((state) => {
+      const body = readBody(init) ?? {};
+      const code = text(body.code).trim().toUpperCase();
+      const name = text(body.name).trim();
+      if (!code || !name) return json({ error: 'رمز الموقع واسمه مطلوبان.', code: 'BIN_FIELDS_REQUIRED' }, 400);
+      if (state.bins.some((bin) => text(bin.code) === code)) {
+        return json({ error: 'رمز الموقع مسجّل مسبقًا.', code: 'BIN_CODE_DUPLICATE' }, 409);
+      }
+      const warehouse = offlineCurrentWarehouse(state);
+      const warehouseId = numberValue(body.warehouseId, warehouse?.id ?? 0);
+      if (warehouseId <= 0) return json({ error: 'المستودع مطلوب.', code: 'BIN_WAREHOUSE_REQUIRED' }, 400);
+      const bin = {
+        id: nextId(state),
+        code,
+        name,
+        warehouseId,
+        zone: body.zone ? text(body.zone).trim().toUpperCase() : null,
+        notes: body.notes ? text(body.notes).trim() : null,
+        isActive: true,
+        createdAt: now(),
+        updatedAt: now(),
+      };
+      state.bins.push(bin);
+      addAudit(state, currentUser, 'create', 'bin', Number(bin.id));
+      return json(bin, 201);
+    });
+  }
+  if (pathname.startsWith('/api/bins/') && (method === 'PUT' || method === 'DELETE')) {
+    if (!roleAllowed(currentUser, ['admin'])) return failure(403, 'ليس لديك صلاحية');
+    return mutate((state) => {
+      const id = Number.parseInt(pathname.split('/').pop() ?? '', 10);
+      if (!Number.isSafeInteger(id) || id <= 0) return json({ error: 'معرّف الموقع غير صالح.', code: 'BIN_ID_INVALID' }, 400);
+      const bin = state.bins.find((entry) => numberValue(entry.id) === id);
+      if (!bin) return json({ error: 'الموقع غير موجود.', code: 'BIN_NOT_FOUND' }, 404);
+      if (method === 'DELETE') {
+        const inUse = state.items.filter((item) => item.isActive !== false && text(item.binCode) === text(bin.code)).length;
+        if (inUse > 0) {
+          return json(
+            { error: `لا يمكن أرشفة موقع مستخدم في ${inUse} صنف. أعد توزيع الأصناف أولًا.`, code: 'BIN_IN_USE', items: inUse },
+            409,
+          );
+        }
+        bin.isActive = false;
+        bin.updatedAt = now();
+        addAudit(state, currentUser, 'archive', 'bin', id);
+        return json(bin);
+      }
+      const body = readBody(init) ?? {};
+      if (body.name !== undefined) {
+        const name = text(body.name).trim();
+        if (!name) return json({ error: 'اسم الموقع مطلوب.', code: 'BIN_NAME_REQUIRED' }, 400);
+        bin.name = name;
+      }
+      if (body.zone !== undefined) bin.zone = body.zone ? text(body.zone).trim().toUpperCase() : null;
+      if (body.notes !== undefined) bin.notes = body.notes ? text(body.notes).trim() : null;
+      if (body.isActive !== undefined) bin.isActive = Boolean(body.isActive);
+      bin.updatedAt = now();
+      addAudit(state, currentUser, 'update', 'bin', id);
+      return json(bin);
+    });
+  }
+
   return failure(404, 'Ø§Ù„Ù…Ø³Ø§Ø± ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯ ÙÙŠ Ø§Ù„ÙˆØ¶Ø¹ Ø§Ù„Ù…Ø­Ù„ÙŠ');
 }
 
@@ -4321,5 +4445,6 @@ export function installOfflineApi() {
     }
   };
 }
+
 
 

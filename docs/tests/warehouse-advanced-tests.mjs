@@ -216,6 +216,22 @@ try {
 
   await req("PUT", "/api/settings", { alertWebhookUrl: null });
   hookServer.close();
+  // ---------------- storage locations (bins) ----------------
+  const bin = await req("POST", "/api/bins", { code: "B-01-1", name: "رف 1", zone: "A" });
+  check("bins: location created", bin.status === 201, `status=${bin.status}`);
+  const dupBin = await req("POST", "/api/bins", { code: "B-01-1", name: "مكرر" });
+  check("bins: duplicate code is rejected", dupBin.status === 409 && dupBin.data?.code === "BIN_CODE_DUPLICATE", `status=${dupBin.status}`);
+  const binList = await req("GET", "/api/bins");
+  check("bins: list responds", Array.isArray(binList.data) && binList.data.some((row) => row.code === "B-01-1"), `rows=${binList.data?.length}`);
+  const binItem = await req("POST", "/api/items", { code: "BIN-1", name: "صنف موقع", unit: unitName, itemType: "item", binCode: "B-01-1" });
+  check("bins: an item can carry the location code", binItem.status === 201 && binItem.data?.binCode === "B-01-1", `binCode=${binItem.data?.binCode}`);
+  const binUsage = await req("GET", "/api/bins/usage");
+  check("bins: usage reports known codes", (binUsage.data ?? []).some((row) => row.binCode === "B-01-1" && row.known === true && Number(row.items) >= 1), `rows=${binUsage.data?.length}`);
+  const binInUse = await req("DELETE", `/api/bins/${Number(bin.data?.id)}`);
+  check("bins: archiving an in-use location is refused", binInUse.status === 409 && binInUse.data?.code === "BIN_IN_USE", `status=${binInUse.status}`);
+  const freeBin = await req("POST", "/api/bins", { code: "B-99-9", name: "رف فارغ" });
+  const freeArchive = await req("DELETE", `/api/bins/${Number(freeBin.data?.id)}`);
+  check("bins: an unused location is archived", freeArchive.status === 200 && freeArchive.data?.isActive === false, `status=${freeArchive.status}`);
   const failed = results.filter((r) => !r.ok);
   console.log(`\n${results.length - failed.length}/${results.length} checks passed`);
   fs.writeFileSync(path.join(root, "docs", "tests", ".advanced-run", "results.txt"), results.map((r) => `${r.ok ? "PASS" : "FAIL"}  ${r.name}`).join("\n") + "\n", "utf8");

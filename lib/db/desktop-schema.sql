@@ -855,3 +855,18 @@ CREATE TABLE "receipt_lines" (
 );
 --> statement-breakpoint
 CREATE INDEX "receipt_lines_receipt_idx" ON "receipt_lines" ("receipt_id");
+--> statement-breakpoint
+CREATE TABLE "bins" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"code" text NOT NULL,
+	"name" text NOT NULL,
+	"warehouse_id" integer NOT NULL,
+	"zone" text,
+	"notes" text,
+	"is_active" boolean DEFAULT true NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "bins_code_unique" UNIQUE("code")
+);
+--> statement-breakpoint
+CREATE INDEX "bins_warehouse_idx" ON "bins" ("warehouse_id","is_active");

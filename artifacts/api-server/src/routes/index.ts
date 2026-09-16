@@ -7,6 +7,7 @@ import importBatchesRouter from "./import-batches";
 import warehousesRouter from "./warehouses";
 import countsRouter from "./counts";
 import receiptsRouter from "./receipts";
+import binsRouter from "./bins";
 import transfersRouter from "./transfers";
 import catalogImportRouter from "./catalog-import";
 import itemsRouter from "./items";
@@ -36,6 +37,7 @@ router.use("/import-batches", importBatchesRouter);
 router.use("/warehouses", warehousesRouter);
 router.use("/counts", countsRouter);
 router.use("/receipts", receiptsRouter);
+router.use("/bins", binsRouter);
 router.use("/transfers", transfersRouter);
 router.use("/catalog", catalogImportRouter);
 router.use("/items", itemsRouter);
@@ -56,4 +58,5 @@ router.use("/sync", syncRouter);
 router.use("/license", licenseRouter);
 
 export default router;
+
 

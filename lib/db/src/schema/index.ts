@@ -23,3 +23,4 @@ export * from "./license-state";
 export * from "./backup";
 export * from "./counts";
 export * from "./receipts";
+export * from "./bins";
