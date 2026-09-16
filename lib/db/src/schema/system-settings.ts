@@ -11,7 +11,8 @@ export const systemSettingsTable = pgTable("system_settings", {
   orgName: text("org_name").notNull().default(DEFAULT_ORG_NAME),
   orgSubtitle: text("org_subtitle"),
   expiryAlertDays: integer("expiry_alert_days").notNull().default(30),
-  unitsList: text("units_list"), // JSON array of unit strings e.g. '["قطعة","علبة","لتر"]'
+  unitsList: text("units_list"),
+  alertWebhookUrl: text("alert_webhook_url"), // JSON array of unit strings e.g. '["قطعة","علبة","لتر"]'
   technicalConditions: text("technical_conditions"), // JSON array of { key, label } objects
   returnConditions: text("return_conditions"), // JSON array of { key, label, behavior } objects
   // Phase 5: the warehouse this installation represents.

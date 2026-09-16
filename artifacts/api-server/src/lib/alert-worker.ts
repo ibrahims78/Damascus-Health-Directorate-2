@@ -18,6 +18,7 @@ import {
   systemSettingsTable,
 } from "@workspace/db";
 import {
+  asc,
   eq,
   and,
   lte,
@@ -156,6 +157,35 @@ async function computeActiveAlerts(
   ];
 }
 
+/** Posts new/escalated alerts to the configured webhook (audit P1-10). */
+async function dispatchAlertWebhook(
+  alerts: Array<{ type: string; entityType: string; entityId: number; severity: string; message: string }>,
+): Promise<void> {
+  try {
+    const [settings] = await db
+      .select({ url: systemSettingsTable.alertWebhookUrl })
+      .from(systemSettingsTable)
+      .orderBy(asc(systemSettingsTable.id))
+      .limit(1);
+    const url = (settings?.url ?? "").trim();
+    if (!url || !/^https?:\/\//i.test(url)) return;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000);
+    try {
+      await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ source: "damascus-health-directorate", generatedAt: new Date().toISOString(), alerts }),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch (error) {
+    console.error("[alert-webhook]", error);
+  }
+}
+
 export async function runAlertWorker(): Promise<void> {
   try {
     logger.info("Alert worker: starting run");
@@ -196,6 +226,7 @@ export async function runAlertWorker(): Promise<void> {
 
     // 4. Upsert active alerts
     const upsertedIds: number[] = [];
+    const dispatched: Array<{ type: string; entityType: string; entityId: number; severity: string; message: string }> = [];
     const escalatedIds: number[] = []; // alerts whose severity increased
 
     for (const alert of active) {
@@ -233,6 +264,7 @@ export async function runAlertWorker(): Promise<void> {
 
       if (!upserted) continue;
       upsertedIds.push(upserted.id);
+      dispatched.push({ type: alert.type, entityType: alert.entityType, entityId: alert.entityId, severity: alert.severity, message: alert.message });
 
       // Detect severity escalation (warning → critical)
       if (
@@ -242,6 +274,11 @@ export async function runAlertWorker(): Promise<void> {
       ) {
         escalatedIds.push(upserted.id);
       }
+    }
+
+    // 4b. External notification (webhook) - best effort, never blocks the worker
+    if (dispatched.length > 0) {
+      await dispatchAlertWebhook(dispatched);
     }
 
     // 5. Delete read-marks for escalated alerts (re-notify users)

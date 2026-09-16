@@ -19,6 +19,7 @@ CREATE TABLE "system_settings" (
 	"org_subtitle" text,
 	"expiry_alert_days" integer DEFAULT 30 NOT NULL,
 	"units_list" text,
+"alert_webhook_url" text,
 "warehouse_id" integer,
 "technical_conditions" text,
 "return_conditions" text,

@@ -7,6 +7,7 @@
  * Run:  node docs/tests/warehouse-advanced-tests.mjs
  */
 import { spawn } from "node:child_process";
+import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -182,6 +183,39 @@ try {
   const supplierSummary = await req("GET", "/api/receipts/summary");
   const supplierRow = (supplierSummary.data?.suppliers ?? []).find((row) => row.supplierName === "مورد الاختبار");
   check("GRN: supplier performance is reported", Boolean(supplierRow) && Number(supplierRow?.rejected) === 2, `rejected=${supplierRow?.rejected}`);
+  // ---------------- external alert notifications (webhook) ----------------
+  const hookPayloads = [];
+  const hookServer = http.createServer((request, response) => {
+    let body = "";
+    request.on("data", (chunk) => { body += chunk; });
+    request.on("end", () => { hookPayloads.push(body); response.writeHead(200); response.end("ok"); });
+  });
+  await new Promise((resolve) => hookServer.listen(0, "127.0.0.1", resolve));
+  const hookPort = hookServer.address().port;
+  const hookUrl = `http://127.0.0.1:${hookPort}/hooks/alerts`;
+
+  const savedHook = await req("PUT", "/api/settings", { alertWebhookUrl: hookUrl });
+  check("webhook: the url is stored in the settings", savedHook.status === 200, `status=${savedHook.status}`);
+  const badHook = await req("PUT", "/api/settings", { alertWebhookUrl: "not-a-url" });
+  check("webhook: an invalid url is rejected", badHook.status === 400, `status=${badHook.status}`);
+  const settingsNow = await req("GET", "/api/settings");
+  check("webhook: the settings endpoint exposes it", settingsNow.data?.alertWebhookUrl === hookUrl, `value=${settingsNow.data?.alertWebhookUrl}`);
+
+  // an item below its minimum makes the worker raise a critical alert
+  const lowItem = await req("POST", "/api/items", { code: "HOOK-1", name: "صنف تنبيه", unit: unitName, itemType: "item", minStock: 10 });
+  check("webhook: probe item created", lowItem.status === 201, `status=${lowItem.status}`);
+  await req("POST", "/api/alerts/refresh", {});
+  for (let attempt = 0; attempt < 24 && hookPayloads.length === 0; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  check("webhook: the alert payload was delivered", hookPayloads.length > 0, `payloads=${hookPayloads.length}`);
+  let parsedHook = null;
+  try { parsedHook = JSON.parse(hookPayloads[0] ?? "{}"); } catch { parsedHook = null; }
+  check("webhook: payload carries the alert list", Array.isArray(parsedHook?.alerts) && parsedHook.alerts.length > 0, `alerts=${parsedHook?.alerts?.length}`);
+  check("webhook: payload identifies the source", parsedHook?.source === "damascus-health-directorate");
+
+  await req("PUT", "/api/settings", { alertWebhookUrl: null });
+  hookServer.close();
   const failed = results.filter((r) => !r.ok);
   console.log(`\n${results.length - failed.length}/${results.length} checks passed`);
   fs.writeFileSync(path.join(root, "docs", "tests", ".advanced-run", "results.txt"), results.map((r) => `${r.ok ? "PASS" : "FAIL"}  ${r.name}`).join("\n") + "\n", "utf8");

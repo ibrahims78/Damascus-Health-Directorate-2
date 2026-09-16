@@ -63,6 +63,7 @@ router.get("/", requireAuth, async (_req, res) => {
       unitsList: settings.unitsList ?? JSON.stringify(DEFAULT_UNITS),
       technicalConditions: settings.technicalConditions ?? JSON.stringify(DEFAULT_TECHNICAL_CONDITIONS),
       returnConditions: settings.returnConditions ?? JSON.stringify(DEFAULT_RETURN_CONDITIONS),
+      alertWebhookUrl: settings.alertWebhookUrl ?? null,
     });
   } catch (err) {
     console.error(err);
@@ -71,12 +72,14 @@ router.get("/", requireAuth, async (_req, res) => {
 });
 
 function validateSystemSettingsInput(input: {
+  alertWebhookUrl?: unknown;
   orgName?: unknown;
   orgSubtitle?: unknown;
   expiryAlertDays?: unknown;
 }) {
   const normalized: {
-    orgName?: string;
+    alertWebhookUrl?: string | null;
+  orgName?: string;
     orgSubtitle?: string | null;
     expiryAlertDays?: number;
   } = {};
@@ -109,6 +112,17 @@ function validateSystemSettingsInput(input: {
     }
   }
 
+  if (input.alertWebhookUrl !== undefined) {
+    const raw = input.alertWebhookUrl === null ? "" : String(input.alertWebhookUrl).trim();
+    if (raw.length === 0) {
+      normalized.alertWebhookUrl = null;
+    } else if (!/^https?:\/\//i.test(raw) || raw.length > 500) {
+      return { error: "عنوان Webhook غير صالح (يجب أن يبدأ بـ http:// أو https://)." };
+    } else {
+      normalized.alertWebhookUrl = raw;
+    }
+  }
+
   if (input.expiryAlertDays !== undefined) {
     if (
       typeof input.expiryAlertDays !== "number" ||
@@ -127,8 +141,8 @@ function validateSystemSettingsInput(input: {
 // PUT /api/settings
 router.put("/", requireAuth, requireRole("admin"), async (req, res) => {
   try {
-    const { orgName, orgSubtitle, expiryAlertDays, unitsList, technicalConditions, returnConditions } = req.body;
-    const validated = validateSystemSettingsInput({ orgName, orgSubtitle, expiryAlertDays });
+    const { orgName, orgSubtitle, expiryAlertDays, unitsList, technicalConditions, returnConditions, alertWebhookUrl } = req.body;
+    const validated = validateSystemSettingsInput({ orgName, orgSubtitle, expiryAlertDays, alertWebhookUrl });
     if ("error" in validated) {
       res.status(400).json({ error: validated.error });
       return;
@@ -247,6 +261,7 @@ router.put("/", requireAuth, requireRole("admin"), async (req, res) => {
       .update(systemSettingsTable)
       .set({
         ...(validated.normalized.orgName !== undefined && { orgName: validated.normalized.orgName }),
+      ...(validated.normalized.alertWebhookUrl !== undefined && { alertWebhookUrl: validated.normalized.alertWebhookUrl }),
         ...(validated.normalized.orgSubtitle !== undefined && { orgSubtitle: validated.normalized.orgSubtitle }),
         ...(validated.normalized.expiryAlertDays !== undefined && {
           expiryAlertDays: validated.normalized.expiryAlertDays,
