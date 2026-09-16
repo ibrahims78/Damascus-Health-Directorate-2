@@ -1,1 +1,1 @@
-{"name":"damascus-health-directorate-desktop","productName":"Damascus Health Directorate","version":"4.5.0","main":"electron/main.cjs","devDependencies":{"@capacitor/android":"^7.6.9","@capacitor/cli":"^7.6.9","typescript":"~5.9.3","vitest":"3.2.4"}}
+{"name":"damascus-health-directorate-desktop","productName":"Damascus Health Directorate","version":"4.6.0","main":"electron/main.cjs","devDependencies":{"@capacitor/android":"^7.6.9","@capacitor/cli":"^7.6.9","typescript":"~5.9.3","vitest":"3.2.4"}}
