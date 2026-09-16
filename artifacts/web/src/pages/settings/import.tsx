@@ -437,8 +437,11 @@ export function ImportTab() {
         throw new Error('حجم الملف يتجاوز الحد المسموح به (10 ميغابايت)');
       }
       const XLSX = await import('xlsx');
-      const buffer = await file.arrayBuffer();
-      const wb = XLSX.read(buffer, { type: 'buffer', cellDates: false });
+      const isCsvFile = /\.csv$/i.test(file.name);
+      // CSV carries the materials table only (opening batches need the two-sheet workbook).
+      const wb = isCsvFile
+        ? XLSX.read(await file.text(), { type: 'string', cellDates: false })
+        : XLSX.read(await file.arrayBuffer(), { type: 'buffer', cellDates: false });
 
       // Prefer the standardized materials sheet; legacy "البيانات" remains supported.
       const sheetName = wb.SheetNames.includes(INVENTORY_SHEET_NAMES.items)
@@ -572,7 +575,7 @@ export function ImportTab() {
           <input
             type="file"
             className="hidden"
-            accept=".xlsx,.xls"
+            accept=".xlsx,.xls,.csv"
             onChange={(e) => void handleFileChange(e)}
           />
         </label>
@@ -957,7 +960,7 @@ export function ImportEquipmentTab() {
           <input
             type="file"
             className="hidden"
-            accept=".xlsx,.xls"
+            accept=".xlsx,.xls,.csv"
             onChange={(e) => void handleFileChange(e)}
           />
         </label>
