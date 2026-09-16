@@ -897,6 +897,17 @@ function offlineOpenBatch(
   return batch;
 }
 
+/** Balance of one item inside one warehouse, read from the batch ledger. */
+function offlineWarehouseBalance(state: OfflineState, itemId: number, warehouseId: number): number {
+  return state.inventoryBatches
+    .filter(
+      (batch) =>
+        numberValue(batch.itemId) === itemId &&
+        numberValue(batch.warehouseId, warehouseId) === warehouseId,
+    )
+    .reduce((sum, batch) => sum + numberValue(batch.remainingQuantity), 0);
+}
+
 /** Consumes batches FEFO whenever stock leaves a warehouse. Returns the shortfall. */
 function offlineConsumeBatches(
   state: OfflineState,
@@ -1708,6 +1719,21 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
         addAudit(state, currentUser, 'create', 'transaction', Number(transaction.id));
         openingBatches += 1;
       }
+      state.importBatches.unshift({
+        id: nextId(state),
+        kind: 'items',
+        mode,
+        fileName: null,
+        createdItems: created,
+        updatedItems: updated,
+        openingBatches,
+        skipped: errors.length,
+        createdItemKeys: decisions
+          .filter((decision) => decision.action === 'create-item')
+          .map((decision) => (decision.row.code ? 'code:' + decision.row.code : 'name:' + decision.row.name + '|unit:' + decision.row.unit)),
+        rolledBack: false,
+        createdAt: now(),
+      });
       return json({ created, updated, openingBatches, inserted: created, skipped: errors.length, errors, warnings });
     });
   }
@@ -1917,6 +1943,21 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
           addAudit(state, currentUser, 'create', 'equipment', Number(equipment.id));
         }
       }
+      state.importBatches.unshift({
+        id: nextId(state),
+        kind: 'catalog',
+        mode,
+        fileName: null,
+        createdItems,
+        updatedItems,
+        createdEquipment,
+        updatedEquipment,
+        skipped: summary.totals.skip,
+        createdItemKeys: items.rows.filter((decision) => decision.action === 'create').map((decision) => decision.key),
+        updatedItemKeys: items.rows.filter((decision) => decision.action === 'update').map((decision) => decision.key),
+        rolledBack: false,
+        createdAt: now(),
+      });
       return json({ ok: true, mode, createdItems, updatedItems, createdEquipment, updatedEquipment, skipped: summary.totals.skip });
     });
   }
@@ -2051,8 +2092,22 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
           if (!item) return failure(404, 'Ø§Ù„Ù…Ø§Ø¯Ø© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø©');
           const previousStock = numberValue(item.currentStock, 0);
           item.currentStock = newStock;
-          transaction.quantity = Math.abs(newStock - previousStock);
-          transaction.details = { previousStock, newStock, delta: newStock - previousStock, deltaType: newStock > previousStock ? 'increase' : 'decrease' };
+          const delta = newStock - previousStock;
+          const adjustWarehouseId = offlineWarehouseId(state);
+          if (delta > 0) {
+            const openedBatch = offlineOpenBatch(state, numberValue(item.id), delta, adjustWarehouseId, {
+              batchNumber: null,
+              expiryDate: null,
+              supplier: null,
+              deliveryNoteNumber: text(transaction.documentNumber),
+              deliveryNoteDate: text(body.documentDate, now().slice(0, 10)),
+            });
+            recordOfflineChange(state, 'inventory_batch', Number(openedBatch.id), 'create', { ...openedBatch });
+          } else if (delta < 0) {
+            offlineConsumeBatches(state, numberValue(item.id), Math.abs(delta), adjustWarehouseId);
+          }
+          transaction.quantity = Math.abs(delta);
+          transaction.details = { previousStock, newStock, delta, deltaType: delta > 0 ? 'increase' : 'decrease' };
         }
       }
       const target = state.items.find((item) => item.id === Number(body.itemId));
@@ -3168,7 +3223,28 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
           return json({ error: `Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø§Ù„Ø¥Ø±Ø³Ø§Ù„. Ø§Ù„Ø­Ø§Ù„Ø© Ø§Ù„Ø­Ø§Ù„ÙŠØ© Â«${status}Â».`, code: 'INVALID_TRANSITION' }, 409);
         }
         const lines = state.transferLines.filter((line) => numberValue(line.transferId) === id);
+        if (lines.length === 0) {
+          return json({ error: 'لا توجد بنود في التحويل.', code: 'NO_LINES' }, 409);
+        }
         const fromWarehouseId = numberValue(transfer.fromWarehouseId, offlineWarehouseId(state));
+        // pre-flight: the whole transfer must be satisfiable, otherwise nothing is written
+        const shortages = lines
+          .map((line) => {
+            const required = numberValue(line.quantity);
+            const available = offlineWarehouseBalance(state, numberValue(line.itemId), fromWarehouseId);
+            return { itemId: numberValue(line.itemId), required, available };
+          })
+          .filter((entry) => entry.available < entry.required);
+        if (shortages.length > 0) {
+          return json(
+            {
+              error: 'لا يمكن الإرسال: الرصيد في مستودع المصدر غير كافٍ.',
+              code: 'INSUFFICIENT_STOCK',
+              shortages,
+            },
+            409,
+          );
+        }
         for (const line of lines) {
           offlineApplyTransferOut(
             state,
@@ -3274,9 +3350,23 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
         createdAt: now(),
         updatedAt: now(),
       };
-      for (const line of rawItems as Array<Record<string, unknown>>) {
-        const itemId = numberValue(line?.itemId);
-        const quantity = numberValue(line?.quantity);
+      const parsedLines = (rawItems as Array<Record<string, unknown>>).map((line) => ({
+        itemId: numberValue(line?.itemId),
+        quantity: numberValue(line?.quantity),
+        unit: line?.unit ? text(line.unit) : null,
+        batchNumber: line?.batchNumber ? text(line.batchNumber) : null,
+        expiryDate: line?.expiryDate ? text(line.expiryDate) : null,
+        notes: line?.notes ? text(line.notes) : null,
+      }));
+      if (parsedLines.some((line) => line.itemId <= 0 || line.quantity <= 0)) {
+        return failure(400, 'بيانات بند غير صحيحة: الكمية ورقم الصنف مطلوبان.');
+      }
+      if (parsedLines.some((line) => !state.items.some((item) => numberValue(item.id) === line.itemId))) {
+        return failure(400, 'أحد الأصناف المطلوب تحويلها غير موجود.');
+      }
+      for (const line of parsedLines) {
+        const itemId = line.itemId;
+        const quantity = line.quantity;
         if (itemId <= 0 || quantity <= 0) return failure(400, 'Ø¨ÙŠØ§Ù†Ø§Øª Ø¨Ù†Ø¯ ØºÙŠØ± ØµØ­ÙŠØ­Ø©: Ø§Ù„ÙƒÙ…ÙŠØ© ÙˆØ±Ù‚Ù… Ø§Ù„ØµÙ†Ù Ù…Ø·Ù„ÙˆØ¨Ø§Ù†.');
         state.transferLines.push({
           id: nextId(state),
@@ -3383,7 +3473,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
         .filter((item) => item.isActive !== false)
         .map((item) => {
           const batches = state.inventoryBatches.filter(
-            (batch) => numberValue(batch.itemId) === numberValue(item.id) && numberValue(batch.remainingQuantity) > 0,
+            (batch) => numberValue(batch.itemId) === numberValue(item.id),
           );
           const batchTotal = batches.reduce((sum, batch) => sum + numberValue(batch.remainingQuantity), 0);
           const currentStock = numberValue(item.currentStock);
@@ -3523,7 +3613,12 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
             notes: text(item.notes) || '',
           })),
         openingBatches: state.inventoryBatches
-          .filter((batch) => numberValue(batch.remainingQuantity) > 0)
+          .filter((batch) => {
+            if (numberValue(batch.remainingQuantity) <= 0) return false;
+            const owner = state.items.find((entry) => numberValue(entry.id) === numberValue(batch.itemId));
+            if (!owner) return false;
+            return owner.isActive !== false;
+          })
           .map((batch) => {
             const item = state.items.find((entry) => numberValue(entry.id) === numberValue(batch.itemId));
             return {
@@ -3562,3 +3657,4 @@ export function installOfflineApi() {
     }
   };
 }
+

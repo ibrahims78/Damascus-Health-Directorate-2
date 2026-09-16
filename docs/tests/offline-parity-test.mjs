@@ -202,6 +202,37 @@ const exported = await api("GET", "/items/export");
 check("export: items export responds", exported.status === 200 && exported.data?.version === "4.0", `version=${exported.data?.version}`);
 check("export: export carries items + batches", exported.data?.items?.length === 1 && exported.data?.openingBatches?.length === 2, `items=${exported.data?.items?.length} batches=${exported.data?.openingBatches?.length}`);
 
+// --------------------- deep-review regression guards ---------------------
+// issuing more than the source warehouse holds must fail without writing anything
+const balanceBefore = (await api("GET", "/reports/stock-by-warehouse")).data?.positions ?? [];
+const overTransfer = await api("POST", "/transfers", { fromWarehouseId: centralId, toWarehouseId: branchId, items: [{ itemId, quantity: 999 }] });
+const overIssue = await api("POST", `/transfers/${Number(overTransfer.data?.id)}/issue`, {});
+check("guard: issuing more than the source holds is rejected (409 INSUFFICIENT_STOCK)", overIssue.status === 409 && overIssue.data?.code === "INSUFFICIENT_STOCK", `status=${overIssue.status}`);
+const balanceAfter = (await api("GET", "/reports/stock-by-warehouse")).data?.positions ?? [];
+check("guard: a rejected issue writes nothing", JSON.stringify(balanceBefore) === JSON.stringify(balanceAfter));
+
+// an unknown item must be rejected before anything is persisted
+const badItem = await api("POST", "/transfers", { fromWarehouseId: centralId, toWarehouseId: branchId, items: [{ itemId: 999999, quantity: 1 }] });
+check("guard: unknown item in a transfer is rejected (400)", badItem.status === 400, `status=${badItem.status}`);
+
+// an adjustment must keep the batch ledger honest
+const adjust = await api("POST", "/transactions/adjust", { itemId, itemType: "item", newStock: 8, documentDate: today });
+check("adjust: accepted", adjust.status === 201 || adjust.status === 200, `status=${adjust.status}`);
+const reconAdjust = await api("GET", "/reports/reconciliation");
+check("adjust: ledger still reconciles after an adjustment", Number(reconAdjust.data?.mismatches) === 0, `mismatches=${reconAdjust.data?.mismatches}`);
+const totalAfterAdjust = ((await api("GET", "/reports/stock-by-warehouse")).data?.positions ?? []).reduce((sum, row) => sum + row.quantity, 0);
+check("adjust: total quantity follows the new stock", totalAfterAdjust === 8, `total=${totalAfterAdjust}`);
+
+// catalog import is journaled and can be rolled back on the device
+await api("POST", "/catalog/import", { mode: "add-and-update", items: [{ code: "ROLL-1", name: "ROLL-1", unit: unitName }] });
+const batchesList = (await api("GET", "/import-batches")).data ?? [];
+const catalogBatch = batchesList.find((entry) => entry.kind === "catalog");
+check("governance: catalog import is journaled", Boolean(catalogBatch), `rows=${batchesList.length}`);
+check("governance: the journal records the created item keys", Array.isArray(catalogBatch?.createdItemKeys) && catalogBatch.createdItemKeys.includes("code:ROLL-1"));
+const rollback = await api("POST", `/import-batches/${Number(catalogBatch?.id)}/rollback`, {});
+check("governance: rollback reports the removed rows", rollback.status === 200 && Number(rollback.data?.removed) === 1, `removed=${rollback.data?.removed}`);
+const afterRollback = await api("GET", "/items?limit=5000");
+check("governance: rollback archives the imported item", !(afterRollback.data?.items ?? []).some((entry) => entry.code === "ROLL-1" && entry.isActive !== false));
 const failed = checks.filter((c) => !c.ok);
 console.log(`\n${checks.length - failed.length}/${checks.length} checks passed`);
 fs.writeFileSync(new URL("./.offline-parity/results.txt", import.meta.url), checks.map((c) => `${c.ok ? "PASS" : "FAIL"}  ${c.name}`).join("\n") + "\n", "utf8");
