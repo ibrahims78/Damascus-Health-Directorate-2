@@ -39,6 +39,7 @@ export function CatalogImportPanel({
 }) {
   const [mode, setMode] = useState<'add-only' | 'add-and-update'>('add-and-update');
   const [fileName, setFileName] = useState<string | null>(null);
+  const [csvNote, setCsvNote] = useState<string | null>(null);
   const [payload, setPayload] = useState<{ items: Array<Record<string, unknown>>; equipment: Array<Record<string, unknown>> } | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [busy, setBusy] = useState(false);
@@ -80,14 +81,29 @@ export function CatalogImportPanel({
     setPayload(null);
     try {
       const XLSX = await import('xlsx');
-      const buffer = await file.arrayBuffer();
-      const wb = XLSX.read(buffer, { type: 'array' });
-      const sheetRows = (name: string) => {
-        const sheet = wb.Sheets[name];
-        return sheet ? (XLSX.utils.sheet_to_json(sheet, { defval: '' }) as Array<Record<string, unknown>>) : [];
-      };
-      const items = sheetRows('المواد');
-      const equipment = sheetRows('التجهيزات');
+      const isCsv = /\.csv$/i.test(file.name);
+      let items: Array<Record<string, unknown>> = [];
+      let equipment: Array<Record<string, unknown>> = [];
+      if (isCsv) {
+        // CSV carries a single sheet: the first row is the header row (same Arabic labels).
+        const csvText = await file.text();
+        const parsed = XLSX.read(csvText, { type: 'string' });
+        const first = parsed.SheetNames[0];
+        items = first
+          ? (XLSX.utils.sheet_to_json(parsed.Sheets[first], { defval: '' }) as Array<Record<string, unknown>>)
+          : [];
+        setCsvNote('ملف CSV: يُقرأ كجدول مواد واحد (ورقة التجهيزات غير متاحة في CSV).');
+      } else {
+        const buffer = await file.arrayBuffer();
+        const wb = XLSX.read(buffer, { type: 'array' });
+        const sheetRows = (name: string) => {
+          const sheet = wb.Sheets[name];
+          return sheet ? (XLSX.utils.sheet_to_json(sheet, { defval: '' }) as Array<Record<string, unknown>>) : [];
+        };
+        items = sheetRows('المواد');
+        equipment = sheetRows('التجهيزات');
+        setCsvNote(null);
+      }
       if (items.length === 0 && equipment.length === 0) {
         setError('لم يُعثر على صفوف في ورقتي «المواد» أو «التجهيزات».');
         return;
@@ -192,7 +208,7 @@ export function CatalogImportPanel({
               <input
                 id="catalog-file"
                 type="file"
-                accept=".xlsx,.xls"
+                accept=".xlsx,.xls,.csv"
                 className="block text-sm"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
@@ -203,6 +219,9 @@ export function CatalogImportPanel({
           </div>
 
           {fileName && <p className="text-xs text-muted-foreground">الملف: {fileName}</p>}
+          {csvNote && (
+            <p className="rounded-md border border-amber-600/40 bg-amber-50 p-2 text-xs text-amber-800">{csvNote}</p>
+          )}
           {error && <p className="rounded-md border border-destructive/40 bg-destructive/5 p-2 text-sm text-destructive">{error}</p>}
           {message && <p className="rounded-md border border-emerald-600/30 bg-emerald-50 p-2 text-sm text-emerald-800">{message}</p>}
         </CardContent>
@@ -303,6 +322,7 @@ export function CatalogImportPanel({
           <p>• الوحدة والتصنيف يجب أن يطابقا ورقة «القيم المرجعية» حرفيًا.</p>
           <p>• للتجهيزات: الرقم التسلسلي هو المفتاح الأساسي، والكمية تُثبَّت على 1.</p>
           <p>• لا توجد أعمدة كمية في قالب الكتالوج؛ رصيد الافتتاح يُدار من قالب الرصيد الافتتاحي أو الحركات.</p>
+          <p>• يُقبل Excel (.xlsx/.xls) وCSV: في CSV يُقرأ جدول المواد بعناوينه العربية نفسها (بورقة واحدة).</p>
         </CardContent>
       </Card>
     </div>
