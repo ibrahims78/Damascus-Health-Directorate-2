@@ -6,9 +6,9 @@
   "scripts": {
     "dev": "vite --config vite.config.ts --host 0.0.0.0",
     "build": "vite build --config vite.config.ts",
-    "build:standard": "VITE_OFFLINE_MODE=0 VITE_PROTECTED_BUILD=0 VITE_APP_VERSION=5.0.1 VITE_OUTPUT_DIR=dist/public vite build --config vite.config.ts",
-    "build:android-offline": "VITE_OFFLINE_MODE=1 VITE_PROTECTED_BUILD=0 VITE_APP_VERSION=5.0.1 VITE_OUTPUT_DIR=dist/android-offline/public vite build --config vite.config.ts",
-    "build:protected": "VITE_OFFLINE_MODE=1 VITE_PROTECTED_BUILD=1 VITE_APP_VERSION=5.0.1 VITE_OUTPUT_DIR=dist/protected/public vite build --config vite.config.ts",
+    "build:standard": "VITE_OFFLINE_MODE=0 VITE_PROTECTED_BUILD=0 VITE_APP_VERSION=5.0.2 VITE_OUTPUT_DIR=dist/public vite build --config vite.config.ts",
+    "build:android-offline": "VITE_OFFLINE_MODE=1 VITE_PROTECTED_BUILD=0 VITE_APP_VERSION=5.0.2 VITE_OUTPUT_DIR=dist/android-offline/public vite build --config vite.config.ts",
+    "build:protected": "VITE_OFFLINE_MODE=1 VITE_PROTECTED_BUILD=1 VITE_APP_VERSION=5.0.2 VITE_OUTPUT_DIR=dist/protected/public vite build --config vite.config.ts",
     "serve": "vite preview --config vite.config.ts --host 0.0.0.0",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
