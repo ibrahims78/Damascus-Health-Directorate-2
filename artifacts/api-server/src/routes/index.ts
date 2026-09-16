@@ -1,4 +1,4 @@
-import { Router } from "express";
+﻿import { Router } from "express";
 import healthRouter from "./health";
 import authRouter from "./auth";
 import categoriesRouter from "./categories";
@@ -6,6 +6,7 @@ import unitsRouter from "./units";
 import importBatchesRouter from "./import-batches";
 import warehousesRouter from "./warehouses";
 import countsRouter from "./counts";
+import receiptsRouter from "./receipts";
 import transfersRouter from "./transfers";
 import catalogImportRouter from "./catalog-import";
 import itemsRouter from "./items";
@@ -34,6 +35,7 @@ router.use("/units", unitsRouter);
 router.use("/import-batches", importBatchesRouter);
 router.use("/warehouses", warehousesRouter);
 router.use("/counts", countsRouter);
+router.use("/receipts", receiptsRouter);
 router.use("/transfers", transfersRouter);
 router.use("/catalog", catalogImportRouter);
 router.use("/items", itemsRouter);
@@ -54,3 +56,4 @@ router.use("/sync", syncRouter);
 router.use("/license", licenseRouter);
 
 export default router;
+

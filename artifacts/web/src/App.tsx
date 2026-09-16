@@ -34,6 +34,7 @@ const TransferPrintPage = lazy(() => import('@/pages/transfer-print').then(({ Tr
 const PrintReportPage = lazy(() => import('@/pages/print-report').then(({ PrintReportPage }) => ({ default: PrintReportPage })));
 const TransactionsPage = lazy(() => import('@/pages/transactions').then(({ TransactionsPage }) => ({ default: TransactionsPage })));
 const CountsPage = lazy(() => import('@/pages/counts'));
+const ReceiptsPage = lazy(() => import('@/pages/receipts'));
 const ReportsPage = lazy(() => import('@/pages/reports').then(({ ReportsPage }) => ({ default: ReportsPage })));
 const UsersPage = lazy(() => import('@/pages/users').then(({ UsersPage }) => ({ default: UsersPage })));
 const SettingsPage = lazy(() => import('@/pages/settings').then(({ SettingsPage }) => ({ default: SettingsPage })));
@@ -169,6 +170,7 @@ function Router() {
 
       <Route path="/transactions"><ProtectedRoute component={TransactionsPage} /></Route>
               <Route path="/counts"><ProtectedRoute component={CountsPage} roles={['admin', 'warehouse_manager']} /></Route>
+              <Route path="/receipts"><ProtectedRoute component={ReceiptsPage} roles={['admin', 'warehouse_manager']} /></Route>
       <Route path="/transactions/in/new"><ProtectedRoute component={TransactionsPage} /></Route>
       <Route path="/transactions/out/new"><ProtectedRoute component={TransactionsPage} /></Route>
       <Route path="/custody/out/new"><ProtectedRoute component={CustodyOutForm} roles={["admin","warehouse_manager"]} /></Route>

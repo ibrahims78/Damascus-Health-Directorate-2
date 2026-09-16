@@ -807,3 +807,50 @@ CREATE TABLE "count_lines" (
 );
 --> statement-breakpoint
 CREATE INDEX "count_lines_session_idx" ON "count_lines" ("session_id");
+--> statement-breakpoint
+CREATE TABLE "receipts" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"code" text NOT NULL,
+	"status" text DEFAULT 'draft' NOT NULL,
+	"warehouse_id" integer NOT NULL,
+	"supplier_name" text,
+	"delivery_note_number" text,
+	"delivery_note_date" text,
+	"reference_number" text,
+	"notes" text,
+	"created_by_user_id" integer,
+	"created_by_name" text,
+	"posted_by_user_id" integer,
+	"posted_by_name" text,
+	"lines_count" integer DEFAULT 0 NOT NULL,
+	"received_total" integer DEFAULT 0 NOT NULL,
+	"rejected_total" integer DEFAULT 0 NOT NULL,
+	"posted_at" timestamp with time zone,
+	"cancelled_at" timestamp with time zone,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "receipts_code_unique" UNIQUE("code")
+);
+--> statement-breakpoint
+CREATE INDEX "receipts_status_idx" ON "receipts" ("status");
+--> statement-breakpoint
+CREATE INDEX "receipts_warehouse_idx" ON "receipts" ("warehouse_id","status");
+--> statement-breakpoint
+CREATE TABLE "receipt_lines" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"receipt_id" integer NOT NULL,
+	"item_id" integer NOT NULL,
+	"item_code" text,
+	"item_name" text NOT NULL,
+	"unit" text NOT NULL,
+	"ordered_quantity" integer DEFAULT 0 NOT NULL,
+	"received_quantity" integer DEFAULT 0 NOT NULL,
+	"rejected_quantity" integer DEFAULT 0 NOT NULL,
+	"rejection_reason" text,
+	"batch_number" text,
+	"expiry_date" text,
+	"inspection_notes" text,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE INDEX "receipt_lines_receipt_idx" ON "receipt_lines" ("receipt_id");

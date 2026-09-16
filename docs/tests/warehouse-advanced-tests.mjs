@@ -152,6 +152,36 @@ try {
   const scoped = await req("POST", "/api/users", { username: "branchuser", password: "Branch@12345", fullName: "مستخدم فرع", role: "warehouse_manager", warehouseId: branchId });
   check("users: warehouse scope is stored", scoped.status === 201, `status=${scoped.status}`);
 
+  // ---------------- goods receipt note (GRN) ----------------
+  const draftNoReason = await req("POST", "/api/receipts", { supplierName: "مورد الاختبار", deliveryNoteNumber: "GDN-1", deliveryNoteDate: today, lines: [{ itemId: idA, orderedQuantity: 10, receivedQuantity: 8, rejectedQuantity: 2 }] });
+  check("GRN: draft created with lines", draftNoReason.status === 201 && Array.isArray(draftNoReason.data?.lines), `status=${draftNoReason.status}`);
+  const noReasonId = Number(draftNoReason.data?.id);
+  const postNoReason = await req("POST", `/api/receipts/${noReasonId}/post`, {});
+  check("GRN: rejection without a reason is refused", postNoReason.status === 409 && postNoReason.data?.code === "RECEIPT_REJECTION_REASON_REQUIRED", `status=${postNoReason.status}`);
+  await req("POST", `/api/receipts/${noReasonId}/cancel`, {});
+  const cancelledPost = await req("POST", `/api/receipts/${noReasonId}/post`, {});
+  check("GRN: a cancelled receipt cannot be posted", cancelledPost.status === 409, `status=${cancelledPost.status}`);
+
+  const beforeGrn = await req("GET", `/api/items/${idA}`);
+  const stockBefore = Number(beforeGrn.data?.currentStock ?? 0);
+  const draft = await req("POST", "/api/receipts", { supplierName: "مورد الاختبار", deliveryNoteNumber: "GDN-2", deliveryNoteDate: today, referenceNumber: "PO-77", lines: [
+    { itemId: idA, orderedQuantity: 10, receivedQuantity: 8, rejectedQuantity: 2, rejectionReason: "عبوة تالفة", batchNumber: "GRN-B-1", expiryDate: "2027-06-30" },
+  ] });
+  const draftId = Number(draft.data?.id);
+  const beforePost = await req("GET", `/api/items/${idA}`);
+  check("GRN: draft does not touch stock", Number(beforePost.data?.currentStock) === stockBefore, `stock=${beforePost.data?.currentStock}`);
+  const posted = await req("POST", `/api/receipts/${draftId}/post`, {});
+  check("GRN: posting accepts the received quantity", posted.status === 200 && Number(posted.data?.receivedTotal) === 8, `received=${posted.data?.receivedTotal}`);
+  check("GRN: rejected quantity is recorded, not stocked", Number(posted.data?.rejectedTotal) === 2, `rejected=${posted.data?.rejectedTotal}`);
+  const afterPost = await req("GET", `/api/items/${idA}`);
+  check("GRN: stock grew by the accepted quantity only", Number(afterPost.data?.currentStock) === stockBefore + 8, `stock=${afterPost.data?.currentStock}`);
+  const reconAfterGrn = await req("GET", "/api/reports/reconciliation");
+  check("GRN: ledger reconciles after posting", Number(reconAfterGrn.data?.mismatches) === 0, `mismatches=${reconAfterGrn.data?.mismatches}`);
+  const twice2 = await req("POST", `/api/receipts/${draftId}/post`, {});
+  check("GRN: a posted receipt cannot be posted twice", twice2.status === 409, `status=${twice2.status}`);
+  const supplierSummary = await req("GET", "/api/receipts/summary");
+  const supplierRow = (supplierSummary.data?.suppliers ?? []).find((row) => row.supplierName === "مورد الاختبار");
+  check("GRN: supplier performance is reported", Boolean(supplierRow) && Number(supplierRow?.rejected) === 2, `rejected=${supplierRow?.rejected}`);
   const failed = results.filter((r) => !r.ok);
   console.log(`\n${results.length - failed.length}/${results.length} checks passed`);
   fs.writeFileSync(path.join(root, "docs", "tests", ".advanced-run", "results.txt"), results.map((r) => `${r.ok ? "PASS" : "FAIL"}  ${r.name}`).join("\n") + "\n", "utf8");

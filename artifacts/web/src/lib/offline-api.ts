@@ -76,6 +76,8 @@ type OfflineState = {
   documentSequences: Array<Record<string, unknown>>;
   countSessions: Array<Record<string, unknown>>;
   countLines: Array<Record<string, unknown>>;
+  receipts: Array<Record<string, unknown>>;
+  receiptLines: Array<Record<string, unknown>>;
 };
 
 const DB_NAME = 'damascus-emergency-inventory-offline';
@@ -192,6 +194,8 @@ function initialState(): OfflineState {
     documentSequences: [],
     countSessions: [],
     countLines: [],
+    receipts: [],
+    receiptLines: [],
   };
 }
 
@@ -304,6 +308,8 @@ async function loadState(): Promise<OfflineState> {
       documentSequences: existing.documentSequences ?? fresh.documentSequences,
       countSessions: existing.countSessions ?? fresh.countSessions,
       countLines: existing.countLines ?? fresh.countLines,
+      receipts: existing.receipts ?? fresh.receipts,
+      receiptLines: existing.receiptLines ?? fresh.receiptLines,
     };
   }
   const fresh = initialState();
@@ -1094,6 +1100,15 @@ function offlineRefreshCount(state: OfflineState, id: number) {
   session.varianceLines = lines.filter((line) => numberValue(line.variance) !== 0).length;
   session.totalVariance = lines.reduce((sum, line) => sum + numberValue(line.variance), 0);
   session.updatedAt = now();
+}
+
+function offlineReceipt(state: OfflineState, id: number) {
+  const receipt = state.receipts.find((entry) => numberValue(entry.id) === id);
+  if (!receipt) return null;
+  return {
+    ...receipt,
+    lines: state.receiptLines.filter((line) => numberValue(line.receiptId) === id).map((line) => ({ ...line })),
+  };
 }
 
 function readBody(init?: RequestInit): any {
@@ -4090,6 +4105,197 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
         items: rows,
         generatedAt: now(),
       });
+    });
+  }
+
+  /* ---------------- P0-2: goods receipt note (GRN) ---------------- */
+  if (pathname === '/api/receipts' && method === 'GET') {
+    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'ليس لديك صلاحية');
+    return read((state) => {
+      const limit = Math.min(200, Math.max(1, numberValue(searchParams.get('limit'), 100)));
+      const rows = [...state.receipts]
+        .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+        .slice(0, limit);
+      return json(rows);
+    });
+  }
+  if (pathname === '/api/receipts/summary' && method === 'GET') {
+    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'ليس لديك صلاحية');
+    return read((state) => {
+      const posted = state.receipts.filter((receipt) => text(receipt.status) === 'posted');
+      const bySupplier = new Map<string, { supplierName: string; receipts: number; received: number; rejected: number }>();
+      for (const receipt of posted) {
+        const key = text(receipt.supplierName) || 'غير محدد';
+        const entry = bySupplier.get(key) ?? { supplierName: key, receipts: 0, received: 0, rejected: 0 };
+        entry.receipts += 1;
+        entry.received += numberValue(receipt.receivedTotal);
+        entry.rejected += numberValue(receipt.rejectedTotal);
+        bySupplier.set(key, entry);
+      }
+      const suppliers = [...bySupplier.values()].map((row) => ({
+        ...row,
+        rejectRate: row.received + row.rejected > 0 ? Math.round((row.rejected / (row.received + row.rejected)) * 1000) / 10 : null,
+      }));
+      return json({
+        suppliers,
+        received: suppliers.reduce((sum, row) => sum + row.received, 0),
+        rejected: suppliers.reduce((sum, row) => sum + row.rejected, 0),
+        generatedAt: now(),
+      });
+    });
+  }
+  if (pathname === '/api/receipts' && method === 'POST') {
+    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'ليس لديك صلاحية');
+    return mutate((state) => {
+      const body = readBody(init) ?? {};
+      const warehouse = offlineCurrentWarehouse(state);
+      if (!warehouse) return json({ error: 'لا يوجد مستودع معرّف.', code: 'NO_WAREHOUSE' }, 409);
+      const rawLines = Array.isArray(body.lines) ? body.lines : [];
+      if (rawLines.length === 0) return json({ error: 'يجب إضافة بند واحد على الأقل.', code: 'RECEIPT_NO_LINES' }, 400);
+      const receipt = {
+        id: nextId(state),
+        code: offlineNextDocumentNumber(state, 'GRN') ?? `GRN-${Date.now()}`,
+        status: 'draft',
+        warehouseId: warehouse.id,
+        supplierName: body.supplierName ? text(body.supplierName).trim() : null,
+        deliveryNoteNumber: body.deliveryNoteNumber ? text(body.deliveryNoteNumber).trim() : null,
+        deliveryNoteDate: body.deliveryNoteDate ? text(body.deliveryNoteDate).trim() : null,
+        referenceNumber: body.referenceNumber ? text(body.referenceNumber).trim() : null,
+        notes: body.notes ? text(body.notes).trim() : null,
+        createdByUserId: currentUser?.id ?? null,
+        createdByName: currentUser?.fullName ?? null,
+        postedByUserId: null,
+        postedByName: null,
+        linesCount: rawLines.length,
+        receivedTotal: 0,
+        rejectedTotal: 0,
+        postedAt: null,
+        cancelledAt: null,
+        createdAt: now(),
+        updatedAt: now(),
+      };
+      state.receipts.unshift(receipt);
+      for (const raw of rawLines as Array<Record<string, unknown>>) {
+        const item = state.items.find((candidate) => numberValue(candidate.id) === numberValue(raw?.itemId));
+        if (!item) return json({ error: 'أحد الأصناف في السند غير موجود.', code: 'RECEIPT_UNKNOWN_ITEM' }, 400);
+        state.receiptLines.push({
+          id: nextId(state),
+          receiptId: receipt.id,
+          itemId: numberValue(item.id),
+          itemCode: text(item.code) || null,
+          itemName: text(item.name),
+          unit: text(item.unit),
+          orderedQuantity: Math.max(0, Math.trunc(numberValue(raw?.orderedQuantity))),
+          receivedQuantity: Math.max(0, Math.trunc(numberValue(raw?.receivedQuantity))),
+          rejectedQuantity: Math.max(0, Math.trunc(numberValue(raw?.rejectedQuantity))),
+          rejectionReason: raw?.rejectionReason ? text(raw.rejectionReason).trim() : null,
+          batchNumber: raw?.batchNumber ? text(raw.batchNumber).trim() : null,
+          expiryDate: raw?.expiryDate ? text(raw.expiryDate).trim() : null,
+          inspectionNotes: raw?.inspectionNotes ? text(raw.inspectionNotes).trim() : null,
+          createdAt: now(),
+        });
+      }
+      addAudit(state, currentUser, 'create', 'receipt', Number(receipt.id));
+      return json(offlineReceipt(state, Number(receipt.id)), 201);
+    });
+  }
+  if (pathname.startsWith('/api/receipts/') && pathname.endsWith('/post') && method === 'POST') {
+    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'ليس لديك صلاحية');
+    return mutate((state) => {
+      const id = Number.parseInt(pathname.split('/')[3] ?? '', 10);
+      const receipt = state.receipts.find((entry) => numberValue(entry.id) === id);
+      if (!receipt) return failure(404, 'سند الاستلام غير موجود.');
+      if (text(receipt.status) !== 'draft') {
+        return json({ error: 'لا يمكن ترحيل سند غير مسودة.', code: 'RECEIPT_NOT_DRAFT' }, 409);
+      }
+      const lines = state.receiptLines.filter((line) => numberValue(line.receiptId) === id);
+      const accepted = lines.filter((line) => numberValue(line.receivedQuantity) > 0);
+      if (accepted.length === 0) {
+        return json({ error: 'لا توجد كميات مقبولة للترحيل.', code: 'RECEIPT_NOTHING_ACCEPTED' }, 409);
+      }
+      const missing = lines.find(
+        (line) => numberValue(line.rejectedQuantity) > 0 && !text(line.rejectionReason).trim(),
+      );
+      if (missing) {
+        return json(
+          { error: `يجب تسجيل سبب الرفض (الصنف: ${text(missing.itemName)}).`, code: 'RECEIPT_REJECTION_REASON_REQUIRED' },
+          409,
+        );
+      }
+      const warehouseId = numberValue(receipt.warehouseId, offlineWarehouseId(state));
+      const deliveryNoteNumber = text(receipt.deliveryNoteNumber, text(receipt.code));
+      const deliveryNoteDate = text(receipt.deliveryNoteDate, now().slice(0, 10));
+      let receivedTotal = 0;
+      for (const line of accepted) {
+        const quantity = numberValue(line.receivedQuantity);
+        receivedTotal += quantity;
+        const item = state.items.find((candidate) => numberValue(candidate.id) === numberValue(line.itemId));
+        if (!item) continue;
+        item.currentStock = numberValue(item.currentStock) + quantity;
+        const batch = offlineOpenBatch(state, numberValue(item.id), quantity, warehouseId, {
+          batchNumber: line.batchNumber ? text(line.batchNumber) : null,
+          expiryDate: line.expiryDate ? text(line.expiryDate) : null,
+          supplier: receipt.supplierName ? text(receipt.supplierName) : null,
+          deliveryNoteNumber,
+          deliveryNoteDate,
+        });
+        recordOfflineChange(state, 'inventory_batch', Number(batch.id), 'create', { ...batch });
+        const transaction = {
+          id: nextId(state),
+          type: 'in',
+          documentNumber: deliveryNoteNumber,
+          transactionDate: deliveryNoteDate,
+          itemId: numberValue(item.id),
+          quantity,
+          notes: `استلام بموجب ${text(receipt.code)}`,
+          createdBy: currentUser?.id ?? null,
+          createdAt: now(),
+          warehouseId,
+        };
+        state.transactions.unshift(transaction);
+        recordOfflineChange(state, 'transaction', Number(transaction.id), 'create', {
+          type: 'in',
+          documentNumber: transaction.documentNumber,
+          itemId: transaction.itemId,
+          quantity,
+        });
+        recordOfflineChange(state, 'item', numberValue(item.id), 'update', {
+          name: text(item.name),
+          quantity: numberValue(item.currentStock),
+        });
+      }
+      receipt.status = 'posted';
+      receipt.postedAt = now();
+      receipt.postedByUserId = currentUser?.id ?? null;
+      receipt.postedByName = currentUser?.fullName ?? null;
+      receipt.receivedTotal = receivedTotal;
+      receipt.rejectedTotal = lines.reduce((sum, line) => sum + numberValue(line.rejectedQuantity), 0);
+      receipt.updatedAt = now();
+      addAudit(state, currentUser, 'post', 'receipt', id);
+      return json({ ok: true, receipt: offlineReceipt(state, id), receivedTotal, rejectedTotal: receipt.rejectedTotal });
+    });
+  }
+  if (pathname.startsWith('/api/receipts/') && pathname.endsWith('/cancel') && method === 'POST') {
+    if (!roleAllowed(currentUser, ['admin', 'warehouse_manager'])) return failure(403, 'ليس لديك صلاحية');
+    return mutate((state) => {
+      const id = Number.parseInt(pathname.split('/')[3] ?? '', 10);
+      const receipt = state.receipts.find((entry) => numberValue(entry.id) === id);
+      if (!receipt) return failure(404, 'سند الاستلام غير موجود.');
+      if (text(receipt.status) !== 'draft') {
+        return json({ error: 'لا يمكن إلغاء سند مُرحّل.', code: 'RECEIPT_NOT_DRAFT' }, 409);
+      }
+      receipt.status = 'cancelled';
+      receipt.cancelledAt = now();
+      receipt.updatedAt = now();
+      addAudit(state, currentUser, 'cancel', 'receipt', id);
+      return json(receipt);
+    });
+  }
+  if (pathname.startsWith('/api/receipts/') && method === 'GET') {
+    return read((state) => {
+      const id = Number.parseInt(pathname.split('/').pop() ?? '', 10);
+      const receipt = offlineReceipt(state, id);
+      return receipt ? json(receipt) : failure(404, 'سند الاستلام غير موجود.');
     });
   }
 
