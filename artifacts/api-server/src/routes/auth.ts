@@ -29,7 +29,7 @@ async function loginRateLimiter(req: Request, res: Response, next: NextFunction)
   const { allowed, retryAfterSeconds } = await checkRateLimit(key);
   if (!allowed) {
     res.set("Retry-After", String(retryAfterSeconds ?? 60));
-    res.status(429).json({ error: "Too many attempts. Please try again later." });
+    res.status(429).json({ error: "محاولات كثيرة. حاول مرة أخرى بعد قليل." });
     return;
   }
   res.locals.rateLimitKey = key;
@@ -52,7 +52,7 @@ router.get("/setup-status", async (_req, res) => {
     res.json({ needsSetup: !admin });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -65,7 +65,7 @@ router.post("/setup", loginRateLimiter, async (req, res) => {
       columns: { id: true },
     });
     if (existing) {
-      res.status(409).json({ error: "Admin already exists" });
+      res.status(409).json({ error: "تم إعداد حساب المدير مسبقًا." });
       return;
     }
     const { username, password, fullName } = req.body as {
@@ -74,7 +74,7 @@ router.post("/setup", loginRateLimiter, async (req, res) => {
       fullName?: string;
     };
     if (!username || !password || !fullName) {
-      res.status(400).json({ error: "username, password, and fullName are required" });
+      res.status(400).json({ error: "اسم المستخدم وكلمة المرور والاسم الكامل مطلوبة." });
       return;
     }
     const passwordError = getPasswordPolicyError(password);
@@ -109,11 +109,11 @@ router.post("/setup", loginRateLimiter, async (req, res) => {
     res.json({ id: user.id, username: user.username, fullName: user.fullName, role: user.role, mustChangePassword: false, csrfToken });
   } catch (err: any) {
     if (err?.code === "23505") {
-      res.status(409).json({ error: "Username already taken" });
+      res.status(409).json({ error: "اسم المستخدم مستخدم مسبقًا." });
       return;
     }
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -122,7 +122,7 @@ router.post("/login", loginRateLimiter, async (req, res) => {
   try {
     const { username, password } = req.body as { username?: string; password?: string };
     if (!username || !password || typeof username !== "string" || typeof password !== "string") {
-      res.status(400).json({ error: "Username and password are required" });
+      res.status(400).json({ error: "اسم المستخدم وكلمة المرور مطلوبان." });
       return;
     }
     const user = await db.query.usersTable.findFirst({
@@ -130,13 +130,13 @@ router.post("/login", loginRateLimiter, async (req, res) => {
     });
     if (!user) {
       await recordAuthAttempt(String(res.locals.rateLimitKey ?? req.ip ?? "unknown"));
-      res.status(401).json({ error: "Invalid credentials" });
+      res.status(401).json({ error: "بيانات الدخول غير صحيحة." });
       return;
     }
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) {
       await recordAuthAttempt(String(res.locals.rateLimitKey ?? req.ip ?? "unknown"));
-      res.status(401).json({ error: "Invalid credentials" });
+      res.status(401).json({ error: "بيانات الدخول غير صحيحة." });
       return;
     }
     await resetAuthAttempts(String(res.locals.rateLimitKey ?? req.ip ?? "unknown"));
@@ -158,7 +158,7 @@ router.post("/login", loginRateLimiter, async (req, res) => {
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 

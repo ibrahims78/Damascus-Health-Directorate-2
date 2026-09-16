@@ -25,7 +25,7 @@ router.get("/", requireAuth, async (req, res) => {
     res.json(await listUnits(includeArchived));
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -35,7 +35,7 @@ router.get("/usage", requireAuth, requireRole("admin"), async (_req, res) => {
     res.json(await unitUsage());
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -47,7 +47,7 @@ router.post("/seed-defaults", requireAuth, requireRole("admin"), async (req, res
     res.json({ created });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -74,7 +74,7 @@ router.post("/normalize", requireAuth, requireRole("admin"), async (req, res) =>
     res.json({ updated });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -109,7 +109,7 @@ router.post("/", requireAuth, requireRole("admin"), async (req, res) => {
       return;
     }
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -167,7 +167,7 @@ router.put("/:id", requireAuth, requireRole("admin"), async (req, res) => {
       return;
     }
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -202,7 +202,7 @@ router.delete("/:id", requireAuth, requireRole("admin"), async (req, res) => {
     res.json(archived);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 

@@ -96,7 +96,7 @@ router.get("/", requireAuth, async (req, res) => {
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -125,7 +125,7 @@ router.post(
         maintenanceNotes,
       } = req.body;
       if (!name) {
-        res.status(400).json({ error: "name is required" });
+        res.status(400).json({ error: "الاسم مطلوب." });
         return;
       }
       const qty = quantity !== undefined ? parseInt(String(quantity), 10) : 1;
@@ -208,7 +208,7 @@ router.post(
         return;
       }
       console.error(err);
-      res.status(500).json({ error: "Internal server error" });
+      res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
     }
   }
 );
@@ -405,7 +405,7 @@ router.post(
       runAlertWorker();
     } catch (err) {
       console.error(err);
-      res.status(500).json({ error: "Internal server error" });
+      res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
     }
   }
 );
@@ -418,13 +418,13 @@ router.get("/:id", requireAuth, async (req, res) => {
       where: (e, { eq: eqFn }) => eqFn(e.id, id),
     });
     if (!item) {
-      res.status(404).json({ error: "Equipment not found" });
+      res.status(404).json({ error: "التجهيز غير موجود." });
       return;
     }
     res.json(item);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -433,7 +433,7 @@ router.get("/:id/history", requireAuth, async (req, res) => {
   try {
     const id = Number.parseInt(String(req.params.id), 10);
     if (!Number.isSafeInteger(id) || id <= 0) {
-      res.status(400).json({ error: "Invalid equipment id" });
+      res.status(400).json({ error: "معرّف التجهيز غير صالح." });
       return;
     }
 
@@ -444,13 +444,13 @@ router.get("/:id/history", requireAuth, async (req, res) => {
       document: typeof req.query.document === "string" ? req.query.document : undefined,
     });
     if (!data) {
-      res.status(404).json({ error: "Equipment not found" });
+      res.status(404).json({ error: "التجهيز غير موجود." });
       return;
     }
     res.json(data);
   } catch (err) {
     console.error("[equipment-history]", err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -604,7 +604,7 @@ router.put(
         });
 
       if (!eq_) {
-        res.status(404).json({ error: "Equipment not found" });
+        res.status(404).json({ error: "التجهيز غير موجود." });
         return;
       }
       await auditLog({
@@ -628,7 +628,7 @@ router.put(
         return;
       }
       console.error(err);
-      res.status(500).json({ error: "Internal server error" });
+      res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
     }
   }
 );
@@ -671,7 +671,7 @@ router.delete(
       res.status(204).send();
     } catch (err) {
       console.error(err);
-      res.status(500).json({ error: "Internal server error" });
+      res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
     }
   }
 );

@@ -4,11 +4,13 @@ import {
   equipmentTable,
   itemsTable,
   systemSettingsTable,
+  transactionBatchAllocationsTable,
   transactionsTable,
   usersTable,
 } from "@workspace/db";
 import { and, eq, gte, ilike, lte, or, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
+import { scopedWarehouseId } from "../lib/scope";
 import { auditLog } from "../middlewares/audit";
 import { runAlertWorker } from "../lib/alert-worker";
 import {
@@ -82,6 +84,8 @@ router.get("/", requireAuth, async (req, res) => {
       );
     }
     const where = conditions.length ? and(...conditions) : undefined;
+    const scope = scopedWarehouseId(res.locals.user);
+    if (scope !== null) conditions.push(eq(transactionsTable.warehouseId, scope));
     const [transactions, totalResult] = await Promise.all([
       db
         .select({
@@ -130,7 +134,7 @@ router.get("/", requireAuth, async (req, res) => {
     });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -333,13 +337,13 @@ router.get("/:id", requireAuth, async (req, res) => {
   try {
     const transaction = await getTransaction(Number.parseInt(String(req.params.id), 10));
     if (!transaction) {
-      res.status(404).json({ error: "Transaction not found" });
+      res.status(404).json({ error: "الحركة غير موجودة." });
       return;
     }
     res.json(transaction);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -347,12 +351,24 @@ router.get("/:id/print", requireAuth, async (req, res) => {
   try {
     const transaction = await getTransaction(Number.parseInt(String(req.params.id), 10));
     if (!transaction) {
-      res.status(404).json({ error: "Transaction not found" });
+      res.status(404).json({ error: "الحركة غير موجودة." });
       return;
     }
     const settings = await db.query.systemSettingsTable.findFirst();
+    // the printed document must show how the quantity was taken from batches
+    const allocations = await db
+      .select({
+        id: transactionBatchAllocationsTable.id,
+        batchId: transactionBatchAllocationsTable.batchId,
+        quantity: transactionBatchAllocationsTable.quantity,
+        batchNumber: transactionBatchAllocationsTable.batchNumberSnap,
+        expiryDate: transactionBatchAllocationsTable.expiryDateSnap,
+      })
+      .from(transactionBatchAllocationsTable)
+      .where(eq(transactionBatchAllocationsTable.transactionId, transaction.id));
     res.json({
       transaction,
+      allocations,
       organizationName:
         settings?.orgName ?? "Ù…Ø³ØªÙˆØ¯Ø¹Ø§Øª Ù…Ø¯ÙŠØ±ÙŠØ© ØµØ­Ø© Ø¯Ù…Ø´Ù‚",
       orgSubtitle: settings?.orgSubtitle ?? null,
@@ -360,7 +376,7 @@ router.get("/:id/print", requireAuth, async (req, res) => {
     });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 

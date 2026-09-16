@@ -26,7 +26,7 @@ router.get("/", requireAuth, requireRole("admin"), async (_req, res) => {
     res.json(users);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -36,7 +36,7 @@ router.post("/", requireAuth, requireRole("admin"), async (req, res) => {
     const { username, password, fullName, role, warehouseId } = req.body;
 
     if (!username || !password || !fullName || !role) {
-      res.status(400).json({ error: "username, password, fullName, and role are required" });
+      res.status(400).json({ error: "اسم المستخدم وكلمة المرور والاسم الكامل والدور مطلوبة." });
       return;
     }
     const normalizedUsername = String(username).trim();
@@ -52,7 +52,7 @@ router.post("/", requireAuth, requireRole("admin"), async (req, res) => {
     }
     const validRoles = ["admin", "warehouse_manager", "viewer"];
     if (!validRoles.includes(role)) {
-      res.status(400).json({ error: "Invalid role" });
+      res.status(400).json({ error: "الدور غير صالح." });
       return;
     }
     const passwordHash = await bcrypt.hash(password, 10);
@@ -78,7 +78,7 @@ router.post("/", requireAuth, requireRole("admin"), async (req, res) => {
       res.status(409).json({ error: "اسم المستخدم موجود مسبقاً" });
       return;
     }
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -86,7 +86,7 @@ router.post("/", requireAuth, requireRole("admin"), async (req, res) => {
 router.put("/:id", requireAuth, requireRole("admin"), async (req, res) => {
   try {
     const id = parseInt(String(req.params.id), 10);
-    if (isNaN(id)) { res.status(400).json({ error: "Invalid user id" }); return; }
+    if (isNaN(id)) { res.status(400).json({ error: "معرّف المستخدم غير صالح." }); return; }
     const { fullName, role, password, isActive, warehouseId } = req.body;
     if (res.locals.user.id === id && isActive === false) {
       res.status(400).json({ error: "لا يمكن تعطيل حسابك الحالي" });
@@ -100,7 +100,7 @@ router.put("/:id", requireAuth, requireRole("admin"), async (req, res) => {
     if (fullName !== undefined) updates.fullName = String(fullName).trim();
     if (role !== undefined) {
       if (!["admin", "warehouse_manager", "viewer"].includes(role)) {
-        res.status(400).json({ error: "Invalid role" }); return;
+        res.status(400).json({ error: "الدور غير صالح." }); return;
       }
       updates.role = role;
     }
@@ -126,14 +126,14 @@ router.put("/:id", requireAuth, requireRole("admin"), async (req, res) => {
         createdAt: usersTable.createdAt,
       });
     if (!user) {
-      res.status(404).json({ error: "User not found" });
+      res.status(404).json({ error: "المستخدم غير موجود." });
       return;
     }
     await auditLog({ req, action: "update", entityType: "user", entityId: user.id, details: { fullName: user.fullName, role: user.role, isActive: user.isActive } });
     res.json(user);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -141,10 +141,10 @@ router.put("/:id", requireAuth, requireRole("admin"), async (req, res) => {
 router.delete("/:id", requireAuth, requireRole("admin"), async (req, res) => {
   try {
     const id = parseInt(String(req.params.id), 10);
-    if (isNaN(id)) { res.status(400).json({ error: "Invalid user id" }); return; }
+    if (isNaN(id)) { res.status(400).json({ error: "معرّف المستخدم غير صالح." }); return; }
     const user = res.locals.user;
     if (user.id === id) {
-      res.status(400).json({ error: "Cannot delete your own account" });
+      res.status(400).json({ error: "لا يمكنك حذف حسابك الخاص." });
       return;
     }
     await db.update(usersTable).set({ isActive: false }).where(eq(usersTable.id, id));
@@ -152,7 +152,7 @@ router.delete("/:id", requireAuth, requireRole("admin"), async (req, res) => {
     res.status(204).send();
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 

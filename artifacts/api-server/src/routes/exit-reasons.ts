@@ -17,7 +17,7 @@ router.get("/", requireAuth, async (req, res) => {
     res.json(reasons);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -41,7 +41,7 @@ router.post("/", requireAuth, requireRole("admin"), async (req, res) => {
   } catch (err: any) {
     if (err?.code === "23505") { res.status(409).json({ error: "السبب مستخدم مسبقاً" }); return; }
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -74,7 +74,7 @@ router.put("/:id", requireAuth, requireRole("admin"), async (req, res) => {
   } catch (err: any) {
     if (err?.code === "23505") { res.status(409).json({ error: "سبب الإخراج مستخدم مسبقاً" }); return; }
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -101,7 +101,7 @@ router.patch("/:id/toggle", requireAuth, requireRole("admin"), async (req, res) 
     res.json(updated);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 

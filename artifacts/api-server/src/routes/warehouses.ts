@@ -24,7 +24,7 @@ router.get("/", requireAuth, async (req, res) => {
     res.json(await listWarehouses(includeArchived));
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -34,7 +34,7 @@ router.get("/current", requireAuth, async (_req, res) => {
     res.json((await getCurrentWarehouse()) ?? null);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -61,7 +61,7 @@ router.get("/next-document-number", requireAuth, requireRole("admin"), async (re
     res.json({ documentNumber: number });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -83,7 +83,7 @@ router.post("/current", requireAuth, requireRole("admin"), async (req, res) => {
       return;
     }
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -114,7 +114,7 @@ router.post("/", requireAuth, requireRole("admin"), async (req, res) => {
     res.status(201).json(created);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -150,7 +150,7 @@ router.put("/:id", requireAuth, requireRole("admin"), async (req, res) => {
     res.json(updated);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 

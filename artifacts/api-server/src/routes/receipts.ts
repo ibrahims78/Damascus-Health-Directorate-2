@@ -11,6 +11,7 @@ import {
   receiptSummary,
 } from "../lib/receipts-service";
 import { movementContextFromRequest } from "../lib/inventory-movement-service";
+import { resolveScopedWarehouse, scopedWarehouseId, withinScope } from "../lib/scope";
 import { getCurrentWarehouse } from "../lib/warehouse-service";
 
 /**
@@ -25,14 +26,16 @@ function receiptFailure(res: Response, error: unknown) {
     return;
   }
   console.error(error);
-  res.status(500).json({ error: "Internal server error" });
+  res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
 }
 
 // GET /api/receipts
 router.get("/", requireAuth, async (req, res) => {
   try {
     const limit = Number.parseInt(String(req.query.limit ?? "100"), 10);
-    res.json(await listReceipts(Number.isFinite(limit) ? limit : 100));
+    const scope = scopedWarehouseId(res.locals.user);
+    const rows = await listReceipts(Number.isFinite(limit) ? limit : 100);
+    res.json(scope === null ? rows : rows.filter((row) => withinScope(res.locals.user, row.warehouseId)));
   } catch (error) {
     receiptFailure(res, error);
   }
@@ -77,7 +80,7 @@ router.post("/", requireAuth, requireRole("admin", "warehouse_manager"), async (
     }
     const requested = Number(req.body?.warehouseId ?? current.id);
     const receipt = await createReceipt({
-      warehouseId: Number.isSafeInteger(requested) && requested > 0 ? requested : current.id,
+      warehouseId: resolveScopedWarehouse(res.locals.user, requested, current.id),
       supplierName: req.body?.supplierName ? String(req.body.supplierName).trim() : null,
       deliveryNoteNumber: req.body?.deliveryNoteNumber ? String(req.body.deliveryNoteNumber).trim() : null,
       deliveryNoteDate: req.body?.deliveryNoteDate ? String(req.body.deliveryNoteDate).trim() : null,

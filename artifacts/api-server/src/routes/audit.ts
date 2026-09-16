@@ -43,7 +43,7 @@ router.get("/", requireAuth, requireRole("admin"), async (req, res) => {
       return;
     }
     if (fromDate && toDate && fromDate > toDate) {
-      res.status(400).json({ error: "from must be before to" });
+      res.status(400).json({ error: "تاريخ البداية يجب أن يسبق تاريخ النهاية." });
       return;
     }
     if (fromDate) conditions.push(gte(auditLogTable.createdAt, fromDate));
@@ -51,7 +51,7 @@ router.get("/", requireAuth, requireRole("admin"), async (req, res) => {
     if (userId) {
       const parsedUserId = parseInt(userId);
       if (!Number.isInteger(parsedUserId) || parsedUserId < 1) {
-        res.status(400).json({ error: "userId must be a positive integer" });
+        res.status(400).json({ error: "معرّف المستخدم غير صالح." });
         return;
       }
       conditions.push(eq(auditLogTable.userId, parsedUserId));
@@ -85,7 +85,7 @@ router.get("/", requireAuth, requireRole("admin"), async (req, res) => {
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 

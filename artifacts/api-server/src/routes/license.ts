@@ -149,7 +149,7 @@ router.get("/status", async (_req, res) => {
     });
   } catch (error) {
     logger.error({ error }, "license status failed");
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -190,7 +190,7 @@ router.post("/activate", async (req, res) => {
     res.json({ ok: true, activated: true, license: result.license });
   } catch (error) {
     logger.error({ error }, "license activation failed");
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 

@@ -108,7 +108,7 @@ router.post("/import/preview", requireAuth, requireRole("admin"), async (req, re
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 

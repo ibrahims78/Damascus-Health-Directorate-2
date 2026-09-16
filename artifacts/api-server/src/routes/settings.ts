@@ -67,7 +67,7 @@ router.get("/", requireAuth, async (_req, res) => {
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -156,7 +156,7 @@ router.put("/", requireAuth, requireRole("admin"), async (req, res) => {
     // Validate and normalize unitsList if provided
     if (unitsList !== undefined) {
       if (typeof unitsList !== "string") {
-        res.status(400).json({ error: "unitsList must be a JSON string" });
+        res.status(400).json({ error: "قائمة الوحدات يجب أن تكون نصًا بصيغة JSON." });
         return;
       }
       try {
@@ -180,7 +180,7 @@ router.put("/", requireAuth, requireRole("admin"), async (req, res) => {
 
     if (technicalConditions !== undefined) {
       if (typeof technicalConditions !== "string") {
-        res.status(400).json({ error: "technicalConditions must be a JSON string" });
+        res.status(400).json({ error: "الشروط الفنية يجب أن تكون نصًا بصيغة JSON." });
         return;
       }
       try {
@@ -218,7 +218,7 @@ router.put("/", requireAuth, requireRole("admin"), async (req, res) => {
 
     if (returnConditions !== undefined) {
       if (typeof returnConditions !== "string") {
-        res.status(400).json({ error: "returnConditions must be a JSON string" });
+        res.status(400).json({ error: "شروط الإرجاع يجب أن تكون نصًا بصيغة JSON." });
         return;
       }
       try {
@@ -283,7 +283,7 @@ router.put("/", requireAuth, requireRole("admin"), async (req, res) => {
     res.json(updated);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -293,7 +293,7 @@ router.post("/change-password", requireAuth, async (req, res) => {
     const user = res.locals.user;
     const { currentPassword, newPassword } = req.body;
     if (typeof currentPassword !== "string" || typeof newPassword !== "string" || !currentPassword || !newPassword) {
-      res.status(400).json({ error: "currentPassword and newPassword are required" });
+      res.status(400).json({ error: "كلمة المرور الحالية والجديدة مطلوبتان." });
       return;
     }
     const passwordError = getPasswordPolicyError(newPassword);
@@ -304,7 +304,7 @@ router.post("/change-password", requireAuth, async (req, res) => {
     const fullUser = await db.query.usersTable.findFirst({
       where: eq(usersTable.id, user.id),
     });
-    if (!fullUser) { res.status(404).json({ error: "User not found" }); return; }
+    if (!fullUser) { res.status(404).json({ error: "المستخدم غير موجود." }); return; }
     const valid = await bcrypt.compare(currentPassword, fullUser.passwordHash);
     if (!valid) {
       res.status(401).json({ error: "كلمة المرور الحالية غير صحيحة" });
@@ -319,7 +319,7 @@ router.post("/change-password", requireAuth, async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -352,7 +352,7 @@ router.patch("/profile", requireAuth, async (req, res) => {
     res.json(updated);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -369,7 +369,7 @@ router.get("/my-activity", requireAuth, async (req, res) => {
     res.json(logs);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 

@@ -21,7 +21,7 @@ router.get("/", requireAuth, async (_req, res) => {
     res.json(categories);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -68,7 +68,7 @@ router.post("/", requireAuth, requireRole("admin"), async (req, res) => {
       return;
     }
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -76,7 +76,7 @@ router.post("/", requireAuth, requireRole("admin"), async (req, res) => {
 router.put("/:id", requireAuth, requireRole("admin"), async (req, res) => {
   try {
     const id = parseInt(String(req.params.id), 10);
-    if (isNaN(id)) { res.status(400).json({ error: "Invalid category id" }); return; }
+    if (isNaN(id)) { res.status(400).json({ error: "معرّف التصنيف غير صالح." }); return; }
     const { name, type } = req.body as { name?: string; type?: string };
     if (!name || !name.trim()) {
       res.status(400).json({ error: "اسم التصنيف مطلوب" });
@@ -123,7 +123,7 @@ router.put("/:id", requireAuth, requireRole("admin"), async (req, res) => {
       return;
     }
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -131,7 +131,7 @@ router.put("/:id", requireAuth, requireRole("admin"), async (req, res) => {
 router.delete("/:id", requireAuth, requireRole("admin"), async (req, res) => {
   try {
     const id = parseInt(String(req.params.id), 10);
-    if (isNaN(id)) { res.status(400).json({ error: "Invalid category id" }); return; }
+    if (isNaN(id)) { res.status(400).json({ error: "معرّف التصنيف غير صالح." }); return; }
     // Phase 1 governance: a category used by any item must not disappear.
     const [inUse] = await db
       .select({ id: itemsTable.id })
@@ -182,7 +182,7 @@ router.delete("/:id", requireAuth, requireRole("admin"), async (req, res) => {
       return;
     }
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 

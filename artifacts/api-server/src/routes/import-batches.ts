@@ -20,7 +20,7 @@ router.get("/", requireAuth, requireRole("admin"), async (req, res) => {
     res.json(await listImportBatches(Number.isFinite(limit) ? limit : 100));
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -47,7 +47,7 @@ router.post("/:id/rollback", requireAuth, requireRole("admin"), async (req, res)
       return;
     }
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 

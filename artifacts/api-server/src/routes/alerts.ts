@@ -83,7 +83,7 @@ router.get("/", requireAuth, async (_req, res) => {
     res.json(response);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -138,7 +138,7 @@ router.post("/read-all", requireAuth, async (_req, res) => {
     res.json({ ok: true });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -148,7 +148,7 @@ router.post("/:id/read", requireAuth, async (req, res) => {
   try {
     const userId = res.locals.user.id as number;
     const alertId = parseInt(String(req.params.id), 10);
-    if (isNaN(alertId)) { res.status(400).json({ error: "Invalid alert id" }); return; }
+    if (isNaN(alertId)) { res.status(400).json({ error: "معرّف التنبيه غير صالح." }); return; }
 
     await db
       .insert(alertReadsTable)
@@ -161,7 +161,7 @@ router.post("/:id/read", requireAuth, async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -172,7 +172,7 @@ router.post("/:id/resolve", requireAuth, requireRole("admin", "warehouse_manager
   try {
     const userId = res.locals.user.id as number;
     const alertId = parseInt(String(req.params.id), 10);
-    if (isNaN(alertId)) { res.status(400).json({ error: "Invalid alert id" }); return; }
+    if (isNaN(alertId)) { res.status(400).json({ error: "معرّف التنبيه غير صالح." }); return; }
 
     const [updated] = await db
       .update(alertsTable)
@@ -181,7 +181,7 @@ router.post("/:id/resolve", requireAuth, requireRole("admin", "warehouse_manager
       .returning({ id: alertsTable.id });
 
     if (!updated) {
-      res.status(404).json({ error: "Alert not found or already resolved" });
+      res.status(404).json({ error: "التنبيه غير موجود أو تمت معالجته مسبقًا." });
       return;
     }
 
@@ -189,7 +189,7 @@ router.post("/:id/resolve", requireAuth, requireRole("admin", "warehouse_manager
     res.json({ ok: true });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 

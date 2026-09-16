@@ -11,6 +11,7 @@ import {
   recordCountEntries,
 } from "../lib/counts-service";
 import { movementContextFromRequest } from "../lib/inventory-movement-service";
+import { resolveScopedWarehouse, scopedWarehouseId, withinScope } from "../lib/scope";
 import { getCurrentWarehouse } from "../lib/warehouse-service";
 
 /**
@@ -26,14 +27,16 @@ function countFailure(res: import("express").Response, error: unknown) {
     return;
   }
   console.error(error);
-  res.status(500).json({ error: "Internal server error" });
+  res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
 }
 
 // GET /api/counts
 router.get("/", requireAuth, async (req, res) => {
   try {
     const limit = Number.parseInt(String(req.query.limit ?? "100"), 10);
-    res.json(await listCountSessions(Number.isFinite(limit) ? limit : 100));
+    const scope = scopedWarehouseId(res.locals.user);
+    const rows = await listCountSessions(Number.isFinite(limit) ? limit : 100);
+    res.json(scope === null ? rows : rows.filter((row) => withinScope(res.locals.user, row.warehouseId)));
   } catch (error) {
     countFailure(res, error);
   }
@@ -63,9 +66,8 @@ router.post("/", requireAuth, requireRole("admin", "warehouse_manager"), async (
     }
     const requestedWarehouseId = Number(req.body?.warehouseId ?? current.id);
     const session = await createCountSession({
-      warehouseId: Number.isSafeInteger(requestedWarehouseId) && requestedWarehouseId > 0
-        ? requestedWarehouseId
-        : current.id,
+      // replaced below by the scoped warehouse
+      warehouseId: resolveScopedWarehouse(res.locals.user, requestedWarehouseId, current.id),
       scope: req.body?.scope ? String(req.body.scope) : "full",
       categoryId: req.body?.categoryId ? Number(req.body.categoryId) : null,
       blindCount: req.body?.blindCount === undefined ? true : Boolean(req.body.blindCount),

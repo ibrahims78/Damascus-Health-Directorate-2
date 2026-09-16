@@ -4,7 +4,7 @@ import { db } from "@workspace/db";
 export const requireAuth: RequestHandler = async (req, res, next) => {
   const userId = req.session?.userId;
   if (!userId) {
-    res.status(401).json({ error: "Unauthorized" });
+    res.status(401).json({ error: "الجلسة منتهية أو غير صالحة. يرجى تسجيل الدخول من جديد." });
     return;
   }
   try {
@@ -14,13 +14,13 @@ export const requireAuth: RequestHandler = async (req, res, next) => {
     });
     if (!user) {
       req.session.destroy(() => {});
-      res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "الجلسة منتهية أو غير صالحة. يرجى تسجيل الدخول من جديد." });
       return;
     }
     res.locals.user = user;
     next();
   } catch {
-    res.status(503).json({ error: "Service unavailable" });
+    res.status(503).json({ error: "الخدمة غير متاحة مؤقتًا. حاول لاحقًا." });
   }
 };
 
@@ -29,7 +29,7 @@ export const requireRole =
   (req, res, next) => {
     const user = res.locals.user;
     if (!user || !roles.includes(user.role)) {
-      res.status(403).json({ error: "Forbidden" });
+      res.status(403).json({ error: "ليس لديك صلاحية للقيام بهذا الإجراء." });
       return;
     }
     next();

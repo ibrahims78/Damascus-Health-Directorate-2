@@ -2320,6 +2320,15 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
   if (transactionId && pathname === `/api/transactions/${transactionId}/print` && method === 'GET') {
     return read((state) => {
       const transaction = state.transactions.find((entry) => entry.id === transactionId);
+      const allocations = state.transactionBatchAllocations
+        .filter((entry) => numberValue(entry.transactionId) === transactionId)
+        .map((entry) => ({
+          id: numberValue(entry.id),
+          batchId: numberValue(entry.batchId),
+          quantity: numberValue(entry.quantity),
+          batchNumber: entry.batchNumberSnap ? text(entry.batchNumberSnap) : null,
+          expiryDate: entry.expiryDateSnap ? text(entry.expiryDateSnap) : null,
+        }));
       if (!transaction) return failure(404, 'Ø§Ù„Ø³Ù†Ø¯ ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯');
       const item = state.items.find((entry) => entry.id === Number(transaction.itemId));
       const equipment = state.equipment.find((entry) => entry.id === Number(transaction.equipmentId));
@@ -2332,6 +2341,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
           equipmentName: equipment?.name ?? null,
           organizationName: state.settings.orgName,
         },
+        allocations,
         organizationName: state.settings.orgName,
         orgSubtitle: state.settings.orgSubtitle,
         printedAt: now(),

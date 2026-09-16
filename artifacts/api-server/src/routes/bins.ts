@@ -24,7 +24,7 @@ function binFailure(res: Response, error: unknown) {
     return;
   }
   console.error(error);
-  res.status(500).json({ error: "Internal server error" });
+  res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
 }
 
 // GET /api/bins

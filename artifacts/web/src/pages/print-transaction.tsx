@@ -14,6 +14,11 @@ export function PrintTransactionPage() {
   const id = params?.id ? parseInt(params.id) : 0;
 
   const { data, isLoading, isError, refetch } = useGetTransactionPrint(id);
+  const allocations = (
+    (data as unknown as {
+      allocations?: Array<{ id: number; quantity: number; batchNumber: string | null; expiryDate: string | null }>;
+    } | null)?.allocations ?? []
+  );
 
   if (isLoading) {
     return (
@@ -317,6 +322,47 @@ export function PrintTransactionPage() {
               ))}
             </tbody>
           </table>
+
+          {/* ===== BATCH BREAKDOWN ===== */}
+          {allocations.length > 0 && (
+            <div style={{ marginBottom: '28px' }}>
+              <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '8px' }}>
+                تفصيل الدفعات المصروفة
+              </div>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <th style={thStyle('center', '40px')}>م.</th>
+                    <th style={thStyle('center')}>رقم الدفعة</th>
+                    <th style={thStyle('center')}>تاريخ الصلاحية</th>
+                    <th style={thStyle('center', '90px')}>الكمية</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {allocations.map((row, index) => (
+                    <tr key={row.id ?? index}>
+                      <td style={tdStyle('center')}>{index + 1}</td>
+                      <td style={tdStyle('center')}>{row.batchNumber ?? '—'}</td>
+                      <td style={tdStyle('center')}>
+                        {row.expiryDate ? String(row.expiryDate).substring(0, 10) : '—'}
+                      </td>
+                      <td style={{ ...tdStyle('center'), fontWeight: 700 }}>{row.quantity}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td style={{ ...tdStyle('center'), fontWeight: 700 }} colSpan={3}>
+                      إجمالي المُصرف من الدفعات
+                    </td>
+                    <td style={{ ...tdStyle('center'), fontWeight: 700 }}>
+                      {allocations.reduce((sum, row) => sum + Number(row.quantity ?? 0), 0)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
 
           {/* ===== SIGNATURES ===== */}
           <div

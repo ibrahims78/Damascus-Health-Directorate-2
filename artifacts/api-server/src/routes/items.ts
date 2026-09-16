@@ -328,7 +328,7 @@ router.get("/", requireAuth, async (req, res) => {
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -793,7 +793,7 @@ router.get("/fefo-preview", requireAuth, async (req, res) => {
     const id = Number.parseInt(String(req.query.itemId ?? ""), 10);
     const quantity = Number.parseInt(String(req.query.quantity ?? ""), 10);
     if (!Number.isSafeInteger(id) || id <= 0) {
-      res.status(400).json({ error: "Invalid item id" });
+      res.status(400).json({ error: "معرّف المادة غير صالح." });
       return;
     }
     if (!Number.isSafeInteger(quantity) || quantity <= 0) {
@@ -811,7 +811,7 @@ router.get("/fefo-preview", requireAuth, async (req, res) => {
       .where(and(eq(itemsTable.id, id), eq(itemsTable.isActive, true)));
 
     if (!item) {
-      res.status(404).json({ error: "Item not found" });
+      res.status(404).json({ error: "المادة غير موجودة." });
       return;
     }
     if (item.itemType !== "item") {
@@ -888,7 +888,7 @@ router.get("/fefo-preview", requireAuth, async (req, res) => {
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -897,7 +897,7 @@ router.get("/history", requireAuth, async (req, res) => {
   try {
     const id = Number.parseInt(String(req.query.itemId ?? ""), 10);
     if (!Number.isSafeInteger(id) || id <= 0) {
-      res.status(400).json({ error: "Invalid item id" });
+      res.status(400).json({ error: "معرّف المادة غير صالح." });
       return;
     }
 
@@ -933,20 +933,20 @@ router.get("/history", requireAuth, async (req, res) => {
       limit: Number.parseInt(String(req.query.limit ?? "20"), 10) || 20,
     });
     if (!result) {
-      res.status(404).json({ error: "Item not found" });
+      res.status(404).json({ error: "المادة غير موجودة." });
       return;
     }
     res.json(result);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
 router.get("/:id", requireAuth, async (req, res) => {
   try {
     const id = parseInt(String(req.params.id), 10);
-    if (isNaN(id)) { res.status(400).json({ error: "Invalid item id" }); return; }
+    if (isNaN(id)) { res.status(400).json({ error: "معرّف المادة غير صالح." }); return; }
     const [item] = await db
       .select({
         id: itemsTable.id,
@@ -972,13 +972,13 @@ router.get("/:id", requireAuth, async (req, res) => {
       .where(and(eq(itemsTable.id, id), eq(itemsTable.isActive, true)));
 
     if (!item) {
-      res.status(404).json({ error: "Item not found" });
+      res.status(404).json({ error: "المادة غير موجودة." });
       return;
     }
     res.json(item);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -1151,7 +1151,7 @@ router.put(
       });
 
       if (!item) {
-        res.status(404).json({ error: "Item not found" });
+        res.status(404).json({ error: "المادة غير موجودة." });
         return;
       }
       await auditLog({
@@ -1182,7 +1182,7 @@ router.delete(
   async (req, res) => {
     try {
       const id = parseInt(String(req.params.id), 10);
-      if (isNaN(id)) { res.status(400).json({ error: "Invalid item id" }); return; }
+      if (isNaN(id)) { res.status(400).json({ error: "معرّف المادة غير صالح." }); return; }
       const node = await ensureNodeIdentity("web");
       const deleted = await db.transaction(async (tx) => {
         const [updated] = await tx
@@ -1208,7 +1208,7 @@ router.delete(
         return updated;
       });
       if (!deleted) {
-        res.status(404).json({ error: "Item not found" });
+        res.status(404).json({ error: "المادة غير موجودة." });
         return;
       }
       await auditLog({ req, action: "delete", entityType: "item", entityId: id, details: {} });
@@ -1216,7 +1216,7 @@ router.delete(
       runAlertWorker().catch((e) => console.error("Alert worker:", e));
     } catch (err) {
       console.error(err);
-      res.status(500).json({ error: "Internal server error" });
+      res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
     }
   }
 );

@@ -60,7 +60,7 @@ router.get("/", requireAuth, async (req, res) => {
     })));
   } catch (error) {
     console.error("[custodies]", error);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -69,18 +69,18 @@ router.get("/:id", requireAuth, async (req, res) => {
   try {
     const id = Number.parseInt(String(req.params.id), 10);
     if (!Number.isSafeInteger(id) || id <= 0) {
-      res.status(400).json({ error: "Invalid custody id" });
+      res.status(400).json({ error: "معرّف العهدة غير صالح." });
       return;
     }
     const data = await getCustodyHistory(id);
     if (!data) {
-      res.status(404).json({ error: "Custody not found" });
+      res.status(404).json({ error: "العهدة غير موجودة." });
       return;
     }
     res.json(data);
   } catch (error) {
     console.error("[custody-history]", error);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 

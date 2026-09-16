@@ -58,7 +58,7 @@ router.get("/stock", requireAuth, async (_req, res) => {
     res.json(items);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -77,7 +77,7 @@ router.get("/movements", requireAuth, async (req, res) => {
       return;
     }
     if (fromDate && toDate && fromDate > toDate) {
-      res.status(400).json({ error: "from must be before to" });
+      res.status(400).json({ error: "تاريخ البداية يجب أن يسبق تاريخ النهاية." });
       return;
     }
     if (fromDate) conditions.push(gte(transactionsTable.createdAt, fromDate));
@@ -123,7 +123,7 @@ router.get("/movements", requireAuth, async (req, res) => {
     res.json(transactions);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -236,7 +236,7 @@ router.get("/stock-position", requireAuth, async (_req, res) => {
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -304,7 +304,7 @@ router.get("/custodies", requireAuth, async (req, res) => {
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -341,7 +341,7 @@ router.get("/expiry", requireAuth, async (_req, res) => {
     res.json(items);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -391,7 +391,7 @@ router.get("/near-expiry", requireAuth, async (_req, res) => {
     res.json(items);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -477,7 +477,7 @@ router.get("/stagnant", requireAuth, async (_req, res) => {
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -509,7 +509,7 @@ router.get("/below-min", requireAuth, async (_req, res) => {
     res.json(items);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -522,7 +522,7 @@ router.get("/equipment", requireAuth, async (_req, res) => {
     res.json(equipment);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -570,7 +570,7 @@ router.get("/reconciliation", requireAuth, requireRole("admin"), async (_req, re
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -625,7 +625,7 @@ router.get("/stock-by-warehouse", requireAuth, async (req, res) => {
     res.json({ positions, byWarehouse, generatedAt: new Date().toISOString() });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -685,7 +685,7 @@ router.get("/consolidated", requireAuth, requireRole("admin"), async (_req, res)
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -737,7 +737,7 @@ router.get("/transfer-variance", requireAuth, async (_req, res) => {
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -790,7 +790,7 @@ router.get("/reorder-suggestions", requireAuth, async (_req, res) => {
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -853,7 +853,7 @@ router.get("/kpi", requireAuth, requireRole("admin"), async (_req, res) => {
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 
@@ -912,7 +912,7 @@ router.get("/abc", requireAuth, requireRole("admin"), async (_req, res) => {
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
   }
 });
 

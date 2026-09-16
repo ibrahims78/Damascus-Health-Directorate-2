@@ -39,15 +39,15 @@ export const csrfProtect: RequestHandler = (req, res, next) => {
   try {
     parsed = new URL(source);
   } catch {
-    res.status(403).json({ error: "Invalid request origin" });
+    res.status(403).json({ error: "طلب غير موثوق (أصل غير مسموح)." });
     return;
   }
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    res.status(403).json({ error: "Invalid request origin" });
+    res.status(403).json({ error: "طلب غير موثوق (أصل غير مسموح)." });
     return;
   }
   if (!allowedOriginPattern.test(parsed.origin)) {
-    res.status(403).json({ error: "Origin not allowed" });
+    res.status(403).json({ error: "أصل الطلب غير مسموح." });
     return;
   }
 
@@ -61,7 +61,7 @@ export const csrfProtect: RequestHandler = (req, res, next) => {
   const expected = req.session.csrfToken;
   const provided = req.headers["x-csrf-token"];
   if (!expected || typeof provided !== "string" || provided !== expected) {
-    res.status(403).json({ error: "CSRF token mismatch" });
+    res.status(403).json({ error: "انتهت صلاحية حماية الطلب. أعد المحاولة." });
     return;
   }
   next();
