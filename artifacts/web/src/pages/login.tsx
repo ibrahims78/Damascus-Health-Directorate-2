@@ -44,6 +44,9 @@ export function LoginPage() {
     refetch: refetchSetup,
   } = useGetSetupStatus();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [twoFactorRequired, setTwoFactorRequired] = useState(false);
+  const [twoFactorCode, setTwoFactorCode] = useState('');
+  const [submittingCode, setSubmittingCode] = useState(false);
   
   const loginMutation = useLogin({
     mutation: {
@@ -60,6 +63,11 @@ export function LoginPage() {
         }
       },
       onError: (err: any) => {
+        if (err?.data?.twoFactorRequired || err?.response?.data?.twoFactorRequired) {
+          setTwoFactorRequired(true);
+          setErrorMsg('أدخل رمز المصادقة الثنائية من تطبيق المصادقة.');
+          return;
+        }
         if (err?.response?.status === 401) {
           setErrorMsg('اسم المستخدم أو كلمة المرور غير صحيحة.');
         } else {
@@ -68,6 +76,36 @@ export function LoginPage() {
       }
     }
   });
+
+  /** Completes the login with the TOTP code (two-factor path). */
+  async function submitTwoFactorCode(values: LoginFormValues) {
+    setSubmittingCode(true);
+    setErrorMsg(null);
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...values, code: twoFactorCode.trim() }),
+      });
+      const payload = (await response.json().catch(() => null)) as {
+        csrfToken?: string;
+        mustChangePassword?: boolean;
+        error?: string;
+      } | null;
+      if (!response.ok) {
+        setErrorMsg(payload?.error ?? 'رمز المصادقة غير صحيح.');
+        return;
+      }
+      storeCsrfToken(payload?.csrfToken ?? null);
+      if (payload?.mustChangePassword) setLocation('/change-password');
+      else setLocation('/');
+    } catch {
+      setErrorMsg('تعذّر الاتصال بالخادم. حاول مرة أخرى.');
+    } finally {
+      setSubmittingCode(false);
+    }
+  }
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -118,6 +156,10 @@ export function LoginPage() {
 
   const onSubmit = (data: LoginFormValues) => {
     setErrorMsg(null);
+    if (twoFactorRequired) {
+      void submitTwoFactorCode(data);
+      return;
+    }
     loginMutation.mutate({ data });
   };
 
@@ -177,11 +219,33 @@ export function LoginPage() {
                   </FormItem>
                 )}
               />
+              {twoFactorRequired && (
+                <div className="space-y-2">
+                  <label htmlFor="two-factor-code" className="text-sm font-medium">
+                    رمز المصادقة الثنائية
+                  </label>
+                  <input
+                    id="two-factor-code"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                    value={twoFactorCode}
+                    onChange={(event) => setTwoFactorCode(event.target.value.replace(/\D/g, ''))}
+                    dir="ltr"
+                    className="w-full rounded-md border bg-background p-3 text-center text-lg tracking-[0.4em]"
+                    placeholder="123456"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    افتح تطبيق المصادقة وأدخل الرمز المكوّن من 6 أرقام.
+                  </p>
+                </div>
+              )}
+
               <Button
                 type="submit"
                 className="mt-6 w-full"
                 size="lg"
-                disabled={loginMutation.isPending}
+                disabled={loginMutation.isPending || submittingCode}
               >
                 {loginMutation.isPending ? 'جاري تسجيل الدخول...' : 'دخول'}
               </Button>

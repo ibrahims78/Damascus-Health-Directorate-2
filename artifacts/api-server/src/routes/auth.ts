@@ -2,6 +2,7 @@ import { Router, type Request, type Response, type NextFunction } from "express"
 import bcrypt from "bcryptjs";
 import { randomUUID } from "node:crypto";
 import { db, usersTable, systemSettingsTable } from "@workspace/db";
+import { generateTotpSecret, totpUri, verifyTotp } from "../lib/totp";
 import { requireAuth } from "../middlewares/auth";
 import { auditLog } from "../middlewares/audit";
 import { eq } from "drizzle-orm";
@@ -139,6 +140,19 @@ router.post("/login", loginRateLimiter, async (req, res) => {
       res.status(401).json({ error: "بيانات الدخول غير صحيحة." });
       return;
     }
+    if (user.twoFactorEnabled && user.twoFactorSecret) {
+      const code = String((req.body as { code?: unknown })?.code ?? "").trim();
+      if (!code) {
+        res.status(401).json({ error: "أدخل رمز المصادقة الثنائية.", twoFactorRequired: true });
+        return;
+      }
+      if (!verifyTotp(user.twoFactorSecret, code)) {
+        await recordAuthAttempt(String(res.locals.rateLimitKey ?? req.ip ?? "unknown"));
+        res.status(401).json({ error: "رمز المصادقة الثنائية غير صحيح.", twoFactorRequired: true });
+        return;
+      }
+    }
+
     await resetAuthAttempts(String(res.locals.rateLimitKey ?? req.ip ?? "unknown"));
     // Regenerate session to prevent session fixation
     await new Promise<void>((resolve, reject) =>
@@ -194,6 +208,88 @@ router.get("/me", requireAuth, (req, res) => {
     mustChangePassword: user.mustChangePassword,
     csrfToken: req.session.csrfToken ?? null,
   });
+});
+
+
+// POST /api/auth/2fa/setup - issue a secret for the signed-in account
+router.post("/2fa/setup", requireAuth, async (req, res) => {
+  try {
+    const user = res.locals.user;
+    const secret = generateTotpSecret();
+    await db.update(usersTable).set({ twoFactorSecret: secret }).where(eq(usersTable.id, user.id));
+    res.json({ secret, otpauthUri: totpUri(secret, user.username), enabled: false });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
+  }
+});
+
+// GET /api/auth/2fa/status
+router.get("/2fa/status", requireAuth, async (_req, res) => {
+  res.json({ enabled: Boolean(res.locals.user?.twoFactorEnabled) });
+});
+
+// POST /api/auth/2fa/enable { code }
+router.post("/2fa/enable", requireAuth, async (req, res) => {
+  try {
+    const [row] = await db.select().from(usersTable).where(eq(usersTable.id, res.locals.user.id)).limit(1);
+    if (!row?.twoFactorSecret) {
+      res.status(409).json({ error: "ابدأ الإعداد أولًا للحصول على مفتاح.", code: "TWO_FACTOR_NOT_SET_UP" });
+      return;
+    }
+    if (!verifyTotp(row.twoFactorSecret, String(req.body?.code ?? ""))) {
+      res.status(400).json({ error: "الرمز غير صحيح. تأكد من ساعة الجهاز.", code: "TWO_FACTOR_INVALID_CODE" });
+      return;
+    }
+    await db.update(usersTable).set({ twoFactorEnabled: true }).where(eq(usersTable.id, row.id));
+    await auditLog({ req, action: "enable", entityType: "two_factor", entityId: row.id });
+    res.json({ ok: true, enabled: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
+  }
+});
+
+// POST /api/auth/2fa/disable { code }
+router.post("/2fa/disable", requireAuth, async (req, res) => {
+  try {
+    const [row] = await db.select().from(usersTable).where(eq(usersTable.id, res.locals.user.id)).limit(1);
+    if (!row?.twoFactorEnabled || !row.twoFactorSecret) {
+      res.status(409).json({ error: "المصادقة الثنائية غير مُفعّلة.", code: "TWO_FACTOR_NOT_ENABLED" });
+      return;
+    }
+    if (!verifyTotp(row.twoFactorSecret, String(req.body?.code ?? ""))) {
+      res.status(400).json({ error: "الرمز غير صحيح.", code: "TWO_FACTOR_INVALID_CODE" });
+      return;
+    }
+    await db.update(usersTable).set({ twoFactorEnabled: false, twoFactorSecret: null }).where(eq(usersTable.id, row.id));
+    await auditLog({ req, action: "disable", entityType: "two_factor", entityId: row.id });
+    res.json({ ok: true, enabled: false });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
+  }
+});
+
+// POST /api/auth/2fa/reset { userId } - admin lockout recovery
+router.post("/2fa/reset", requireAuth, async (req, res) => {
+  try {
+    if (res.locals.user?.role !== "admin") {
+      res.status(403).json({ error: "ليس لديك صلاحية للقيام بهذا الإجراء." });
+      return;
+    }
+    const userId = Number(req.body?.userId);
+    if (!Number.isSafeInteger(userId) || userId <= 0) {
+      res.status(400).json({ error: "معرّف المستخدم غير صالح." });
+      return;
+    }
+    await db.update(usersTable).set({ twoFactorEnabled: false, twoFactorSecret: null }).where(eq(usersTable.id, userId));
+    await auditLog({ req, action: "reset", entityType: "two_factor", entityId: userId });
+    res.json({ ok: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
+  }
 });
 
 export default router;

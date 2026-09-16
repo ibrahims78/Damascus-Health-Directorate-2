@@ -5,6 +5,8 @@ CREATE TABLE "users" (
 	"full_name" text NOT NULL,
 	"role" text NOT NULL,
 	"warehouse_id" integer,
+	"two_factor_secret" text,
+	"two_factor_enabled" boolean DEFAULT false NOT NULL,
 	"is_active" boolean DEFAULT true NOT NULL,
 	"must_change_password" boolean DEFAULT false NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
