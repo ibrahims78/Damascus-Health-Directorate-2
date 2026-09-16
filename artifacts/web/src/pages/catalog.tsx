@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BookOpen, Plus, Ruler, Sparkles, Trash2, Wand2, Warehouse } from 'lucide-react';
 import { CatalogImportPanel } from '@/components/catalog-import-panel';
+import { BinsPanel } from '@/components/bins-panel';
 
 type Unit = { id: number; name: string; symbol: string | null; isActive: boolean; isSystem: boolean; sortOrder: number };
 type WarehouseRow = { id: number; code: string; name: string; type: string; isActive: boolean };
@@ -206,6 +207,7 @@ export function CatalogPage() {
         <TabsList>
           <TabsTrigger value="units" className="gap-2"><Ruler className="w-4 h-4" /> الوحدات</TabsTrigger>
           <TabsTrigger value="import" className="gap-2">استيراد الكتالوج</TabsTrigger>
+          <TabsTrigger value="bins" className="gap-2">المواقع</TabsTrigger>
           <TabsTrigger value="warehouses" className="gap-2"><Warehouse className="w-4 h-4" /> المستودعات</TabsTrigger>
           <TabsTrigger value="items" className="gap-2">المواد</TabsTrigger>
           <TabsTrigger value="equipment" className="gap-2">التجهيزات</TabsTrigger>
@@ -323,6 +325,10 @@ export function CatalogPage() {
             knownCategories={categories}
             onDone={() => void load()}
           />
+        </TabsContent>
+
+        <TabsContent value="bins" className="space-y-4">
+          <BinsPanel />
         </TabsContent>
 
         {/* ---------------- Warehouses ---------------- */}
