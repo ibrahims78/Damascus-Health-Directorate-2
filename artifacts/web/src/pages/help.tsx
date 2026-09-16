@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'wouter';
 import {
   Activity,
   AlertCircle,
+  ArchiveRestore,
   ArrowDownToLine,
   ArrowLeft,
+  ArrowLeftRight,
   ArrowRight,
   ArrowUpFromLine,
-  ArchiveRestore,
   BarChart3,
   BookOpen,
   CheckCircle2,
@@ -16,6 +16,7 @@ import {
   Info,
   KeyRound,
   LayoutDashboard,
+  MapPin,
   Package,
   RefreshCw,
   RotateCcw,
@@ -26,6 +27,7 @@ import {
   Users,
   Wrench,
 } from 'lucide-react';
+import { Link } from 'wouter';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -41,6 +43,39 @@ type Operation = {
   notes: string[];
   href: string;
 };
+
+const troubleshootingItems: Array<{ problem: string; solution: string }> = [
+  {
+    problem: 'لا يمكن الإرسال في التحويل: الرصيد غير كافٍ',
+    solution:
+      'الرسالة INSUFFICIENT_STOCK تعني أن الكمية أكبر من رصيد مستودع المصدر في دفتر الدفعات. راجع «الأرصدة حسب المستودع» أو خفّض الكمية.',
+  },
+  {
+    problem: 'لا يمكن اعتماد جلسة الجرد',
+    solution:
+      'يجب جرد كل الأسطر أولًا (COUNT_INCOMPLETE)، وتسجيل سبب لكل فرق (COUNT_VARIANCE_REASON_REQUIRED). الجلسة المفتوحة لا تؤثر على المخزون.',
+  },
+  {
+    problem: 'الاستيراد رفض الملف',
+    solution:
+      'الوحدة والتصنيف يجب أن يطابقا ورقة «القيم المرجعية»، ولا يُسمح بأعمدة كمية في قالب الكتالوج، والسطر المكرر داخل الملف يُرفض. نزّل تقرير الأخطاء CSV وصحّح الأسطر المذكورة ثم أعد الرفع.',
+  },
+  {
+    problem: 'رمز المصادقة الثنائية مرفوض',
+    solution:
+      'اضبط ساعة الجهاز (يُقبل فرق دقيقة واحدة). وإذا كان الحساب مُفعّلًا وفُقد الجهاز، على المدير استخدام POST /api/auth/2fa/reset بمعرّف المستخدم.',
+  },
+  {
+    problem: 'رقم السند غير متوقع',
+    solution:
+      'الترقيم = كود المستودع-النوع-السنة-تسلسل (000001…). تغيير المستودع الحالي يغيّر البادئة، وكل مستودع له عدّاده المستقل.',
+  },
+  {
+    problem: 'الواجهة كانت تعرض العربية مشوّهة',
+    solution:
+      'كان خلل ترميز في إصدار سابق، وصُحّح بالكامل في 5.0.1. ويوجد فحص آلي (docs/tests/encoding-check.mjs) يمنع عودة التشويه.',
+  },
+];
 
 const operations: Operation[] = [
   {
@@ -314,6 +349,168 @@ const operations: Operation[] = [
     ],
     href: '/',
   },
+  {
+    id: 'help-operation-counts',
+    title: 'الجرد الدوري (Cycle Counting)',
+    summary: 'جلسة جرد أعمى تُقارن الكمية الفيزيائية بالدفترية، ثم اعتماد المدير يرحّل الفروق كتسويات موثّقة.',
+    icon: ClipboardCheck,
+    tone: 'text-primary bg-primary/10 border-primary/20',
+    when: 'جرد دوري شهري أو ربع سنوي، أو عند الاشتباه بفرق في صنف أو مستودع.',
+    steps: [
+      'افتح «الجرد الدوري» ثم «جلسة جرد جديدة» (تُنشأ أعمى: الكمية الدفترية مخفية).',
+      'أدخل الكمية الفيزيائية لكل سطر، ويمكن «كشف الكمية الدفترية» مؤقّتًا للمراجعة.',
+      'عند وجود فرق اكتب سبب الفرق (إلزامي) — لا يمكن الاعتماد قبل جرد كل الأسطر.',
+      '«حفظ الكميات» ثم «اعتماد وترحيل الفروق» (للمدير): يُرحّل كل فرق كتسوية عبر دفتر الدفعات.',
+    ],
+    notes: [
+      'لا تُكتب أي تسوية قبل الاعتماد — الجلسة المفتوحة لا تؤثر على المخزون.',
+      'بعد الاعتماد يبقى تقرير الترصيد نظيفًا لأن التسوية تُحدّث الدفعات أيضًا.',
+    ],
+    href: '/counts',
+  },
+  {
+    id: 'help-operation-receipts',
+    title: 'سندات الاستلام (GRN) بفحص',
+    summary: 'استلام بموجب سند تسليم المورّد: كميات مطلوبة ومستلمة ومرفوضة، ولا يدخل المخزون إلا بالكميات المقبولة عند الترحيل.',
+    icon: ClipboardCheck,
+    tone: 'text-primary bg-primary/10 border-primary/20',
+    when: 'عند وصول شحنة من المورّد، أو استلام جزئي أو ناقص أو تالف.',
+    steps: [
+      'افتح «سندات الاستلام» ثم أنشئ سندًا: المورّد · رقم سند التسليم · التاريخ · المرجع (أمر شراء).',
+      'أضف البنود: الكمية المطلوبة والمستلمة والمرفوضة، وسبب الرفض إلزامي لأي كمية مرفوضة.',
+      'يمكن إدخال رقم الدفعة وتاريخ الصلاحية لكل بند ليُفتح بها المخزون.',
+      '«حفظ كمسودة» ثم «ترحيل» — تُدخل الكميات المقبولة فقط، والمرفوضة تُسجَّل بلا أثر على الرصيد.',
+    ],
+    notes: [
+      'المسودة لا تؤثر على المخزون إطلاقًا، ولا يمكن ترحيل سند مرتين أو ترحيل سند ملغى.',
+      'تقرير أداء المورّدين يوضّح المستلم والمرفوض ونسبة الرفض لكل مورّد.',
+    ],
+    href: '/receipts',
+  },
+  {
+    id: 'help-operation-reversal',
+    title: 'القيد العكسي للحركات',
+    summary: 'بدل تعديل حركة مُرحَّلة يُنشأ مستند تعويضي مرتبط بالأصل مع سبب موثّق.',
+    icon: RefreshCw,
+    tone: 'text-primary bg-primary/10 border-primary/20',
+    when: 'خطأ في كمية أو جهة أو سبب بعد الترحيل.',
+    steps: [
+      'من «سجل الحركات» اضغط أيقونة العكس في سطر الحركة.',
+      'اكتب سبب العكس (5 أحرف على الأقل) ثم أكّد.',
+      'يُرحَّل قيد عكسي برقم REV-<رقم المستند> وتُعلَّم الحركة الأصلية «معكوسة».',
+    ],
+    notes: [
+      'لا يمكن عكس الحركة مرتين، ولا عكس قيد عكسي.',
+      'حركات العهدة تُدار عبر دورة العهدة (إرجاع)، لا عبر القيد العكسي.',
+    ],
+    href: '/transactions',
+  },
+  {
+    id: 'help-operation-transfer-variance',
+    title: 'فروق كميات التحويلات',
+    summary: 'تسجيل الكمية المستلمة فعليًا لكل بند عند استلام التحويل، مع حفظ الفرق وسببه في تقرير مخصص.',
+    icon: ArrowLeftRight,
+    tone: 'text-primary bg-primary/10 border-primary/20',
+    when: 'عند وصول بضاعة بمقدار يختلف عن المشحون (نقص أو تلف أو خطأ عدّ).',
+    steps: [
+      'من «التحويلات» أنشئ طلبًا ثم أرسل (يُخصم من مستودع المصدر).',
+      'عند الاستلام أدخل الكمية المستلمة فعليًا لكل بند وسبب الفرق عند وجوده.',
+      'راجع تقرير «فروق التحويلات» لمتابعة الفروق ونِسبها.',
+    ],
+    notes: ['يترقّم التحويل لكل مستودع: كود-النوع-السنة-تسلسل، ولا يُرسل تحويل بلا رصيد كافٍ.'],
+    href: '/transfers',
+  },
+  {
+    id: 'help-operation-reorder',
+    title: 'إعادة الطلب والكميات المقترحة',
+    summary: 'حد إعادة الطلب والحد الأقصى ومخزون الأمان لكل مادة، وتقرير يقترح كمية الطلب.',
+    icon: Package,
+    tone: 'text-primary bg-primary/10 border-primary/20',
+    when: 'لتجنّب النفاد أو التكديس، ولبناء أمر شراء.',
+    steps: [
+      'من بطاقة المادة حدّد: الحد الأدنى · حد إعادة الطلب · الحد الأقصى · مخزون الأمان.',
+      'افتح تقرير «إعادة الطلب» لعرض المواد عند أو تحت حد الطلب مع الكمية المقترحة.',
+      'المواد ذات الرصيد صفر تظهر معلَّمة كحالة عاجلة وتُقدَّم في الترتيب.',
+    ],
+    notes: ['الكمية المقترحة = الحد الأقصى − الرصيد الحالي (وبدون حد أقصى تُحسب ضعف حد إعادة الطلب).'],
+    href: '/inventory',
+  },
+  {
+    id: 'help-operation-kpi',
+    title: 'مؤشرات الأداء وتصنيف ABC',
+    summary: 'لوحة مؤشرات: معدل الدوران · أيام التغطية · المخزون الراكد · النفاد · دقة الجرد، وتصنيف ABC للمواد.',
+    icon: BarChart3,
+    tone: 'text-primary bg-primary/10 border-primary/20',
+    when: 'مراجعة شهرية لأداء المخزون أو تحضير تقرير للإدارة.',
+    steps: [
+      'افتح «مركز المخزون» ثم قسم المؤشرات (دوران · تغطية · راكد · نفاد · دقة الجرد).',
+      'راجع تصنيف ABC: المواد A هي الأعلى استهلاكًا (80% من الحركة) وتستحق متابعة أدق.',
+      'استخدم «دقة الجرد» لمتابعة أثر الجلسات الدورية على انضباط الأرصدة.',
+    ],
+    notes: ['المؤشرات تُحسب على نافذة 90 يومًا للاستهلاك و180 يومًا للركود، وتظهر للمدير فقط.'],
+    href: '/inventory',
+  },
+  {
+    id: 'help-operation-bins',
+    title: 'مواقع التخزين (Zone/Bin) والملصقات',
+    summary: 'كتالوج مواقع بترميز فريد ومنطقة ومستودع يُسند للصنف، مع صفحة ملصقات قابلة للطباعة بالباركود.',
+    icon: MapPin,
+    tone: 'text-primary bg-primary/10 border-primary/20',
+    when: 'تنظيم الأرفف وتقليل زمن البحث والخطأ في الصرف.',
+    steps: [
+      'من «الكتالوج» ← تبويب «المواقع» أضف موقعًا (مثال: A-01-1) بمنطقة ومستودع.',
+      'أسند الموقع للصنف في حقل «الموقع»، وسيظهر في الجرد والتقارير.',
+      'من «ملصقات المواقع» حدّد المواقع ثم اطبع ورقة الملصقات (باركود + اسم + منطقة).',
+    ],
+    notes: ['لا يمكن أرشفة موقع مرتبط بأصناف، وتقرير استخدام المواقع يكشف الرموز غير المعرّفة لتصحيحها.'],
+    href: '/labels',
+  },
+  {
+    id: 'help-operation-webhook',
+    title: 'الإشعارات الخارجية (Webhook)',
+    summary: 'إرسال حمولة JSON إلى عنوان تحدّده عند إنشاء أي تنبيه أو تصعيده إلى «حرج».',
+    icon: Activity,
+    tone: 'text-primary bg-primary/10 border-primary/20',
+    when: 'ربط التطبيق بنظام مراقبة أو قناة إشعارات عبر وسيط.',
+    steps: [
+      'يضبط المدير العنوان عبر PUT /api/settings بالحقل alertWebhookUrl (http أو https).',
+      'عند حدث تنبيه يُرسل: source و generatedAt وقائمة alerts، بمهلة 5 ثوانٍ.',
+    ],
+    notes: ['فشل الإرسال لا يؤثر على التنبيهات الداخلية ولا على عمل النظام.'],
+    href: '/settings',
+  },
+  {
+    id: 'help-operation-2fa',
+    title: 'المصادقة الثنائية (2FA)',
+    summary: 'رمز زمني (TOTP) من تطبيق مصادقة يُطلب بعد كلمة المرور — على سطح المكتب وعلى الهاتف.',
+    icon: ShieldCheck,
+    tone: 'text-primary bg-primary/10 border-primary/20',
+    when: 'الحسابات المميّزة (مدير النظام وأمناء المستودعات).',
+    steps: [
+      'الإعداد: POST /api/auth/2fa/setup للحصول على المفتاح ورابط otpauth، ثم أضِفه لتطبيق المصادقة.',
+      'التفعيل: POST /api/auth/2fa/enable مع الرمز الحالي، وبعدها يسأل الدخول عن الرمز.',
+      'التعطيل: POST /api/auth/2fa/disable مع رمز صحيح.',
+    ],
+    notes: [
+      'اضبط ساعة الجهاز: النظام يقبل فرقًا دقيقة واحدة في الاتجاهين.',
+      'عند فقدان الجهاز يستخدم المدير POST /api/auth/2fa/reset مع معرّف المستخدم.',
+    ],
+    href: '/settings',
+  },
+  {
+    id: 'help-operation-scope',
+    title: 'نطاق المستودع للمستخدم',
+    summary: 'ربط المستخدم بمستودع يقيّده به: يرى حركات وجرد وسندات مستودعه فقط ولا ينشئ مستندًا لمستودع آخر.',
+    icon: Users,
+    tone: 'text-primary bg-primary/10 border-primary/20',
+    when: 'فصل عمل الفروع وأمناء المستودعات، وتحقيق فصل المهام.',
+    steps: [
+      'من «المستخدمون» حدّد «المستودع» عند إنشاء أو تعديل المستخدم.',
+      'المستخدم بلا مستودع يبقى بصلاحية كاملة، والمدير يرى كل المواقع دائمًا.',
+    ],
+    notes: ['الترقيم مستقل لكل مستودع، فالحركة تحمل كود المستودع الذي أُنشئت فيه.'],
+    href: '/users',
+  },
 ];
 
 const featureCards = [
@@ -499,6 +696,12 @@ export function HelpPage() {
             ['#roles', 'الصلاحيات'],
             ['#glossary', 'المصطلحات'],
             ['#faq', 'الأسئلة الشائعة'],
+            ['#help-operation-counts', 'الجرد الدوري'],
+            ['#help-operation-receipts', 'سندات الاستلام'],
+            ['#help-operation-reversal', 'القيد العكسي'],
+            ['#help-operation-bins', 'المواقع والملصقات'],
+            ['#help-operation-2fa', 'المصادقة الثنائية'],
+            ['#troubleshooting', 'استكشاف الأخطاء'],
           ].map(([href, label]) => (
             <a
               key={href}
@@ -689,6 +892,46 @@ export function HelpPage() {
           </div>
         </div>
       </section>
+
+      <section id="troubleshooting" className="scroll-mt-6">
+        <SectionHeading
+          eyebrow="11 / استكشاف الأخطاء"
+          title="أشهر المشكلات وحلولها"
+          description="رسائل النظام عربية وتشرح سبب المنع؛ وهذا تفسير أعمق للحالات المتكرّرة مع خطوات الحل."
+          icon={AlertCircle}
+        />
+        <div className="grid gap-4 md:grid-cols-2">
+          {troubleshootingItems.map((item) => (
+            <div key={item.problem} className="rounded-xl border bg-card p-4 shadow-sm">
+              <div className="mb-2 flex items-start gap-2 text-sm font-bold">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                {item.problem}
+              </div>
+              <p className="text-sm leading-6 text-muted-foreground">{item.solution}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <footer className="rounded-xl border bg-card p-5 text-sm text-muted-foreground shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="space-y-1">
+            <div className="font-semibold text-foreground">نظام مستودعات مديرية صحة دمشق</div>
+            <div>
+              الإصدار:{' '}
+              {String((import.meta as unknown as { env?: Record<string, string> }).env?.VITE_APP_VERSION ?? '5.0.1')}
+            </div>
+            <div>تصميم: إبراهيم الصيداوي · 0933706403</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="rounded-lg border px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/5 print:hidden"
+          >
+            طباعة صفحة المساعدة
+          </button>
+        </div>
+      </footer>
 
       <div className="flex justify-center border-t pt-8">
         <Link href="/" data-testid="link-help-home" className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline">
