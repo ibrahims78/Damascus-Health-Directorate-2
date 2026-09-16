@@ -42,7 +42,7 @@ const privateKeyPath = path.resolve(
 );
 const keyId = arg("key-id") ?? fs.readFileSync(path.join(path.dirname(privateKeyPath), "key-id.txt"), "utf8").trim();
 const expiresAt = arg("expires") ?? null;
-const appVersion = arg("app-version") ?? "4.4.0";
+const appVersion = arg("app-version") ?? "4.5.0";
 const features = (arg("features") ?? "all").split(",").map((f) => f.trim()).filter(Boolean);
 const outPath = arg("out");
 

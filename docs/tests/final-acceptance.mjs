@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+﻿#!/usr/bin/env node
 /**
  * Final acceptance sweep: verifies every shipped artifact against the recorded
  * checksums and prints the deliverables inventory.
@@ -12,7 +12,10 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const del = path.join(root, "deliverables");
-const sumsFile = path.join(del, "RELEASE-SHA256SUMS-4.4.0.txt");
+const sumsFile = (() => {
+  const candidates = fs.readdirSync(del).filter((name) => /^RELEASE-SHA256SUMS-\d+\.\d+\.\d+\.txt$/.test(name)).sort();
+  return path.join(del, candidates[candidates.length - 1] ?? "RELEASE-SHA256SUMS-4.5.0.txt");
+})();
 
 if (!fs.existsSync(sumsFile)) {
   console.error("checksum file not found: " + sumsFile);
@@ -29,10 +32,10 @@ console.log(`checksums recorded: ${expected.size}`);
 let ok = 0;
 let bad = 0;
 for (const [name, hash] of expected) {
-  const candidates = [
-    path.join(del, name),
-    path.join(del, "Damascus-Health-Directorate-4.4.0-Android", name),
-  ];
+  const androidDirs = fs.readdirSync(del)
+    .filter((entry) => entry.endsWith("-Android") && fs.statSync(path.join(del, entry)).isDirectory())
+    .map((entry) => path.join(del, entry, name));
+  const candidates = [path.join(del, name), ...androidDirs];
   const file = candidates.find((p) => fs.existsSync(p));
   if (!file) { console.log(`MISSING  ${name}`); bad += 1; continue; }
   const actual = crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex").toUpperCase();
@@ -52,7 +55,7 @@ for (const entry of fs.readdirSync(del, { withFileTypes: true }).sort((a, b) => 
 
 // data folders must never be shipped inside a Windows package
 console.log("\n=== package hygiene ===");
-for (const name of ["Damascus-Health-Directorate-4.4.0-Portable-Windows-x64", "Damascus-Health-Directorate-4.4.0-Protected-Windows-x64"]) {
+for (const name of fs.readdirSync(del).filter((entry) => entry.endsWith("-Windows-x64") && fs.statSync(path.join(del, entry)).isDirectory())) {
   const dir = path.join(del, name);
   if (!fs.existsSync(dir)) { console.log(`  ${name}: (absent)`); continue; }
   const dataDir = fs.existsSync(path.join(dir, "data"));
@@ -63,3 +66,5 @@ for (const name of ["Damascus-Health-Directorate-4.4.0-Portable-Windows-x64", "D
 }
 
 process.exit(bad ? 1 : 0);
+
+
