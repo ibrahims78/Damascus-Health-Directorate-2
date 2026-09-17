@@ -27,7 +27,7 @@ env -u DATABASE_URL BACKUP_ACCEPTANCE_PORT=8391 pnpm backup:acceptance
 | كلمة مرور خاطئة | رفض قبل التطبيق | يثبتها الأمر |
 | ملف معدل | رفض MAC/checksum | يثبتها الأمر |
 | merge restore | استعادة دون حذف أحدث بيانات المصدر | يثبتها الأمر |
-| restore report | تقرير completed | يثبتها الأمر |
+| restore report | تقرير نقطة استعادة بحالة `available` وبصمة صحيحة | يثبتها الأمر |
 | audit | وجود `backup_package_restore` | يثبتها الأمر |
 | rollback | عودة نقطة ما قبل الاستعادة | يثبتها الأمر |
 | catalog verify | تحقق دون تعديل البيانات | يثبتها الأمر |
