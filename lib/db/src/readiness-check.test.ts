@@ -29,7 +29,7 @@ function readyClient() {
         return { rows: [{ migration_table: "drizzle.__drizzle_migrations" }] };
       }
       if (text.includes("count(*)")) {
-        return { rows: [{ migration_count: 2 }] };
+        return { rows: [{ migration_count: 3 }] };
       }
       return { rows: [{ hash: "latest-hash", applied_at: "2026-09-17" }] };
     },
@@ -45,7 +45,7 @@ describe("PostgreSQL schema readiness", () => {
       mode: "postgres",
       schemaSource: "postgres-migrations",
       database: "test",
-      migrationsApplied: 2,
+      migrationsApplied: 3,
       lastMigration: {
         hash: "latest-hash",
         appliedAt: "2026-09-17",

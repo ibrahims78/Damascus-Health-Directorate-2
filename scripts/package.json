@@ -15,6 +15,6 @@
     "@workspace/backup-format": "workspace:*",
     "drizzle-orm": "catalog:",
     "postgres": "^3.4.9",
-    "xlsx": "^0.18.5"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   }
 }

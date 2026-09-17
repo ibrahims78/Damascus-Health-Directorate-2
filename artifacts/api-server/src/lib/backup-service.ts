@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { db } from "@workspace/db";
+import { db, desktopMode } from "@workspace/db";
 import {
   createSyncPackage,
   packageSummary,
@@ -23,7 +23,16 @@ export { packageSummary };
 
 const MAX_PACKAGE_BYTES = 48 * 1024 * 1024;
 const SERVER_SCHEMA_VERSION = "2026.08";
-const RESTORE_POINT_PASSWORD = process.env.SESSION_SECRET || "development-restore-point-key";
+const RESTORE_POINT_PASSWORD = process.env.SESSION_SECRET;
+
+function requireRestorePointPassword(): string {
+  if (RESTORE_POINT_PASSWORD) return RESTORE_POINT_PASSWORD;
+  throw new Error(
+    desktopMode
+      ? "SESSION_SECRET is required for server-managed restore points; configure it before using restore rollback."
+      : "SESSION_SECRET is required for server-managed restore points.",
+  );
+}
 
 const TABLES = [
   "categories",
@@ -682,7 +691,7 @@ export async function getRestorePoint(id: string) {
 export async function rollbackRestorePoint(id: string) {
   const point = await getRestorePoint(id);
   if (!point) throw new Error("نقطة الاستعادة غير موجودة");
-  const pkg = readSyncPackage(Buffer.from(point.encryptedPackage, "base64"), RESTORE_POINT_PASSWORD, {
+  const pkg = readSyncPackage(Buffer.from(point.encryptedPackage, "base64"), requireRestorePointPassword(), {
     maxBytes: MAX_PACKAGE_BYTES,
   });
   const report = await applyRestore(pkg, "full");
@@ -698,5 +707,5 @@ export function packageBufferToBase64(buffer: Buffer) {
 }
 
 export function serverRestorePointPassword() {
-  return RESTORE_POINT_PASSWORD;
+  return requireRestorePointPassword();
 }

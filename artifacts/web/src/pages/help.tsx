@@ -1030,9 +1030,9 @@ export function HelpPage() {
             <div className="font-semibold text-foreground">نظام مستودعات مديرية صحة دمشق</div>
             <div>
               الإصدار:{' '}
-              {String((import.meta as unknown as { env?: Record<string, string> }).env?.VITE_APP_VERSION ?? '5.0.1')}
+              {String((import.meta as unknown as { env?: Record<string, string> }).env?.VITE_APP_VERSION ?? '5.0.3')}
             </div>
-            <div>تصميم: إبراهيم الصيداوي · 0933706403</div>
+            <div>الدعم: مسؤول النظام المؤسسي</div>
           </div>
           <button
             type="button"

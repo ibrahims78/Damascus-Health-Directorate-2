@@ -251,11 +251,14 @@ await t('fresh seed: random password + mustChangePassword flow', async () => {
   };
 
   // Pass 1: boot to create the schema, kill, seed (prints the one-time password).
-  const schemaBoot = spawnChild([apiEntry]);
+  const schemaBoot = spawnChild([apiEntry], true);
   if (!(await waitHealth())) {
     await killChild(schemaBoot.child);
     rmSync(dataDir, { recursive: true, force: true });
-    return { error: 'schema-creation boot failed' };
+    return {
+      error: 'schema-creation boot failed',
+      output: schemaBoot.output().slice(-1200),
+    };
   }
   await killChild(schemaBoot.child);
   const seedProc = spawnChild(['--enable-source-maps', seedEntry], true);

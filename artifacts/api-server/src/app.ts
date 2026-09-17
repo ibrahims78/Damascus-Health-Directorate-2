@@ -1,4 +1,5 @@
 import express, { type Express } from "express";
+import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import cors from "cors";
@@ -21,6 +22,10 @@ if (!sessionSecret && !desktopMode) {
   );
   process.exit(1);
 }
+// Desktop may run without a hosted secret. Generate an ephemeral value rather
+// than shipping a well-known fallback. PostgreSQL mode is blocked above.
+const effectiveSessionSecret =
+  sessionSecret ?? randomBytes(32).toString("hex");
 
 const app: Express = express();
 
@@ -117,7 +122,7 @@ const sessionStore = desktopMode
 app.use(
   session({
     ...(sessionStore ? { store: sessionStore } : {}),
-    secret: sessionSecret || "fallback-dev-secret-change-in-prod",
+    secret: effectiveSessionSecret,
     resave: false,
     saveUninitialized: false,
     rolling: true,

@@ -2,10 +2,10 @@
 
 # مستودعات مديرية صحة دمشق
 
-### Damascus Health Directorate Warehouses — v4.3.0
+### Damascus Health Directorate Warehouses — v5.0.3
 
-[![Release](https://img.shields.io/github/v/release/ibrahims78/Damascus-Health-Directorate?label=%D8%A7%D9%84%D8%A5%D8%B5%D8%AF%D8%A7%D8%B1&logo=github)](https://github.com/ibrahims78/Damascus-Health-Directorate/releases/latest)
-[![CI](https://github.com/ibrahims78/Damascus-Health-Directorate/actions/workflows/ci.yml/badge.svg)](https://github.com/ibrahims78/Damascus-Health-Directorate/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/ibrahims78/Damascus-Health-Directorate-2?label=%D8%A7%D9%84%D8%A5%D8%B5%D8%AF%D8%A7%D8%B1&logo=github)](https://github.com/ibrahims78/Damascus-Health-Directorate-2/releases/latest)
+[![CI](https://github.com/ibrahims78/Damascus-Health-Directorate-2/actions/workflows/ci.yml/badge.svg)](https://github.com/ibrahims78/Damascus-Health-Directorate-2/actions/workflows/ci.yml)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Android-blue)](#-التنزيلات)
 [![License](https://img.shields.io/badge/license-Proprietary-red)](LICENSE)
 
@@ -17,7 +17,7 @@
 
 ## 📥 التنزيلات
 
-كل الإصدارات الجاهزة من صفحة [**Releases → Packages v4.3.0**](https://github.com/ibrahims78/Damascus-Health-Directorate/releases/tag/v4.3.0):
+كل الإصدارات الجاهزة من صفحة [**Releases → v5.0.3**](https://github.com/ibrahims78/Damascus-Health-Directorate-2/releases/tag/v5.0.3):
 
 | الحزمة | المنصة | الوصف |
 |---|---|---|
@@ -129,7 +129,7 @@ Recharts            Capacitor (أندرويد)
 │   ├── backup-format/      # صيغة حزم النسخ والمزامنة المشفرة
 │   └── api-spec/           # مواصفة OpenAPI (مصدر الحقيقة)
 ├── android/                # مشروع أندرويد
-├── release-artifacts/v4.3.0/        # سكربتات التجميع والتوقيع ومفاتيح التحقق العامة
+├── release-artifacts/               # ملاحظات الإصدار ومخرجات الإصدار خارج Git
 ├── docs/                   # أدلة التشغيل والمستخدم وقواعد المجال
 └── scripts/                # أدوات الاستيراد وإصدار التراخيص + CI
 ```
@@ -157,9 +157,8 @@ pnpm db:readiness
 # بناء حزم الإصدار
 node scripts/build-protected-web.mjs windows          # واجهة النسخة المحمية
 pnpm --filter @workspace/api-server run build:protected
-node release-artifacts/v4.3.0/scripts/reassemble-electron.mjs  # إعادة تجميع Windows من Linux
-./release-artifacts/v4.3.0/scripts/reassemble-electron.ps1    # إعادة التجميع على Windows
-./release-artifacts/v4.3.0/android/build-android-apk.ps1      # حزمتا أندرويد (يتطلب Android SDK)
+node scripts/release-dry-run.mjs                         # تحقق إصدار قابل للتتبع + checksums
+./android/gradlew assembleRelease                         # بناء Android (يتطلب Android SDK/JDK)
 ```
 
 اختبارات CI تعمل تلقائياً عبر `.github/workflows/ci.yml`، وتوقف الدمج عند
@@ -175,7 +174,7 @@ node release-artifacts/v4.3.0/scripts/reassemble-electron.mjs  # إعادة تج
 | لا يفتح من متصفح جهاز آخر | جدار الحماية (القاعدتان أعلاه) + `ipconfig` للعنوان الصحيح |
 | `Cannot GET /` على المنفذ 41789 | طبيعي — 41789 هو API فقط؛ الواجهة على **41790** |
 | «الترخيص غير مقبول» | تأكد أن مولّد التفعيل بنفس المنصة وأن المعرّف منسوخ كاملاً |
-| فشلت الاستعادة | حدّث النسخة إلى v4.3.0 (يتضمن تحديث الهوية البصرية وتحسينات الإصدار) وشغّل مرة واحدة قبل الاستعادة |
+| فشلت الاستعادة | تحقق من `SESSION_SECRET` في بيئة الخادم، ثم راجع `docs/database-runbook-ar.md` |
 | المنفذ 41789/41790 مشغول | أغلق النسخ المكررة من التطبيق — يعود للمنفذ الثابت |
 
 ---
@@ -185,8 +184,7 @@ node release-artifacts/v4.3.0/scripts/reassemble-electron.mjs  # إعادة تج
 | | |
 |---|---|
 | **المالك** | مديرية صحة دمشق |
-| **المصمم والمطوّر** | إبراهيم الصيداوي (ibrahims78) |
-| **موبايل** | 00963933706403 |
+| **الدعم** | قناة الدعم المؤسسية المعتمدة لدى مديرية صحة دمشق |
 ---
 
 ## 📄 الترخيص
@@ -197,7 +195,7 @@ node release-artifacts/v4.3.0/scripts/reassemble-electron.mjs  # إعادة تج
 
 ---
 
-## 🆕 الإصدار 4.3.0 — الميزات والإمكانيات
+## 🆕 الإصدار 5.0.3 — الميزات والإمكانيات
 
 ### الحاكمية والصلاحيات
 - ثلاث صلاحيات: **مدير** · **أمين مستودع** · **مراقب**، مفروضة على الخادم.
@@ -238,4 +236,4 @@ node release-artifacts/v4.3.0/scripts/reassemble-electron.mjs  # إعادة تج
 - ترخيص مُوقّع Ed25519 مخصّص للجهاز · مجموعة تفعيل كاملة تولّد تراخيص Windows/Android.
 
 📘 **الدليل التفصيلي الكامل:** [`docs/user-guide-ar.md`](docs/user-guide-ar.md)
-📦 **ملاحظات الإصدار:** `deliverables/RELEASE-4.3.0-AR.md`
+📦 **ملاحظات الإصدار:** [CHANGELOG.md](CHANGELOG.md) و[دليل الإصدار](docs/release-runbook-ar.md)

@@ -4,10 +4,10 @@
 
 ## النطاق
 
-تم تشغيل المشروع من الفرع `master` المرتبط بمستودع GitHub عبر HTTPS:
+تم تشغيل المشروع من الفرع `main` المرتبط بمستودع GitHub عبر HTTPS:
 
-- المستودع: `https://github.com/ibrahims78/Damascus-Health-Directorate`
-- الفرع: `master`
+- المستودع: `https://github.com/ibrahims78/Damascus-Health-Directorate-2`
+- الفرع: `main`
 - OAuth: غير مستخدم
 - بيانات الإنتاج والأسرار: خارج نطاق الاختبار
 

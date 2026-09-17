@@ -41,8 +41,6 @@ import {
 } from '@/components/ui/tooltip';
 
 const APP_VERSION = import.meta.env.VITE_APP_VERSION ?? "v5.0.3";
-const DESIGNER_NAME = 'إبراهيم الصيداوي';
-const DESIGNER_PHONE = '0933706403';
 
 const navItems = [
   { href: '/',               label: 'لوحة المعلومات',  icon: LayoutDashboard },
@@ -344,7 +342,7 @@ export function Sidebar() {
           })}
         </nav>
 
-        {/* Footer: version + designer signature */}
+          {/* Footer: version + institutional support channel */}
         <div
           className={cn(
             'border-t mt-auto transition-all duration-300',
@@ -363,8 +361,7 @@ export function Sidebar() {
               <TooltipContent side="left">
                 <div className="text-center leading-relaxed">
                   <div>{APP_VERSION}</div>
-                  <div className="opacity-80">تصميم: {DESIGNER_NAME}</div>
-                  <div className="opacity-60 font-mono">{DESIGNER_PHONE}</div>
+                  <div className="opacity-80">الدعم: مسؤول النظام المؤسسي</div>
                 </div>
               </TooltipContent>
             </Tooltip>
@@ -379,18 +376,14 @@ export function Sidebar() {
                 </span>
               </div>
               <div className="flex items-center gap-1.5 pt-0.5 border-t border-dashed border-border/40">
-                <Code2 className="w-3 h-3 text-muted-foreground/30 flex-shrink-0" />
+                  <Code2 className="w-3 h-3 text-muted-foreground/30 flex-shrink-0" />
                 <div className="min-w-0">
                   <div className="text-[10px] text-muted-foreground/50 leading-tight truncate">
-                    تصميم: {DESIGNER_NAME}
+                      الدعم: مسؤول النظام المؤسسي
                   </div>
-                  <a
-                    href={`tel:${DESIGNER_PHONE}`}
-                    className="text-[10px] font-mono text-muted-foreground/40 hover:text-muted-foreground/70 transition-colors leading-tight block"
-                    dir="ltr"
-                  >
-                    {DESIGNER_PHONE}
-                  </a>
+                    <div className="text-[10px] text-muted-foreground/40 leading-tight">
+                      قناة الدعم الداخلية المعتمدة
+                    </div>
                 </div>
               </div>
             </div>

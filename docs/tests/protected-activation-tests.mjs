@@ -17,8 +17,17 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const kit = path.join(root, "deliverables", "Damascus-Health-Directorate-5.0.3-Activation-Kit");
-const APP_VERSION = "5.0.3";
+const kitInput = process.env.ACTIVATION_KIT_DIR;
+if (!kitInput) {
+  console.error("Set ACTIVATION_KIT_DIR to an extracted activation kit before running this test.");
+  process.exit(2);
+}
+const kit = path.resolve(root, kitInput);
+const APP_VERSION =
+  JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).version;
+const publicKeyPath =
+  process.env.ACTIVATION_PUBLIC_KEY_PATH ??
+  path.join(kit, "android", "license-public-key.b64");
 const deviceId = "AABBCCDD-1122-3344-5566-AABBCCDDEEFF";
 
 const results = [];
@@ -52,9 +61,7 @@ await esbuild.build({
 const core = await import(`file://${bundlePath.replace(/\\/g, "/")}`);
 
 // 2) the app's embedded public key (what the gate ships) and the protected bundles
-const embeddedKey = fs
-  .readFileSync(path.join(root, "release-artifacts", "v4.0.3", "license-public-keys", "android.b64"), "utf8")
-  .trim();
+const embeddedKey = fs.readFileSync(path.resolve(root, publicKeyPath), "utf8").trim();
 const kitKey = fs.readFileSync(path.join(kit, "android", "license-public-key.b64"), "utf8").trim();
 check("the embedded android key matches the kit", embeddedKey === kitKey);
 

@@ -2183,11 +2183,11 @@ pnpm --filter @workspace/scripts run phase6:backup
 ## 29. حالة GitHub وريبليت
 
 تم ربط مساحة عمل Replit بالمستودع الحالي:
-`https://github.com/ibrahims78/Damascus-Health-Directorate.git` على الفرع
-`master`، وضُبط `origin` عبر HTTPS مع تتبع `origin/master`. القراءة والدفع
+`https://github.com/ibrahims78/Damascus-Health-Directorate-2.git` على الفرع
+`main`، وضُبط `origin` عبر HTTPS مع تتبع `origin/main`. القراءة والدفع
 يعملان دون OAuth عبر رمز وصول محفوظ في Replit Secrets، ولا يوضع الرمز في
 عنوان remote أو الملفات أو المحادثة. بعد كل رفع يجب فحص تطابق `HEAD` مع
-`origin/master`.
+`origin/main`.
 
 ## 30. تقرير التحقق النهائي للمراحل 1–6
 
@@ -2572,10 +2572,10 @@ console لطلبات محمية قبل تسجيل الدخول، وهذا متو
 
 ```text
 branch: main
-remote: https://github.com/ibrahims78/Damascus-Health-Directorate.git
-branch: master
+remote: https://github.com/ibrahims78/Damascus-Health-Directorate-2.git
+branch: main
 read/fetch/push: PASS عبر HTTPS دون OAuth
-بعد تحديث هذا التقرير: HEAD == origin/master
+بعد تحديث هذا التقرير: HEAD == origin/main
 ```
 
 هذا التحديث الوثائقي يُدفع إلى `origin/master` عبر HTTPS باستخدام

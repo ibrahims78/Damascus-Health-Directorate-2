@@ -1,12 +1,12 @@
 # دليل التطوير التقني — مستودعات مديرية صحة دمشق
 
-> هذا الدليل لمن يريد البناء من المصدر أو المساهمة. للاستخدام اليومي راجع [README.md](README.md) وصفحة [الإصدارات](https://github.com/ibrahims78/Damascus-Health-Directorate/releases).
+> هذا الدليل لمن يريد البناء من المصدر أو المساهمة. للاستخدام اليومي راجع [README.md](README.md) وصفحة [الإصدارات](https://github.com/ibrahims78/Damascus-Health-Directorate-2/releases).
 
 ## البيئة
 
 - **Node.js 20+** و **pnpm 9+** (على ويندوز: `pnpm install --ignore-scripts` لتجاوز سكربت preinstall الذي يفترض bash)
-- بناء أندرويد الكامل يحتاج Android SDK وJDK 21 مع Capacitor 7 (`android/build-android-apk.ps1`) — البديل المختصر: `release-artifacts/v4.3.0/android/build-android-apk.ps1`
-- بناء حزم سطح المكتب: `release-artifacts/v4.3.0/scripts/reassemble-electron.ps1` أو سكربت Node المقابل على Linux
+- بناء أندرويد الكامل يحتاج Android SDK وJDK 21 مع Capacitor 7 (`android/gradlew assembleRelease`)
+- بناء حزم سطح المكتب يُدار من خلال خطوات الإصدار الموثقة في `docs/release-runbook-ar.md`
 
 ## المنافذ
 
@@ -30,7 +30,7 @@ pnpm --filter @workspace/api-server run build:standard
 pnpm --filter @workspace/api-server run build:protected
 
 # تجميع حزم سطح المكتب (يدمج web + api + schema داخل app.asar)
-node release-artifacts/v4.3.0/scripts/reassemble-electron.mjs
+node scripts/release-dry-run.mjs
 ```
 
 **مهم**: عند تعديل `lib/api-spec/openapi.yaml` نفّذ codegen ثم `tsc --build` قبل typecheck (حزم lib تعتمد على مخرجات TS المترجمة).
@@ -41,7 +41,7 @@ node release-artifacts/v4.3.0/scripts/reassemble-electron.mjs
 |---|---|
 | `lib/db/desktop-schema.sql` | مخطط قاعدة الحزم — **ترتيب العبارات حساس** (ALTER بعد CREATE) + ترميم ذاتي مطابق في `lib/db/src/index.ts` |
 | `lib/license-core/src/index.ts` | تحقق الترخيص (WebCrypto + noble الاحتياطي) — مشترك بين الويب والخادم |
-| `release-artifacts/v4.3.0/scripts/main-template.cjs` | قالب إقلاع إلكترون (المنافذ الثابتة + تمرير الترخيص + شعار نافذة Windows) |
+| `scripts/release-dry-run.mjs` | تحقق الإصدار ومخرجات البناء وchecksums قبل النشر |
 | `lib/api-client-react/` + `lib/api-zod/` | مولدة من OpenAPI — **لا تعدل يدوياً** |
 
 ## الاختبارات
@@ -56,7 +56,7 @@ node release-artifacts/v4.3.0/scripts/reassemble-electron.mjs
 artifacts/        web (React) + api-server (Express)
 lib/              db, license-core, backup-format, api-spec, api-client-react, api-zod, sync-contract
 android/          مشروع أندرويد (Capacitor)
-release-artifacts/v4.3.0/  سكربتات التجميع + المولدات + مفاتيح التحقق العامة
+release-artifacts/  ملاحظات ومخرجات الإصدار غير المشمولة في حزم المصدر
 docs/             العمليات، دليل المستخدم، قواعد المجال، الاختبارات
 scripts/          الاستيراد (Excel/Equipment)، إصدار التراخيص، CI
 ```
@@ -70,7 +70,7 @@ scripts/          الاستيراد (Excel/Equipment)، إصدار التراخ
 
 ---
 
-## الإصدار 4.3.0
+## الإصدار 5.0.3
 
 يحتوي هذا الإصدار مراحل التطوير الكاملة: الحاكمية والصلاحيات · الكتالوج والوحدات المعيارية ·
 حاكمية الاستيراد · مركز المخزون والترصيد · نموذج المستودعات · دورة التحويل · إدارة المزامنة ·

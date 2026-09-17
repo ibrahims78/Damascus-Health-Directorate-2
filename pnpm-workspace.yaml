@@ -75,6 +75,9 @@ onlyBuiltDependencies:
   - unrs-resolver
 
 overrides:
+  # Express 5 accepts qs 6.16+, which fixes the array-limit and isBuffer DoS
+  # advisories without changing the request parsing API.
+  qs: "^6.16.0"
   # replit uses linux-x64 only, we can exclude all other platforms
   "esbuild>@esbuild/darwin-arm64": "-"
   "esbuild>@esbuild/darwin-x64": "-"

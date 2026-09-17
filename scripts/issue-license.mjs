@@ -5,7 +5,7 @@
  * Usage:
  *   node scripts/issue-license.mjs --platform windows|android \
  *     --device-id <deviceId-from-the-client-gate> \
- *     [--private-key release-secrets-v4.0.3/<platform>/license-private-key.pem] \
+ *     [--private-key <external-secrets>/<platform>/license-private-key.pem] \
  *     [--key-id <keyId>] [--expires 2027-12-31] [--app-version "*"] \
  *     [--features all] [--out license.txt]
  *
@@ -32,7 +32,7 @@ if (!deviceId) {
   process.exit(1);
 }
 const root = path.resolve(import.meta.dirname ?? process.cwd(), "..");
-const releaseVersion = process.env.DAMASCUS_RELEASE_VERSION ?? "v4.0.3";
+const releaseVersion = process.env.DAMASCUS_RELEASE_VERSION ?? "v5.0.3";
 const externalSecretsRoot = process.env.DAMASCUS_RELEASE_SECRETS_DIR;
 const privateKeyPath = path.resolve(
   arg("private-key") ??
