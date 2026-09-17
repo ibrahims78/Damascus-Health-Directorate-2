@@ -15,6 +15,7 @@
     "test:e2e": "bash scripts/ci-e2e.sh",
     "security:scan": "node scripts/security-scan.mjs",
     "docs:check": "node scripts/docs-check.mjs",
+    "performance:check": "node scripts/bundle-budget.mjs",
     "version:check": "node scripts/sync-version.mjs --check",
     "version:sync": "node scripts/sync-version.mjs --write",
     "release:dry-run": "pnpm version:check && pnpm build && node scripts/release-dry-run.mjs",

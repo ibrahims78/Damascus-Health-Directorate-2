@@ -1,1 +1,2 @@
 - [GitHub push credentials](github-push-credentials.md) — Replit secrets may be available to workflows but not interactive shell sessions; use a temporary workflow and remove it after push.
+- [SheetJS Node adapter](sheetjs-node-adapter.md) — the ESM build needs an explicit Node filesystem adapter before writing XLSX files.

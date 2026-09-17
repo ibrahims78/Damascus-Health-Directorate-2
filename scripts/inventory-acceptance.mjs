@@ -1,9 +1,14 @@
 import { execFile as execFileCallback, spawn } from "node:child_process";
+import * as nodeFs from "node:fs";
 import { mkdtemp, mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 import XLSX from "xlsx";
+
+// SheetJS' ESM build does not auto-detect Node's filesystem adapter. Register it
+// explicitly so the acceptance test exercises a real XLSX file on Node 20.
+XLSX.set_fs(nodeFs);
 
 const execFile = promisify(execFileCallback);
 const root = resolve(new URL("..", import.meta.url).pathname);
