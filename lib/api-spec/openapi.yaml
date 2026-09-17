@@ -1779,10 +1779,47 @@ components:
   schemas:
     HealthStatus:
       type: object
-      required: [status]
+      required: [status, database]
       properties:
         status:
           type: string
+        database:
+          type: object
+          required: [status, mode, schemaSource]
+          properties:
+            status:
+              type: string
+              enum: [ready, not_ready]
+            mode:
+              type: string
+              enum: [desktop, postgres]
+            schemaSource:
+              type: string
+              enum: [desktop-schema.sql, postgres-migrations]
+            database:
+              type: string
+            schema:
+              type: string
+            missingTables:
+              type: array
+              items:
+                type: string
+            missingColumns:
+              type: array
+              items:
+                type: string
+            migrationsApplied:
+              type: integer
+            lastMigration:
+              type: object
+              required: [hash, appliedAt]
+              properties:
+                hash:
+                  type: string
+                appliedAt:
+                  type: string
+            reason:
+              type: string
 
     SetupStatus:
       type: object

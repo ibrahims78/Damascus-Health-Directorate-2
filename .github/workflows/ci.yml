@@ -21,11 +21,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm build
-      # Lint is wired up but not yet a hard gate: the codebase carries legacy
-      # warnings. Run it so regressions are visible without blocking merges.
-      - name: Lint (informational)
-        continue-on-error: true
-        run: pnpm lint
+      - run: pnpm test
+      - run: pnpm lint
 
   e2e:
     name: E2E (two live instances)
@@ -41,8 +38,8 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @workspace/api-server build
+      - run: pnpm build:api
       - name: Run E2E suites
         env:
           SEED_ADMIN_PASSWORD: 'Admin@1234'
-        run: bash ./scripts/ci-e2e.sh
+        run: pnpm test:e2e

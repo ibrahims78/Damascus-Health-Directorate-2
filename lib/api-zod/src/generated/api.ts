@@ -12,7 +12,22 @@ import * as zod from 'zod';
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({
-  "status": zod.string()
+  "status": zod.string(),
+  "database": zod.object({
+    "status": zod.enum(["ready", "not_ready"]),
+    "mode": zod.enum(["desktop", "postgres"]),
+    "schemaSource": zod.enum(["desktop-schema.sql", "postgres-migrations"]),
+    "database": zod.string().optional(),
+    "schema": zod.string().optional(),
+    "missingTables": zod.array(zod.string()).optional(),
+    "missingColumns": zod.array(zod.string()).optional(),
+    "migrationsApplied": zod.number().int().optional(),
+    "lastMigration": zod.object({
+      "hash": zod.string(),
+      "appliedAt": zod.string()
+    }).optional(),
+    "reason": zod.string().optional()
+  })
 })
 
 

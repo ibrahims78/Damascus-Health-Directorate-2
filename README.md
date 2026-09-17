@@ -142,6 +142,13 @@ Recharts            Capacitor (أندرويد)
 pnpm install --ignore-scripts   # (Windows: تجاوز سكربت preinstall)
 pnpm run typecheck              # كل الحزم
 pnpm run build                  # بناء كامل
+pnpm test
+pnpm lint
+pnpm test:e2e
+
+# PostgreSQL المستضاف — قبل تشغيل API
+pnpm db:migrate
+pnpm db:readiness
 
 # تطوير يومي (أدلة ضمن المستودع)
 ./start-dev.ps1                 # API + واجهة التطوير
@@ -155,7 +162,9 @@ node release-artifacts/v4.3.0/scripts/reassemble-electron.mjs  # إعادة تج
 ./release-artifacts/v4.3.0/android/build-android-apk.ps1      # حزمتا أندرويد (يتطلب Android SDK)
 ```
 
-اختبارات CI تعمل تلقائياً عبر `.github/workflows/ci.yml` (مزامنة + أمان + قواعد بيانات على مثيلين حيين).
+اختبارات CI تعمل تلقائياً عبر `.github/workflows/ci.yml`، وتوقف الدمج عند
+فشل النوع أو البناء أو الاختبار أو lint أو E2E. راجع
+`docs/ci-guide-ar.md` و`docs/database-runbook-ar.md` لمساري التشغيل.
 
 ---
 

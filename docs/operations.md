@@ -13,10 +13,32 @@
 
 ```bash
 pnpm install --frozen-lockfile
-pnpm --filter @workspace/db run push
 pnpm run typecheck
 pnpm run build
 ```
+
+## مسارا قاعدة البيانات
+
+### Desktop/PGlite
+
+يستخدم Workflow المحلي `DAMASCUS_DESKTOP=1` مع
+`lib/db/desktop-schema.sql` و`.damascus-data`. يطبق الخادم الإصلاحات
+الإضافية بطريقة idempotent عند الإقلاع، ولا يحتاج إلى `DATABASE_URL`.
+
+### PostgreSQL
+
+المigrations خطوة مستقلة قبل تشغيل API:
+
+```bash
+pnpm db:migrate
+pnpm db:readiness
+```
+
+يستخدم `db:migrate` ملف `lib/db/drizzle.config.ts` ومجلد
+`lib/db/migrations/`. يفحص `db:readiness` الاتصال و47 جدولاً والأعمدة
+الحرجة وسجل `drizzle.__drizzle_migrations` وآخر migration، ولا يغير البيانات.
+لا تستخدم `push` أو `push-force` كبديل لمسار migrations في بيئة مستضافة.
+عند غياب migration أو جدول، يفشل API قبل فتح المنفذ برسالة تحتوي أمر الإصلاح.
 
 للتشغيل اليدوي:
 
@@ -33,9 +55,11 @@ pnpm --filter @workspace/web run dev
 1. شغّل `pnpm run typecheck` و`pnpm run build`.
 2. شغّل `pnpm test` و`pnpm run acceptance:inventory` و`pnpm run phase0:baseline`
    بعد إزالة `DATABASE_URL` من جلسة الاختبار.
-3. راجع إعدادات `DATABASE_URL` و`SESSION_SECRET` في بيئة النشر.
+3. في PostgreSQL شغّل `pnpm db:migrate` ثم `pnpm db:readiness`، وراجع إعدادات
+   `DATABASE_URL` و`SESSION_SECRET` في بيئة النشر.
 4. نفّذ نشر ريبليت من نقطة تحقق ناجحة.
-5. بعد النشر تحقّق من `GET /api/healthz` ومن تسجيل الدخول والتقارير.
+5. بعد النشر تحقّق من `GET /api/healthz` ومن تسجيل الدخول والتقارير. يجب أن
+   يذكر healthz `database.status=ready` ومصدر المخطط الصحيح.
 
 لا تعتبر المعاينة المحلية بديلاً عن اعتماد مسؤول المستودع لقواعد الرصيد
 والبيانات التشغيلية قبل فتح النظام للمستخدمين.
@@ -91,8 +115,8 @@ pnpm --filter @workspace/web run dev
 
 ## اختبارات الصيانة
 
-الاختبارات المتوفرة في النسخة الحالية هي `pnpm test` و`pnpm run typecheck`
-و`pnpm lint`. أما اختبارات المراحل القديمة التي كانت تعتمد على ملفات تشغيلية
+الاختبارات الموحدة هي `pnpm test` و`pnpm run typecheck` و`pnpm lint` و
+`pnpm test:e2e`. أما اختبارات المراحل القديمة التي كانت تعتمد على ملفات تشغيلية
 خارج المستودع فلم تعد أوامر مدعومة، حتى لا تشير وثائق التشغيل إلى ملفات غير
 موجودة.
 

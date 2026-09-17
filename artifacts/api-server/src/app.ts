@@ -15,8 +15,10 @@ import "./types/session.d.ts";
 
 // ── Enforce SESSION_SECRET in production ─────────────────────────────────────
 const sessionSecret = process.env.SESSION_SECRET;
-if (!sessionSecret && process.env.NODE_ENV === "production") {
-  logger.error("SESSION_SECRET environment variable is required in production. Exiting.");
+if (!sessionSecret && !desktopMode) {
+  logger.error(
+    "SESSION_SECRET environment variable is required for PostgreSQL mode. Exiting.",
+  );
   process.exit(1);
 }
 

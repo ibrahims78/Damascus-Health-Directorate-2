@@ -7,6 +7,11 @@ import { and, eq, like, ne, or } from "drizzle-orm";
 import pg from "pg";
 import * as schema from "./schema";
 import { DEFAULT_ORG_NAME } from "./schema/system-settings";
+import {
+  formatReadinessFailure,
+  getPostgresReadiness,
+  type DatabaseReadiness,
+} from "./readiness-check";
 
 const { Pool } = pg;
 
@@ -274,10 +279,30 @@ async function normalizeLegacyDeliveryDestination(): Promise<void> {
     .where(eq(schema.transactionsTable.deliveryDestination, "ambulance_point"));
 }
 
+async function assertPostgresDatabaseReady(): Promise<void> {
+  const readiness = await getPostgresReadiness(postgresPool!);
+  if (readiness.status !== "ready") {
+    throw new Error(formatReadinessFailure(readiness));
+  }
+}
+
 export const databaseReady = isDesktopMode
   ? initializeDesktopDatabase()
       .then(normalizeLegacyOrganizationName)
       .then(normalizeLegacyDeliveryDestination)
-  : normalizeLegacyOrganizationName().then(normalizeLegacyDeliveryDestination);
+  : assertPostgresDatabaseReady()
+      .then(normalizeLegacyOrganizationName)
+      .then(normalizeLegacyDeliveryDestination);
+
+export async function getDatabaseReadiness(): Promise<DatabaseReadiness> {
+  if (isDesktopMode) {
+    return {
+      status: "ready",
+      mode: "desktop",
+      schemaSource: "desktop-schema.sql",
+    };
+  }
+  return getPostgresReadiness(postgresPool!);
+}
 
 export * from "./schema";

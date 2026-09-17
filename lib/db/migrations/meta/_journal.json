@@ -15,6 +15,13 @@
       "when": 1789077257075,
       "tag": "0001_nebulous_black_bolt",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789645097745,
+      "tag": "0002_sour_leech",
+      "breakpoints": true
     }
   ]
 }

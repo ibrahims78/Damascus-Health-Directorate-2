@@ -24,14 +24,14 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   {
     files: ['artifacts/web/src/**/*.{ts,tsx}'],
-    plugins: {
-      'react-hooks': reactHooks,
-    },
     rules: {
       ...reactHooks.configs.recommended.rules,
     },
   },
   {
+    plugins: {
+      'react-hooks': reactHooks,
+    },
     rules: {
       // Pragmatic baseline for a mature codebase: these legacy patterns are
       // reported as warnings so CI can show trends without blocking merges.
@@ -47,6 +47,15 @@ export default tseslint.config(
       'no-useless-escape': 'off',
       'no-constant-condition': 'off',
       'no-prototype-builtins': 'off',
+      // React 19's compiler-oriented rules currently report legacy patterns
+      // across existing forms and data-loading effects. Keep them visible as
+      // warnings until the UI migration is scheduled; all other lint errors
+      // remain hard failures.
+      'react-hooks/set-state-in-effect': 'warn',
+      'react-hooks/refs': 'warn',
+      'react-hooks/purity': 'warn',
+      'preserve-caught-error': 'warn',
+      'no-useless-assignment': 'warn',
     },
   },
 );

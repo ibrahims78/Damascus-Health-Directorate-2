@@ -8,4 +8,19 @@
 
 export interface HealthStatus {
   status: string;
+  database: {
+    status: 'ready' | 'not_ready';
+    mode: 'desktop' | 'postgres';
+    schemaSource: 'desktop-schema.sql' | 'postgres-migrations';
+    database?: string;
+    schema?: string;
+    missingTables?: string[];
+    missingColumns?: string[];
+    migrationsApplied?: number;
+    lastMigration?: {
+      hash: string;
+      appliedAt: string;
+    };
+    reason?: string;
+  };
 }
