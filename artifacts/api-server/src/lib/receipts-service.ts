@@ -32,6 +32,7 @@ export type ReceiptLineInput = {
   batchNumber?: string | null;
   expiryDate?: string | null;
   inspectionNotes?: string | null;
+  unitCost?: number | null;
 };
 
 export async function createReceipt(input: {
@@ -90,6 +91,7 @@ export async function createReceipt(input: {
           itemName: item.name,
           unit: item.unit,
           orderedQuantity: Math.max(0, Math.trunc(Number(line.orderedQuantity ?? 0))),
+          unitCost: line.unitCost === undefined || line.unitCost === null ? null : Math.round(Number(line.unitCost) * 100) / 100,
           receivedQuantity: Math.max(0, Math.trunc(Number(line.receivedQuantity ?? 0))),
           rejectedQuantity: Math.max(0, Math.trunc(Number(line.rejectedQuantity ?? 0))),
           rejectionReason: line.rejectionReason ? String(line.rejectionReason).trim() : null,
@@ -165,6 +167,7 @@ export async function postReceipt(
         documentDate: receipt.deliveryNoteDate ?? new Date().toISOString().slice(0, 10),
         batchNumber: line.batchNumber,
         expiryDate: line.expiryDate,
+        unitCost: line.unitCost ?? undefined,
         notes: `استلام بموجب ${receipt.code}${receipt.supplierName ? ` من ${receipt.supplierName}` : ""}`,
         warehouseId: receipt.warehouseId,
       } as never,

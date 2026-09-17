@@ -4,6 +4,7 @@ import {
   pgTable,
   serial,
   text,
+  doublePrecision,
   integer,
   boolean,
   timestamp,
@@ -25,6 +26,8 @@ export const itemsTable = pgTable(
     unit: text("unit").notNull(),
     currentStock: integer("current_stock").notNull().default(0),
     minStock: integer("min_stock").notNull().default(0),
+  // FIFO costing: the default purchase cost used when a batch carries none.
+  unitCost: doublePrecision("unit_cost"),
   reorderPoint: integer("reorder_point"),
   maxStock: integer("max_stock"),
   safetyStock: integer("safety_stock"),

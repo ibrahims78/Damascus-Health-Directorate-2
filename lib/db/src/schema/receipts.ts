@@ -1,4 +1,4 @@
-import { boolean, index, integer, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, doublePrecision, index, integer, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
 
 /**
  * P0-2 (warehouse practice audit) - goods receipt note (GRN) with inspection.
@@ -52,6 +52,7 @@ export const receiptLinesTable = pgTable(
     itemName: text("item_name").notNull(),
     unit: text("unit").notNull(),
     orderedQuantity: integer("ordered_quantity").notNull().default(0),
+    unitCost: doublePrecision("unit_cost"),
     receivedQuantity: integer("received_quantity").notNull().default(0),
     rejectedQuantity: integer("rejected_quantity").notNull().default(0),
     rejectionReason: text("rejection_reason"),

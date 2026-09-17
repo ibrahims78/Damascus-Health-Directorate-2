@@ -114,6 +114,8 @@ export type MovementInput = {
   newStock?: unknown;
   /** Phase 6: explicit site for transfers (defaults to the current one). */
   warehouseId?: unknown;
+  /** FIFO costing: landed cost per unit for the batches opened by this movement. */
+  unitCost?: number | null;
 };
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -567,6 +569,7 @@ async function createInbound(
       batchNumber: textOrNull(input.batchNumber),
       receivedQuantity: quantity,
       remainingQuantity: quantity,
+      unitCost: normalizeCost(input.unitCost) ?? null,
       expiryDate: assertIsoDate(input.expiryDate, "الصلاحية"),
       supplier: textOrNull(input.supplier),
       deliveryNoteNumber,
@@ -1108,6 +1111,7 @@ async function createAdjustment(
         batchNumber: null,
         receivedQuantity: delta,
         remainingQuantity: delta,
+        unitCost: null,
         expiryDate: null,
         supplier: null,
         deliveryNoteNumber: documentNumber,
@@ -1508,6 +1512,13 @@ export async function createInventoryMovementInTransaction(
     quantity: transaction.quantity,
   });
   return transaction;
+}
+
+/** Optional non-negative money value (FIFO costing). */
+function normalizeCost(value: unknown): number | null {
+  if (value === undefined || value === null || value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed * 100) / 100 : null;
 }
 
 export async function createInventoryMovement(

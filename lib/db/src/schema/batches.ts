@@ -1,14 +1,4 @@
-import {
-  check,
-  date,
-  index,
-  integer,
-  pgTable,
-  serial,
-  text,
-  timestamp,
-  unique,
-} from "drizzle-orm/pg-core";
+import { check, date, doublePrecision, index, integer, pgTable, serial, text, timestamp, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { sql } from "drizzle-orm";
 import { z } from "zod/v4";
@@ -33,6 +23,8 @@ export const inventoryBatchesTable = pgTable(
     batchNumber: text("batch_number"),
     receivedQuantity: integer("received_quantity").notNull(),
     remainingQuantity: integer("remaining_quantity").notNull(),
+    // FIFO costing: the landed cost per unit for this batch.
+    unitCost: doublePrecision("unit_cost"),
     expiryDate: date("expiry_date", { mode: "string" }),
     supplier: text("supplier"),
     deliveryNoteNumber: text("delivery_note_number"),

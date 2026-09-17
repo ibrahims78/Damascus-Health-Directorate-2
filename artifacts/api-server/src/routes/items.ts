@@ -42,6 +42,12 @@ import {
 import { eq, and, ne, ilike, or, lte, sql, isNotNull, asc, desc, type AnyColumn } from "drizzle-orm";
 
 /** Optional non-negative integer (audit P1: reorder / max / safety stock). */
+function optionalCost(value: unknown): number | null {
+  if (value === undefined || value === null || value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed * 100) / 100 : null;
+}
+
 function optionalNonNullNegative(value: unknown): number | null {
   if (value === undefined || value === null || value === "") return null;
   const parsed = Number(value);
@@ -351,6 +357,7 @@ router.post(
   maxStock = null,
   safetyStock = null,
   binCode = null,
+  unitCost = null,
         expiryDate,
         batchNumber,
         location,
@@ -412,6 +419,7 @@ router.post(
         maxStock: optionalNonNullNegative(maxStock),
         safetyStock: optionalNonNullNegative(safetyStock),
         binCode: binCode ? String(binCode).trim() : null,
+        unitCost: optionalCost(unitCost),
             expiryDate: normalizedExpiryDate || null,
             batchNumber: typeof batchNumber === "string" ? batchNumber.trim() || null : null,
             location: typeof location === "string" ? location.trim() || null : null,
@@ -1091,6 +1099,7 @@ router.put(
       updates.reorderPoint = optionalNonNullNegative((req.body as Record<string, unknown>)?.reorderPoint);
       updates.maxStock = optionalNonNullNegative((req.body as Record<string, unknown>)?.maxStock);
       updates.safetyStock = optionalNonNullNegative((req.body as Record<string, unknown>)?.safetyStock);
+      updates.unitCost = optionalCost((req.body as Record<string, unknown>)?.unitCost);
       if ((req.body as Record<string, unknown>)?.binCode !== undefined) {
         const rawBin = (req.body as Record<string, unknown>).binCode;
         updates.binCode = rawBin ? String(rawBin).trim() : null;

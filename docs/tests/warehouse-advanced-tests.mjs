@@ -252,6 +252,25 @@ try {
   check("print: it carries each expiry date", allocations.some((row) => row.batchNumber === "LOT-A" && String(row.expiryDate).startsWith("2027-03-31")) && allocations.some((row) => row.batchNumber === "LOT-B" && String(row.expiryDate).startsWith("2026-12-31")));
   check("print: the breakdown follows FEFO (earliest expiry consumed first)", allocations[0]?.batchNumber === "LOT-B" && Number(allocations[0]?.quantity) === 100, `first=${allocations[0]?.batchNumber}:${allocations[0]?.quantity}`);
   check("print: the batches sum to the issued quantity", allocations.reduce((sum, row) => sum + Number(row.quantity ?? 0), 0) === 700, `sum=${allocations.reduce((sum, row) => sum + Number(row.quantity ?? 0), 0)}`);
+  // ---------------- FIFO valuation and COGS ----------------
+  const costItem = await req("POST", "/api/items", { code: "FIFO-1", name: "صنف التقييم", unit: unitName, itemType: "item", minStock: 0, unitCost: 10 });
+  const costItemId = Number(costItem.data?.id);
+  check("valuation: the item stores its default cost", Number(costItem.data?.unitCost) === 10, `unitCost=${costItem.data?.unitCost}`);
+  await req("POST", "/api/transactions/in", { itemId: costItemId, itemType: "item", quantity: 600, supplySource: "central_warehouses", deliveryNoteNumber: "FIFO-A", deliveryNoteDate: today, documentDate: today, batchNumber: "LOT-A", expiryDate: "2027-05-31", unitCost: 10 });
+  await req("POST", "/api/transactions/in", { itemId: costItemId, itemType: "item", quantity: 100, supplySource: "central_warehouses", deliveryNoteNumber: "FIFO-B", deliveryNoteDate: today, documentDate: today, batchNumber: "LOT-B", expiryDate: "2026-11-30", unitCost: 12 });
+  const valuation1 = await req("GET", "/api/reports/valuation");
+  const row1 = (valuation1.data?.rows ?? []).find((row) => Number(row.id) === costItemId);
+  check("valuation: FIFO value uses each batch cost", Number(row1?.quantity) === 700 && Number(row1?.value) === 7200, `qty=${row1?.quantity} value=${row1?.value}`);
+  const issuePart = await req("POST", "/api/transactions/out", { itemId: costItemId, itemType: "item", quantity: 100, recipientId, exitReasonId, documentDate: today, internalDeliveryNoteNumber: "IDN-FIFO-1", internalDeliveryNoteDate: today, deliveryDestination: "administrative_building" });
+  check("valuation: partial issue accepted", issuePart.status === 201, `status=${issuePart.status}`);
+  const cogs = await req("GET", "/api/reports/cogs");
+  check("valuation: COGS uses the consumed layer cost (100 x 12)", Number(cogs.data?.cogs) === 1200, `cogs=${cogs.data?.cogs}`);
+  const cogsRow = (cogs.data?.items ?? []).find((row) => Number(row.itemId) === costItemId);
+  check("valuation: COGS reports the item layer (100 x 12 = 1200)", Number(cogsRow?.quantity) === 100 && Number(cogsRow?.value) === 1200, `qty=${cogsRow?.quantity} value=${cogsRow?.value}`);
+  const valuation2 = await req("GET", "/api/reports/valuation");
+  const row2 = (valuation2.data?.rows ?? []).find((row) => Number(row.id) === costItemId);
+  check("valuation: remaining stock is worth 600 x 10", Number(row2?.quantity) === 600 && Number(row2?.value) === 6000, `qty=${row2?.quantity} value=${row2?.value}`);
+  check("valuation: report declares the FIFO method", valuation2.data?.method === "FIFO");
   const failed = results.filter((r) => !r.ok);
   console.log(`\n${results.length - failed.length}/${results.length} checks passed`);
   fs.writeFileSync(path.join(root, "docs", "tests", ".advanced-run", "results.txt"), results.map((r) => `${r.ok ? "PASS" : "FAIL"}  ${r.name}`).join("\n") + "\n", "utf8");

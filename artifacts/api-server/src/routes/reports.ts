@@ -14,6 +14,7 @@ import {
   transfersTable,
   transferLinesTable,
   countSessionsTable,
+  transactionBatchAllocationsTable,
 } from "@workspace/db";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { eq, and, lte, gte, sql, desc, asc } from "drizzle-orm";
@@ -908,6 +909,122 @@ router.get("/abc", requireAuth, requireRole("admin"), async (_req, res) => {
         C: items.filter((row) => row.class === "C").length,
       },
       items,
+      generatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
+  }
+});
+
+
+// GET /api/reports/valuation - FIFO inventory value
+// Value of what is on hand: every remaining batch is valued at its own landed
+// cost (falling back to the item default when a batch was opened without one).
+router.get("/valuation", requireAuth, requireRole("admin"), async (_req, res) => {
+  try {
+    const items = await db
+      .select({ id: itemsTable.id, code: itemsTable.code, name: itemsTable.name, unit: itemsTable.unit, unitCost: itemsTable.unitCost })
+      .from(itemsTable)
+      .where(eq(itemsTable.isActive, true));
+    const batches = await db
+      .select({
+        itemId: inventoryBatchesTable.itemId,
+        remainingQuantity: inventoryBatchesTable.remainingQuantity,
+        unitCost: inventoryBatchesTable.unitCost,
+      })
+      .from(inventoryBatchesTable);
+
+    const byItem = new Map<number, { quantity: number; value: number; missingCost: number }>();
+    for (const batch of batches) {
+      const quantity = Number(batch.remainingQuantity ?? 0);
+      if (quantity <= 0) continue;
+      const entry = byItem.get(Number(batch.itemId)) ?? { quantity: 0, value: 0, missingCost: 0 };
+      entry.quantity += quantity;
+      if (batch.unitCost === null || batch.unitCost === undefined) entry.missingCost += quantity;
+      else entry.value += quantity * Number(batch.unitCost);
+      byItem.set(Number(batch.itemId), entry);
+    }
+
+    const rows = items
+      .map((item) => {
+        const entry = byItem.get(item.id) ?? { quantity: 0, value: 0, missingCost: 0 };
+        const fallback = item.unitCost === null || item.unitCost === undefined ? 0 : Number(item.unitCost);
+        const value = entry.value + entry.missingCost * fallback;
+        return {
+          id: item.id,
+          code: item.code,
+          name: item.name,
+          unit: item.unit,
+          quantity: entry.quantity,
+          value: Math.round(value * 100) / 100,
+          unitCost: entry.quantity > 0 ? Math.round((value / entry.quantity) * 100) / 100 : fallback || null,
+          batchesWithoutCost: entry.missingCost,
+        };
+      })
+      .filter((row) => row.quantity > 0)
+      .sort((a, b) => b.value - a.value);
+
+    res.json({
+      method: "FIFO",
+      items: rows.length,
+      totalValue: Math.round(rows.reduce((sum, row) => sum + row.value, 0) * 100) / 100,
+      itemsWithoutCost: rows.filter((row) => row.batchesWithoutCost > 0).length,
+      rows,
+      generatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
+  }
+});
+
+// GET /api/reports/cogs?from&to - cost of goods issued (FIFO layers)
+router.get("/cogs", requireAuth, requireRole("admin"), async (req, res) => {
+  try {
+    const from = req.query.from ? new Date(String(req.query.from)) : new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+    const to = req.query.to ? new Date(String(req.query.to)) : new Date();
+    const rows = await db
+      .select({
+        transactionId: transactionBatchAllocationsTable.transactionId,
+        quantity: transactionBatchAllocationsTable.quantity,
+        cost: inventoryBatchesTable.unitCost,
+        batchNumber: transactionBatchAllocationsTable.batchNumberSnap,
+        itemId: inventoryBatchesTable.itemId,
+        itemName: itemsTable.name,
+        itemUnitCost: itemsTable.unitCost,
+      })
+      .from(transactionBatchAllocationsTable)
+      .leftJoin(inventoryBatchesTable, eq(transactionBatchAllocationsTable.batchId, inventoryBatchesTable.id))
+      .innerJoin(transactionsTable, eq(transactionBatchAllocationsTable.transactionId, transactionsTable.id))
+      .leftJoin(itemsTable, eq(inventoryBatchesTable.itemId, itemsTable.id))
+      .where(and(gte(transactionsTable.createdAt, from), lte(transactionsTable.createdAt, to)));
+
+    const byItem = new Map<number, { itemId: number; name: string | null; quantity: number; value: number }>();
+    let totalQuantity = 0;
+    let totalValue = 0;
+    for (const row of rows) {
+      const quantity = Number(row.quantity ?? 0);
+      const unitCost = row.cost === null || row.cost === undefined ? Number(row.itemUnitCost ?? 0) : Number(row.cost);
+      const value = quantity * unitCost;
+      totalQuantity += quantity;
+      totalValue += value;
+      const itemId = Number(row.itemId ?? 0);
+      const entry = byItem.get(itemId) ?? { itemId, name: row.itemName ?? null, quantity: 0, value: 0 };
+      entry.quantity += quantity;
+      entry.value += value;
+      byItem.set(itemId, entry);
+    }
+
+    res.json({
+      method: "FIFO",
+      window: { from: from.toISOString(), to: to.toISOString() },
+      consumedQuantity: totalQuantity,
+      cogs: Math.round(totalValue * 100) / 100,
+      averageUnitCost: totalQuantity > 0 ? Math.round((totalValue / totalQuantity) * 100) / 100 : null,
+      items: [...byItem.values()]
+        .map((row) => ({ ...row, value: Math.round(row.value * 100) / 100 }))
+        .sort((a, b) => b.value - a.value),
       generatedAt: new Date().toISOString(),
     });
   } catch (err) {
