@@ -2,7 +2,7 @@
 
 # مستودعات مديرية صحة دمشق
 
-### Damascus Health Directorate Warehouses — v5.0.3
+### Damascus Health Directorate Warehouses — v5.0.4
 
 [![Release](https://img.shields.io/github/v/release/ibrahims78/Damascus-Health-Directorate-2?label=%D8%A7%D9%84%D8%A5%D8%B5%D8%AF%D8%A7%D8%B1&logo=github)](https://github.com/ibrahims78/Damascus-Health-Directorate-2/releases/latest)
 [![CI](https://github.com/ibrahims78/Damascus-Health-Directorate-2/actions/workflows/ci.yml/badge.svg)](https://github.com/ibrahims78/Damascus-Health-Directorate-2/actions/workflows/ci.yml)
@@ -17,7 +17,7 @@
 
 ## 📥 التنزيلات
 
-كل الإصدارات الجاهزة من صفحة [**Releases → v5.0.3**](https://github.com/ibrahims78/Damascus-Health-Directorate-2/releases/tag/v5.0.3):
+كل الإصدارات الجاهزة من صفحة [**Releases → v5.0.4**](https://github.com/ibrahims78/Damascus-Health-Directorate-2/releases/tag/v5.0.4):
 
 | الحزمة | المنصة | الوصف |
 |---|---|---|
@@ -195,7 +195,7 @@ node scripts/release-dry-run.mjs                         # تحقق إصدار �
 
 ---
 
-## 🆕 الإصدار 5.0.3 — الميزات والإمكانيات
+## 🆕 الإصدار 5.0.4 — الميزات والإمكانيات
 
 ### الحاكمية والصلاحيات
 - ثلاث صلاحيات: **مدير** · **أمين مستودع** · **مراقب**، مفروضة على الخادم.

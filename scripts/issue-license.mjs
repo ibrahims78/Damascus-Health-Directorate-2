@@ -32,7 +32,7 @@ if (!deviceId) {
   process.exit(1);
 }
 const root = path.resolve(import.meta.dirname ?? process.cwd(), "..");
-const releaseVersion = process.env.DAMASCUS_RELEASE_VERSION ?? "v5.0.3";
+const releaseVersion = process.env.DAMASCUS_RELEASE_VERSION ?? "v5.0.4";
 const externalSecretsRoot = process.env.DAMASCUS_RELEASE_SECRETS_DIR;
 const privateKeyPath = path.resolve(
   arg("private-key") ??
@@ -42,7 +42,7 @@ const privateKeyPath = path.resolve(
 );
 const keyId = arg("key-id") ?? fs.readFileSync(path.join(path.dirname(privateKeyPath), "key-id.txt"), "utf8").trim();
 const expiresAt = arg("expires") ?? null;
-const appVersion = arg("app-version") ?? "5.0.3";
+const appVersion = arg("app-version") ?? "5.0.4";
 const features = (arg("features") ?? "all").split(",").map((f) => f.trim()).filter(Boolean);
 const outPath = arg("out");
 

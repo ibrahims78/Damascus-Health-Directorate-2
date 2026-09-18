@@ -18,7 +18,7 @@ if (!["windows", "android"].includes(platform)) {
   process.exit(1);
 }
 const root = path.resolve(import.meta.dirname ?? process.cwd(), "..");
-const releaseVersion = process.env.DAMASCUS_RELEASE_VERSION ?? "v5.0.3";
+const releaseVersion = process.env.DAMASCUS_RELEASE_VERSION ?? "v5.0.4";
 const keyFile = path.join(root, "release-artifacts", releaseVersion, "license-public-keys", `${platform}.b64`);
 if (!fs.existsSync(keyFile)) {
   console.error(`platform public key not found: ${keyFile}`);

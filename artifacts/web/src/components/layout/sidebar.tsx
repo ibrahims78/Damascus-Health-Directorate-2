@@ -40,7 +40,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 
-const APP_VERSION = import.meta.env.VITE_APP_VERSION ?? "v5.0.3";
+const APP_VERSION = import.meta.env.VITE_APP_VERSION ?? "v5.0.4";
 
 const navItems = [
   { href: '/',               label: 'لوحة المعلومات',  icon: LayoutDashboard },

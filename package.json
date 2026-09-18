@@ -1,7 +1,7 @@
 {
   "name": "damascus-health-directorate-desktop",
   "productName": "Damascus Health Directorate",
-  "version": "5.0.3",
+  "version": "5.0.4",
   "main": "electron/main.cjs",
   "type": "module",
   "packageManager": "pnpm@10.26.1",

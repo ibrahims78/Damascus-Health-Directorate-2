@@ -2,7 +2,7 @@
 import { createPrivateKey, randomUUID, sign } from "node:crypto";
 
 const PRIVATE_KEY_ENV = "DAMASCUS_LICENSE_PRIVATE_KEY_B64";
-const [platform = "android", deviceId, appVersion = "5.0.3", expiresAt = ""] =
+const [platform = "android", deviceId, appVersion = "5.0.4", expiresAt = ""] =
   process.argv.slice(2);
 
 if (platform !== "android" && platform !== "windows") {

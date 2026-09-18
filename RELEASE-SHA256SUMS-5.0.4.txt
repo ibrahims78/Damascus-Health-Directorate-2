@@ -1,0 +1,5 @@
+# SHA-256 checksums — Damascus Health Directorate v5.0.4
+8fdadf9cf520a735c87780502c84bec0600932ab7aaeac18c2732c9f1da92654  Damascus-Health-Directorate-5.0.4-Portable-Windows-x64.zip
+6ad4cc2077c242fa06225b7313bc005b1f7f97f75f662635661c89836495161f  Damascus-Health-Directorate-5.0.4-Protected-Windows-x64.zip
+2d5504e28406f32afa2c1520570be5839427369c509298d6ec930d4902da0264  Damascus-Health-Directorate-v5.0.4-Android-Offline.apk
+8e7256b091563b41d792df37e31a44a7c9927dc657cc6ccea00573f3840040e2  Damascus-Health-Directorate-v5.0.4-Android-Protected.apk
