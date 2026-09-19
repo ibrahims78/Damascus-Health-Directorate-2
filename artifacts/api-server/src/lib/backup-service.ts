@@ -128,16 +128,18 @@ type QueryExecutor = {
   execute(query: ReturnType<typeof sql>): Promise<unknown>;
 };
 
-function encodeBackupData(table: BackupTable, data: Record<string, unknown>) {
+type BackupRecordTable = BackupTable | "users";
+
+function encodeBackupData(table: BackupRecordTable, data: Record<string, unknown>) {
   if (table !== "count_lines" || !Object.hasOwn(data, "session_id")) return data;
-  const encoded = { ...data, count_parent_id: data.session_id };
+  const encoded: Record<string, unknown> = { ...data, count_parent_id: data.session_id };
   delete encoded.session_id;
   return encoded;
 }
 
-function decodeBackupData(table: BackupTable, data: Record<string, unknown>) {
+function decodeBackupData(table: BackupRecordTable, data: Record<string, unknown>) {
   if (table !== "count_lines" || !Object.hasOwn(data, "count_parent_id")) return data;
-  const decoded = { ...data, session_id: data.count_parent_id };
+  const decoded: Record<string, unknown> = { ...data, session_id: data.count_parent_id };
   delete decoded.count_parent_id;
   return decoded;
 }

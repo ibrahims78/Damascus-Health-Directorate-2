@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -14,6 +14,7 @@ const adminPassword = "Phase7!Synthetic-2026";
 const packagePassword = "Phase7!Package-2026";
 const sessionSecret = "Phase7!Session-Only-2026";
 const dataDir = await mkdtemp(join(tmpdir(), "dme-backup-acceptance-"));
+const outputDir = process.env.BACKUP_ACCEPTANCE_OUTPUT_DIR;
 const apiEntry = join(root, "artifacts", "api-server", "dist", "index.mjs");
 const seedEntry = join(root, "artifacts", "api-server", "dist", "seed.mjs");
 const schemaPath = join(root, "lib", "db", "desktop-schema.sql");
@@ -184,12 +185,22 @@ try {
   assert(exported.status === 200 && exported.payload instanceof Uint8Array, "full backup export failed");
   const packageB64 = packageBase64(exported.payload);
   assert(exported.payload.length > 100, "backup package is unexpectedly small");
+  if (outputDir) {
+    await mkdir(outputDir, { recursive: true });
+    await writeFile(join(outputDir, "full-backup-5.0.4.dme-sync"), exported.payload);
+  }
 
   const inspected = await api("/api/backups/inspect", {
     method: "POST",
     body: { packageBase64: packageB64, password: packagePassword },
   });
   assert(inspected.status === 200 && inspected.payload?.manifest?.packageType === "full-backup", "inspect failed", inspected);
+  if (outputDir) {
+    await writeFile(
+      join(outputDir, "backup-manifest.json"),
+      JSON.stringify(inspected.payload, null, 2),
+    );
+  }
 
   const wrongPassword = await api("/api/backups/inspect", {
     method: "POST",
@@ -279,7 +290,7 @@ try {
   assert(catalogVerify.status === 200 && catalogVerify.payload?.verified === true, "catalog verification failed", catalogVerify);
 
   const sourceChangeToBackupMinutes = Number(((performance.now() - changeCommittedAt) / 60000).toFixed(4));
-  console.log(JSON.stringify({
+  const result = {
     status: "passed",
     environment: "isolated temporary PGlite",
     data: "synthetic only",
@@ -309,7 +320,11 @@ try {
       packageHash: inspected.payload.manifest.packageHash,
     },
     restorePointId: restored.payload.restorePointId,
-  }, null, 2));
+  };
+  if (outputDir) {
+    await writeFile(join(outputDir, "acceptance-report.json"), JSON.stringify(result, null, 2));
+  }
+  console.log(JSON.stringify(result, null, 2));
 } finally {
   if (server) {
     server.__stopping = true;
