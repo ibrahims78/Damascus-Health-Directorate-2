@@ -1,0 +1,38 @@
+{
+  "packageHash": "6ef3008353ae769b56330c160c0ecbb320ab1adbbf77ed1c5cf16c69105b69b7",
+  "manifest": {
+    "baseVector": {},
+    "changeCount": 2,
+    "changesFile": "changes.jsonl",
+    "checksumAlgorithm": "SHA-256",
+    "compression": "gzip",
+    "createdAt": "2026-09-19T10:37:55.274Z",
+    "encryption": "AES-256-GCM",
+    "format": "dme-sync",
+    "formatVersion": 1,
+    "kdf": "scrypt",
+    "lastVector": {
+      "5dfb966e-254c-49c1-922d-2c3d3c8f99ce": 2
+    },
+    "macAlgorithm": "HMAC-SHA-256",
+    "packageType": "full-backup",
+    "recordCount": 32,
+    "recordsFile": "records.jsonl",
+    "schemaVersion": "2026.08",
+    "sourceNodeId": "5dfb966e-254c-49c1-922d-2c3d3c8f99ce"
+  },
+  "recordCount": 32,
+  "changeCount": 2,
+  "entityTypes": [
+    "audit_log",
+    "categories",
+    "document_sequences",
+    "exit_reasons",
+    "inventory_batches",
+    "items",
+    "recipients",
+    "transactions",
+    "users",
+    "warehouses"
+  ]
+}

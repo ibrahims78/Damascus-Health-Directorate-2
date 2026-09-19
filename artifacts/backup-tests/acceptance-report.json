@@ -1,0 +1,30 @@
+{
+  "status": "passed",
+  "environment": "isolated temporary PGlite",
+  "data": "synthetic only",
+  "checks": {
+    "fullExport": "passed",
+    "inspect": "passed",
+    "wrongPasswordRejected": "passed",
+    "tamperRejected": "passed",
+    "mergePreservedNewerSourceData": "passed",
+    "restore": "passed",
+    "restoreReport": "passed",
+    "restoreAudit": "passed",
+    "rollback": "passed",
+    "catalogVerify": "passed"
+  },
+  "measurements": {
+    "exportElapsedMs": 130.26,
+    "restoreElapsedMs": 149.26,
+    "rollbackElapsedMs": 109.14,
+    "syntheticRpoObservationMinutes": 0.0116
+  },
+  "package": {
+    "bytes": 3807,
+    "packageType": "full-backup",
+    "recordCount": 32,
+    "changeCount": 2
+  },
+  "restorePointId": "df540986-a57d-44ef-ad75-3577b62bf91e"
+}
