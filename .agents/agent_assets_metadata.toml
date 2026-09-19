@@ -1,0 +1,58 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "bGIKaVX4PFx1IbAld3vrm"
+uri = "file://.local/outputs/backup-tests/full-backup-5.0.4.dme-sync"
+type = "unspecified"
+title = "حزمة النسخ الاحتياطية الكاملة 5.0.4"
+description = "حزمة DME-SYNC مشفرة ببيانات اصطناعية للاختبار، جاهزة للفحص والاستعادة التجريبية داخل التطبيق."
+logical_id = "f1705e02-8fc5-489f-b757-e5007859a50c"
+content_hash = "sha256:6ef3008353ae769b56330c160c0ecbb320ab1adbbf77ed1c5cf16c69105b69b7"
+size = 3807
+mtime_ms = 1789814275354
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:6d28e4a6-d74f-4c35-89cd-86a5e50f134d/f1705e02-8fc5-489f-b757-e5007859a50c/f3c4ab79-cd46-49e1-8833-623489d07375"
+storage_version_token = "1789814320048319"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "2HtpK437gcwhMsph16bZl"
+uri = "file://.local/outputs/backup-tests/feature-coverage-report-ar.md"
+type = "text"
+title = "تقرير تغطية العمليات والاختبارات"
+description = "تقرير عربي يوضح الربط مع GitHub، حالة التشغيل، ما تغطيه الحزمة، وما لم يُختبر أو ما هو مؤجل."
+logical_id = "16d49bf3-1574-40d2-ba47-7d8576e1d562"
+content_hash = "sha256:9f924b4b57258eabd3beb21ca5da8a2ae959bad11f7497b6d0fc34b9d49a9a91"
+size = 8575
+mtime_ms = 1789814299494
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:6d28e4a6-d74f-4c35-89cd-86a5e50f134d/16d49bf3-1574-40d2-ba47-7d8576e1d562/0abcb0e5-5baf-42e7-9ff3-688f7c6bceab"
+storage_version_token = "1789814320503676"
+content_type = "text/markdown"
+
+[[outputs]]
+id = "8VUaIOwIx9Ax92b5Cd3GU"
+uri = "file://.local/outputs/backup-tests/backup-manifest.json"
+type = "unspecified"
+title = "Manifest حزمة النسخ"
+description = "بيانات manifest والعدادات والبصمة الناتجة من فحص الحزمة دون كشف محتوى البيانات المشفرة."
+logical_id = "24309d1d-11e6-42bd-b411-55b9ad069c44"
+content_hash = "sha256:8be5cf06c215d18043443caedf77e8ee39f69ff188aa27d69164b446c6bbbc54"
+size = 947
+mtime_ms = 1789814275402
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:6d28e4a6-d74f-4c35-89cd-86a5e50f134d/24309d1d-11e6-42bd-b411-55b9ad069c44/43b1a108-a1fb-49ca-b6e7-54e5e6ff1857"
+storage_version_token = "1789814320967326"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "uOcDy-fOKUtzlLVgKzgqA"
+uri = "file://.local/outputs/backup-tests/acceptance-report.json"
+type = "unspecified"
+title = "تقرير قبول النسخ والاستعادة"
+description = "نتيجة الاختبار الآلي الأخير: التصدير، الفحص، الرفض، الاستعادة، التقرير، التراجع والتحقق من الكتالوج."
+logical_id = "2d5c00cc-f3cc-4588-8054-143ff7a4a5b0"
+content_hash = "sha256:6c994692bca1333ccfc7aedbd919e6f344cb1ca7ed4f23b52388ca528833cfe9"
+size = 773
+mtime_ms = 1789814275918
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:6d28e4a6-d74f-4c35-89cd-86a5e50f134d/2d5c00cc-f3cc-4588-8054-143ff7a4a5b0/03bdd082-042f-4c02-8b0e-54adaf78dc1b"
+storage_version_token = "1789814321514485"
+content_type = "application/octet-stream"
