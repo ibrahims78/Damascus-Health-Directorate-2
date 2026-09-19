@@ -35,12 +35,17 @@ function requireRestorePointPassword(): string {
 }
 
 const TABLES = [
+  "system_settings",
+  "units",
   "categories",
+  "warehouses",
+  "document_sequences",
+  "bins",
+  "import_batches",
   "items",
   "equipment",
   "recipients",
   "exit_reasons",
-  "system_settings",
   "transactions",
   "inventory_batches",
   "transaction_batch_allocations",
@@ -48,6 +53,13 @@ const TABLES = [
   "custody_returns",
   "damage_records",
   "central_returns",
+  "receipts",
+  "receipt_lines",
+  "transfers",
+  "transfer_lines",
+  "count_sessions",
+  "count_lines",
+  "alerts",
   "audit_log",
 ] as const;
 type BackupTable = (typeof TABLES)[number];
@@ -60,6 +72,16 @@ const TABLES_WITH_USERS = [...TABLES, "users"] as const;
 const ENTITY_TO_TABLE: Record<string, BackupTable> = {
   category: "categories",
   categories: "categories",
+  unit: "units",
+  units: "units",
+  warehouse: "warehouses",
+  warehouses: "warehouses",
+  document_sequence: "document_sequences",
+  document_sequences: "document_sequences",
+  bin: "bins",
+  bins: "bins",
+  import_batch: "import_batches",
+  import_batches: "import_batches",
   item: "items",
   items: "items",
   equipment: "equipment",
@@ -84,6 +106,20 @@ const ENTITY_TO_TABLE: Record<string, BackupTable> = {
   damage_records: "damage_records",
   central_return: "central_returns",
   central_returns: "central_returns",
+  receipt: "receipts",
+  receipts: "receipts",
+  receipt_line: "receipt_lines",
+  receipt_lines: "receipt_lines",
+  transfer: "transfers",
+  transfers: "transfers",
+  transfer_line: "transfer_lines",
+  transfer_lines: "transfer_lines",
+  count_session: "count_sessions",
+  count_sessions: "count_sessions",
+  count_line: "count_lines",
+  count_lines: "count_lines",
+  alert: "alerts",
+  alerts: "alerts",
   audit_log: "audit_log",
 };
 export type BackupVector = Record<string, number>;
@@ -91,6 +127,20 @@ export type BackupVector = Record<string, number>;
 type QueryExecutor = {
   execute(query: ReturnType<typeof sql>): Promise<unknown>;
 };
+
+function encodeBackupData(table: BackupTable, data: Record<string, unknown>) {
+  if (table !== "count_lines" || !Object.hasOwn(data, "session_id")) return data;
+  const encoded = { ...data, count_parent_id: data.session_id };
+  delete encoded.session_id;
+  return encoded;
+}
+
+function decodeBackupData(table: BackupTable, data: Record<string, unknown>) {
+  if (table !== "count_lines" || !Object.hasOwn(data, "count_parent_id")) return data;
+  const decoded = { ...data, session_id: data.count_parent_id };
+  delete decoded.count_parent_id;
+  return decoded;
+}
 
 function rowsFromResult(result: unknown): Record<string, unknown>[] {
   if (Array.isArray(result)) return result as Record<string, unknown>[];
@@ -127,7 +177,7 @@ export async function collectBackupRecords(executor: QueryExecutor = db): Promis
       ...rows.map((data) => ({
         entityType: table,
         localId: typeof data.id === "number" ? data.id : null,
-        data,
+        data: encodeBackupData(table, data),
       })),
     );
   }
@@ -189,7 +239,7 @@ async function collectCurrentRecordsForChanges(
       ...rows.map((data) => ({
         entityType: table,
         localId: typeof data.id === "number" ? data.id : null,
-        data,
+          data: encodeBackupData(table, data),
       })),
     );
   }
@@ -504,13 +554,15 @@ function insertStatement(table: BackupTable, data: Record<string, unknown>, upda
       return sql`INSERT INTO ${sql.identifier(table)}
         (${sql.join(columns.map((column) => sql.identifier(column)), sql`, `)})
         VALUES (${sql.join(columns.map((column) => sql`${data[column]}`), sql`, `)})
-        ON CONFLICT ("id") DO UPDATE SET ${assignments}`;
+        ON CONFLICT ("id") DO UPDATE SET ${assignments}
+        RETURNING "id"`;
     }
   }
   return sql`INSERT INTO ${sql.identifier(table)}
     (${sql.join(columns.map((column) => sql.identifier(column)), sql`, `)})
     VALUES (${sql.join(columns.map((column) => sql`${data[column]}`), sql`, `)})
-    ON CONFLICT DO NOTHING`;
+    ON CONFLICT DO NOTHING
+    RETURNING "id"`;
 }
 
 async function deleteBusinessRows(tx: QueryExecutor) {
@@ -521,7 +573,12 @@ async function deleteBusinessRows(tx: QueryExecutor) {
 
 async function synchronizeBusinessSequences(tx: QueryExecutor) {
   const sequenceTables = [
+    ["units", "units"],
     ["categories", "categories"],
+    ["warehouses", "warehouses"],
+    ["document_sequences", "document_sequences"],
+    ["bins", "bins"],
+    ["import_batches", "import_batches"],
     ["items", "items"],
     ["equipment", "equipment"],
     ["recipients", "recipients"],
@@ -533,6 +590,13 @@ async function synchronizeBusinessSequences(tx: QueryExecutor) {
     ["custody_returns", "custody_returns"],
     ["damage_records", "damage_records"],
     ["central_returns", "central_returns"],
+    ["receipts", "receipts"],
+    ["receipt_lines", "receipt_lines"],
+    ["transfers", "transfers"],
+    ["transfer_lines", "transfer_lines"],
+    ["count_sessions", "count_sessions"],
+    ["count_lines", "count_lines"],
+    ["alerts", "alerts"],
     ["audit_log", "audit_log"],
   ] as const;
 
@@ -605,16 +669,17 @@ export async function applyRestore(
       try {
         const isDelta = pkg.manifest.packageType === "delta-sync";
         const normalized = normalizeUserReferences(
-          record.data,
+          decodeBackupData(table, record.data),
           availableUserIds,
           fallbackUserId ?? null,
         );
-        const inserted = (await tx.execute(
+        const inserted = await tx.execute(
           insertStatement(table, normalized.data, isDelta && mode === "merge"),
-        )) as {
-          rowCount?: number;
-        };
-        if (Number(inserted.rowCount ?? 0) > 0) {
+        );
+        const rowCount =
+          Number((inserted as { rowCount?: number }).rowCount ?? 0) ||
+          rowsFromResult(inserted).length;
+        if (rowCount > 0) {
           result.status = "applied";
         } else {
           result.status = "duplicate";
