@@ -56,3 +56,17 @@ mtime_ms = 1789814275918
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:6d28e4a6-d74f-4c35-89cd-86a5e50f134d/2d5c00cc-f3cc-4588-8054-143ff7a4a5b0/03bdd082-042f-4c02-8b0e-54adaf78dc1b"
 storage_version_token = "1789814321514485"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "lbeW1zOVGAmqJEOiKlyK0"
+uri = "file://.local/outputs/full-application-audit-5.0.4-ar.txt"
+type = "text"
+title = "بروتوكول التدقيق الكامل لتطبيق 5.0.4"
+description = "ملف نصي عربي احترافي قابل لإعادة التنفيذ، يتضمن فحص المشروع والواجهة وAPI وقاعدة البيانات والنسخ والاستعادة والمزامنة والاستيراد والتقارير والصلاحيات والعمل دون اتصال وWindows وAndroid والوظائف المؤجلة."
+logical_id = "30ea4681-e4ff-4e0c-bea4-13675e6b0ff1"
+content_hash = "sha256:a56cef873a607906302cdfda87535e9859577edeb2a5e32c4dec6f6d575b0352"
+size = 35704
+mtime_ms = 1789815490830
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:6d28e4a6-d74f-4c35-89cd-86a5e50f134d/30ea4681-e4ff-4e0c-bea4-13675e6b0ff1/c0fa2f1d-945d-43a8-b429-ea5276d80a62"
+storage_version_token = "1789815494566476"
+content_type = "text/plain"
