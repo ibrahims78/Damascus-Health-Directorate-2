@@ -45,7 +45,7 @@ export async function createCountSession(input: {
   userName?: string | null;
 }) {
   const code = (await nextDocumentNumber("CNT")) ?? `CNT-${Date.now()}`;
-  const conditions = [eq(itemsTable.isActive, true), eq(itemsTable.itemType, "item")];
+  const conditions = [eq(itemsTable.isActive, true), eq(itemsTable.itemType, "consumable")];
   if (input.categoryId) conditions.push(eq(itemsTable.categoryId, input.categoryId));
   const rows = await db
     .select({

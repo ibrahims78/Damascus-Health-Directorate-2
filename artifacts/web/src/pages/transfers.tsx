@@ -48,6 +48,7 @@ export function TransfersPage() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isBranch, setIsBranch] = useState(false);
   const [dialog, setDialog] = useState<{ open: boolean; from: string; to: string; itemId: string; quantity: string; batch: string; expiry: string }>({
     open: false, from: '', to: '', itemId: '', quantity: '1', batch: '', expiry: '',
   });
@@ -56,14 +57,16 @@ export function TransfersPage() {
     setLoading(true);
     setError(null);
     try {
-      const [t, w, i] = await Promise.all([
+      const [t, w, i, cur] = await Promise.all([
         api<Transfer[]>('/transfers?limit=200'),
         api<Warehouse[]>('/warehouses'),
         api<{ items: Item[] }>('/items?limit=5000'),
+        api<{ type?: string } | null>('/warehouses/current'),
       ]);
       setTransfers(Array.isArray(t) ? t : []);
       setWarehouses(Array.isArray(w) ? w : []);
       setItems(i.items ?? []);
+      setIsBranch(cur?.type === 'branch');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'خطأ في التحميل');
     } finally {
@@ -114,7 +117,7 @@ export function TransfersPage() {
           <Button variant="outline" className="gap-2" onClick={() => void load()} disabled={loading}>
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> تحديث
           </Button>
-          {canOperate && (
+          {canOperate && !isBranch && (
             <Button className="gap-2" onClick={() => setDialog({ ...dialog, open: true })}>
               <Plus className="w-4 h-4" /> طلب تحويل
             </Button>
@@ -160,7 +163,7 @@ export function TransfersPage() {
                     </TableCell>
                     <TableCell className="text-left">
                       <div className="flex justify-end gap-1">
-                        {canOperate && t.status === 'requested' && (
+                        {canOperate && !isBranch && t.status === 'requested' && (
                           <Button size="sm" variant="outline" onClick={() => void action(t.id, 'issue', undefined, 'تم الإرسال.')} disabled={busy}>إرسال</Button>
                         )}
                         {canOperate && t.status === 'issued' && (

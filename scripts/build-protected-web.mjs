@@ -18,7 +18,8 @@ if (!["windows", "android"].includes(platform)) {
   process.exit(1);
 }
 const root = path.resolve(import.meta.dirname ?? process.cwd(), "..");
-const releaseVersion = process.env.DAMASCUS_RELEASE_VERSION ?? "v5.0.4";
+const appVersion = String(JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).version);
+const releaseVersion = process.env.DAMASCUS_RELEASE_VERSION ?? ("v" + appVersion);
 const keyFile = path.join(root, "release-artifacts", releaseVersion, "license-public-keys", `${platform}.b64`);
 if (!fs.existsSync(keyFile)) {
   console.error(`platform public key not found: ${keyFile}`);
@@ -31,6 +32,7 @@ const offline = platform === "android" ? "1" : "0";
 const outDir = `dist/protected-${platform}/public`;
 const env = {
   ...process.env,
+  VITE_APP_VERSION: appVersion,
   VITE_OFFLINE_MODE: offline,
   VITE_PROTECTED_BUILD: "1",
   VITE_OUTPUT_DIR: outDir,

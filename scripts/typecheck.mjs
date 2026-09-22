@@ -17,9 +17,10 @@ const checks = [
 
 for (const [name, args] of checks) {
   console.log(`\n[typecheck] ${name}`);
-  const result = spawnSync("pnpm", args, {
+    const result = spawnSync("pnpm", args, {
     stdio: "inherit",
     env: process.env,
+    shell: true,
   });
   if (result.error) {
     console.error(`[typecheck] ${name} could not start: ${result.error.message}`);

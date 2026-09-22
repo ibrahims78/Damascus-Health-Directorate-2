@@ -83,15 +83,18 @@ export default function ReceiptsPage() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isBranch, setIsBranch] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const [list, itemList] = await Promise.all([
+      const [list, itemList, current] = await Promise.all([
         api<Receipt[]>('/receipts?limit=50'),
         api<{ items: Item[] }>('/items?limit=5000'),
+        api<{ type?: string } | null>('/warehouses/current'),
       ]);
       setReceipts(Array.isArray(list) ? list : []);
       setItems(Array.isArray(itemList?.items) ? itemList.items : []);
+      setIsBranch(current?.type === 'branch');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'تعذّر تحميل سندات الاستلام');
     }
@@ -203,6 +206,7 @@ export default function ReceiptsPage() {
       {error && <p className="rounded-md border border-destructive/40 bg-destructive/5 p-2 text-sm text-destructive">{error}</p>}
       {message && <p className="rounded-md border border-emerald-600/30 bg-emerald-50 p-2 text-sm text-emerald-800">{message}</p>}
 
+      {!isBranch && (
       <Card>
         <CardHeader>
           <CardTitle className="text-base">سند جديد</CardTitle>
@@ -286,6 +290,14 @@ export default function ReceiptsPage() {
           </div>
         </CardContent>
       </Card>
+      )}
+      {isBranch && (
+        <Card>
+          <CardContent className="pt-4">
+            <p className="text-sm text-muted-foreground">إنشاء سندات استلام من مورد متاح للمستودع المركزي فقط. استخدم «استلام تحويل من المركزي».</p>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

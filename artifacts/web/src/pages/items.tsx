@@ -236,184 +236,6 @@ function ExportButton() {
   );
 }
 
-/* ─────────────────────── Bulk import dialog ─────────────────────────────── */
-
-function BulkImportDialog({
-  open,
-  onClose,
-  onDone,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onDone: () => void;
-}) {
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [status, setStatus] = useState<'idle' | 'parsing' | 'uploading' | 'done' | 'error'>('idle');
-  const [result, setResult] = useState<{ created: number; updated: number; errors: { row: number; name: string; error: string }[] } | null>(null);
-  const [errorMsg, setErrorMsg] = useState('');
-
-  const reset = () => { setStatus('idle'); setResult(null); setErrorMsg(''); if (fileRef.current) fileRef.current.value = ''; };
-  const handleClose = () => { reset(); onClose(); };
-
-  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const extension = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
-    if (!['.xlsx', '.xls'].includes(extension)) {
-      setStatus('error');
-      setErrorMsg('صيغة الملف غير مدعومة. اختر ملف Excel بامتداد .xlsx أو .xls.');
-      return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      setStatus('error');
-      setErrorMsg('حجم الملف أكبر من الحد المسموح (10 ميغابايت).');
-      return;
-    }
-    setStatus('parsing');
-    setResult(null);
-    setErrorMsg('');
-    try {
-      const XLSX = await import('xlsx');
-      const buffer = await file.arrayBuffer();
-      const wb = XLSX.read(buffer, { type: 'array' });
-      const sheet = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: '' });
-
-      const COL_MAP: Record<string, string> = {
-        'الاسم': 'name', 'اسم المادة': 'name', 'name': 'name',
-        'الرمز': 'code', 'رمز المادة': 'code', 'code': 'code',
-        'التصنيف': 'categoryName', 'تصنيف': 'categoryName', 'category': 'categoryName',
-        'الوحدة': 'unit', 'وحدة': 'unit', 'unit': 'unit',
-        'الرصيد': 'currentStock', 'الكمية': 'currentStock', 'الرصيد الحالي': 'currentStock', 'currentStock': 'currentStock',
-        'الحد الأدنى': 'minStock', 'حد التنبيه': 'minStock', 'minStock': 'minStock',
-        'تاريخ الصلاحية': 'expiryDate', 'الصلاحية': 'expiryDate', 'expiryDate': 'expiryDate',
-        'رقم التشغيلة': 'batchNumber', 'الدفعة': 'batchNumber', 'batchNumber': 'batchNumber',
-        'الموقع': 'location', 'location': 'location',
-        'المورد': 'supplier', 'supplier': 'supplier',
-        'ملاحظات': 'notes', 'notes': 'notes',
-      };
-
-      const mapped = rows.map((row) => {
-        const out: Record<string, any> = {};
-        for (const [k, v] of Object.entries(row)) {
-          const mappedKey = COL_MAP[k.trim()] ?? k;
-          out[mappedKey] = v;
-        }
-        return out;
-      }).filter((r) => r.name);
-
-      if (mapped.length === 0) {
-        setStatus('error');
-        setErrorMsg('لم يُعثر على بيانات قابلة للقراءة. تأكد من وجود صف رأس وعمود "الاسم".');
-        return;
-      }
-
-      setStatus('uploading');
-      const res = await fetch('/api/items/bulk-import?mode=upsert', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(mapped),
-        credentials: 'include',
-      });
-      if (!res.ok) { const d = await res.json(); setStatus('error'); setErrorMsg(d.error ?? 'حدث خطأ أثناء الاستيراد'); return; }
-      const data = await res.json();
-      setResult(data);
-      setStatus('done');
-      onDone();
-    } catch (err: any) {
-      setStatus('error');
-      setErrorMsg(err.message ?? 'خطأ غير متوقع');
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={(value) => !value && handleClose()}>
-      <DialogContent className="sm:max-w-lg" dir="rtl">
-        <DialogHeader className="text-right">
-          <DialogTitle className="flex items-center gap-2">
-              <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
-              استيراد مواد من Excel
-          </DialogTitle>
-          <DialogDescription>يُقبل الملف بصيغة .xlsx أو .xls، والصف الأول مخصص لرؤوس الأعمدة. الحد الأقصى 10 ميغابايت.</DialogDescription>
-        </DialogHeader>
-
-        {/* Format hint */}
-        <div className="rounded-md bg-muted/50 border p-3 text-xs space-y-1">
-          <p className="font-semibold mb-1">الأعمدة المدعومة (رؤوس الأعمدة بالعربية أو الإنجليزية):</p>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-muted-foreground">
-            <span>• <b>الاسم</b> (إلزامي)</span>
-            <span>• <b>الوحدة</b> (إلزامي)</span>
-            <span>• الرمز</span>
-            <span>• التصنيف</span>
-            <span>• الرصيد الحالي</span>
-            <span>• الحد الأدنى</span>
-            <span>• تاريخ الصلاحية</span>
-            <span>• رقم التشغيلة</span>
-            <span>• الموقع</span>
-            <span>• المورد</span>
-          </div>
-          <p className="text-muted-foreground mt-1">إذا وُجد رمز متطابق، يُحدَّث السجل (upsert).</p>
-        </div>
-
-        {/* Upload area */}
-        {status === 'idle' && (
-          <label className="flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-8 cursor-pointer hover:border-primary hover:bg-primary/5 transition-colors gap-2">
-            <Upload className="w-8 h-8 text-muted-foreground" />
-            <span className="text-sm font-medium">اضغط لاختيار ملف Excel</span>
-            <span className="text-xs text-muted-foreground">.xlsx أو .xls</span>
-            <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFile} />
-          </label>
-        )}
-
-        {(status === 'parsing' || status === 'uploading') && (
-          <div className="flex items-center justify-center gap-3 py-8 text-muted-foreground">
-            <Loader2 className="w-5 h-5 animate-spin" />
-            <span>{status === 'parsing' ? 'جاري قراءة الملف...' : 'جاري رفع البيانات...'}</span>
-          </div>
-        )}
-
-        {status === 'error' && (
-          <div className="rounded-md bg-destructive/10 border border-destructive/20 p-4 text-sm text-destructive" role="alert">
-            {errorMsg}
-          </div>
-        )}
-
-        {status === 'done' && result && (
-          <div className="space-y-3">
-            <div className="flex items-center gap-4 rounded-md bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 p-4">
-              <FileSpreadsheet className="w-8 h-8 text-emerald-600 shrink-0" />
-              <div>
-                <p className="font-semibold text-emerald-700 dark:text-emerald-400">تم الاستيراد بنجاح</p>
-                <p className="text-sm text-emerald-600 dark:text-emerald-500">
-                  تمت إضافة {result.created} صنف · تحديث {result.updated}
-                  {result.errors.length > 0 && ` · ${result.errors.length} خطأ`}
-                </p>
-              </div>
-            </div>
-            {result.errors.length > 0 && (
-              <div className="rounded-md border p-3 text-xs space-y-1 max-h-32 overflow-y-auto">
-                <p className="font-semibold text-destructive mb-1">أخطاء تفصيلية:</p>
-                {result.errors.map((e, i) => (
-                  <p key={i} className="text-muted-foreground">صف {e.row}: {e.name} — {e.error}</p>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        <DialogFooter className="gap-2">
-          {status === 'error' && (
-            <Button variant="link" size="sm" onClick={reset}>إعادة المحاولة</Button>
-          )}
-          <Button variant="outline" size="sm" onClick={handleClose}>
-            {status === 'done' ? 'إغلاق' : 'إلغاء'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 /* ──────────────────────────── Main list ─────────────────────────────────── */
 
 const PAGE_SIZE = 20;
@@ -432,7 +254,6 @@ function ItemsList() {
   const [sortBy, setSortBy]             = useState<SortKey>('name');
   const [sortDir, setSortDir]           = useState<'asc' | 'desc'>('asc');
   const [deleteTarget, setDeleteTarget] = useState<Item | null>(null);
-  const [importOpen, setImportOpen]     = useState(false);
 
   /* debounce search */
   useEffect(() => {
@@ -580,15 +401,6 @@ function ItemsList() {
           />
         </div>
 
-        {/* Bulk import dialog */}
-        <BulkImportDialog
-          open={importOpen}
-          onClose={() => setImportOpen(false)}
-          onDone={() => {
-            queryClient.invalidateQueries({ queryKey: ['items'] });
-            queryClient.invalidateQueries({ queryKey: ['items-kpi'] });
-          }}
-        />
 
         {/* Table card */}
         <div className="bg-card border rounded-lg shadow-sm">
@@ -687,23 +499,7 @@ function ItemsList() {
               {/* Export */}
               <ExportButton />
 
-              {/* Import — managers only */}
-              {canDefine && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-1.5"
-                      onClick={() => setImportOpen(true)}
-                    >
-                      <Upload className="w-4 h-4" />
-                      استيراد
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>استيراد مواد من ملف Excel</TooltipContent>
-                </Tooltip>
-              )}
+
             </div>
           </div>
 

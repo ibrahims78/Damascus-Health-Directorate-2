@@ -29,6 +29,7 @@ export type InventoryImportRow = {
 export type InventoryOpeningBatchRow = {
   rowNumber: number;
   code: string | null;
+  warehouseCode: string | null;
   quantity: number | null;
   batchNumber: string | null;
   expiryDate: string | null;
@@ -73,6 +74,8 @@ export type InventoryImportContext = {
 
 export type InventoryOpeningBatchContext = {
   existingByCode: Map<string, ExistingInventoryItem>;
+  /** Active warehouse codes; opening balances must name their destination site. */
+  knownWarehouseCodes?: Set<string>;
   seenBatchKeys?: Set<string>;
   existingBatchKeys?: Set<string>;
 };
@@ -123,6 +126,7 @@ export const INVENTORY_TEMPLATE_COLUMNS = {
   ],
   openingBatches: [
     { key: "code", label: "رمز المادة", required: true, type: "text" },
+    { key: "warehouse", label: "المستودع", required: true, type: "text" },
     { key: "quantity", label: "الكمية الافتتاحية", required: true, type: "integer" },
     { key: "batchNumber", label: "رقم الدفعة", required: false, type: "text" },
     { key: "expiryDate", label: "تاريخ الصلاحية", required: false, type: "date" },
@@ -176,6 +180,12 @@ const HEADER_ALIASES: Record<string, string> = {
   "الرصيد الافتتاحي": "quantity",
   openingquantity: "quantity",
   quantity: "quantity",
+  المستودع: "warehouse",
+  "كود المستودع": "warehouse",
+  "رمز المستودع": "warehouse",
+  "اسم المستودع": "warehouse",
+  warehouse: "warehouse",
+  warehousecode: "warehouse",
   "تاريخ الانتهاء": "expiryDate",
   "تاريخ الصلاحية": "expiryDate",
   الصلاحية: "expiryDate",
@@ -214,6 +224,7 @@ const ITEM_FIELDS = new Set([
 
 const OPENING_BATCH_FIELDS = new Set([
   "code",
+  "warehouse",
   "quantity",
   "batchNumber",
   "expiryDate",
@@ -372,6 +383,7 @@ export function normalizeOpeningBatchRow(
   return {
     rowNumber,
     code: normalizeCode(canonical.code),
+    warehouseCode: normalizeText(canonical.warehouse),
     quantity: parseNonNegativeInteger(canonical.quantity, null),
     batchNumber: normalizeText(canonical.batchNumber),
     expiryDate: expiryDate.value,
@@ -526,6 +538,14 @@ export function validateInventoryOpeningBatchRow(
   }
 
   if (!row.code) errors.push({ code: "ITEM_CODE_REQUIRED", message: "رمز المادة مطلوب" });
+  if (!row.warehouseCode) {
+    errors.push({ code: "WAREHOUSE_REQUIRED", message: "المستودع مطلوب للأرصدة الافتتاحية" });
+  } else if (
+    context.knownWarehouseCodes &&
+    !context.knownWarehouseCodes.has(row.warehouseCode)
+  ) {
+    errors.push({ code: "UNKNOWN_WAREHOUSE", message: `المستودع غير معروف: ${row.warehouseCode}` });
+  }
   if (row.quantity === null || row.quantity <= 0) {
     errors.push({ code: "INVALID_OPENING_QUANTITY", message: "الكمية الافتتاحية يجب أن تكون عددًا صحيحًا أكبر من الصفر" });
   }

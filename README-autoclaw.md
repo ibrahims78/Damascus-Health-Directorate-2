@@ -22,16 +22,20 @@
 ```bash
 pnpm install --ignore-scripts
 pnpm run typecheck            # كل الحزم (lib ثم artifacts)
-pnpm run build                # بناء كامل
+pnpm run build                # بناء كامل (API + واجهة)
 
 # النسخة المحمية (ويب)
-node scripts/build-protected-web.mjs windows    # أو android
-pnpm --filter @workspace/api-server run build:standard
+node scripts/build-protected-web.mjs windows    # أو android (يشتق الإصدار من package.json)
 pnpm --filter @workspace/api-server run build:protected
 
-# تجميع حزم سطح المكتب (يدمج web + api + schema داخل app.asar)
-node scripts/release-dry-run.mjs
+# بناء APK (Offline + Protected) بالتوليفة والمفتاح المحليين
+.\Build-Android-Apk.ps1
+
+# تجميع حزمة ويندوز (يحتاج runtime Electron + main-template)
+.\release-artifacts\scripts\reassemble-electron.ps1
 ```
+
+> **التوليفة المحلية في هذه النسخة:** `offline-build-tools/` (JDK 21 + Android SDK + Gradle + Electron runtime + pnpm store)، ومفتاح التوقيع في `release-secrets/android/`، وحزمة التفعيل في `deliverables/`. راجع `BUILD-AND-TOOLS-AR.md`.
 
 **مهم**: عند تعديل `lib/api-spec/openapi.yaml` نفّذ codegen ثم `tsc --build` قبل typecheck (حزم lib تعتمد على مخرجات TS المترجمة).
 
@@ -46,19 +50,21 @@ node scripts/release-dry-run.mjs
 
 ## الاختبارات
 
-- `docs/tests/` — اختبارات API الشاملة (مزامنة 51 حالة، أمان، استعادة) تعمل على مثيلين حيين
-- `.github/workflows/ci.yml` — CI يبني ويشغّل الاختبارات + `scripts/ci-e2e.sh`
-- Vitest: `pnpm test` (قواعد الجرد والحركة)
+- `docs/tests/` — اختبارات API الشاملة (مزامنة، أمان، استعادة) تعمل على مثيلين حيين. **غير مضمّنة في هذه النسخة المحلية** (مقصودة: لا ملفات اختبار).
+- `.github/workflows/ci.yml` و`scripts/ci-e2e.sh` — CI يبني ويشغّل الاختبارات. **غير مضمّنة هنا**.
+- Vitest (`pnpm test`) — قواعد الجرد والحركة. `vitest.config.ts` غير مضمّن هنا.
 
 ## هيكل المستودع
 
 ```
-artifacts/        web (React) + api-server (Express)
-lib/              db, license-core, backup-format, api-spec, api-client-react, api-zod, sync-contract
-android/          مشروع أندرويد (Capacitor)
-release-artifacts/  ملاحظات ومخرجات الإصدار غير المشمولة في حزم المصدر
-docs/             العمليات، دليل المستخدم، قواعد المجال، الاختبارات
-scripts/          الاستيراد (Excel/Equipment)، إصدار التراخيص، CI
+artifacts/          web (React) + api-server (Express)
+lib/                db, license-core, backup-format, api-spec, api-client-react, api-zod, sync-contract
+android/            مشروع أندرويد (Capacitor)
+scripts/            البناء، إصدار التراخيص، الاستيراد
+release-artifacts/  ملاحظات الإصدار + سكربتات تجميع ويندوز + مفاتيح التحقق
+release-secrets/    مفتاح توقيع الإنتاج (keystore) — سري
+offline-build-tools/  التوليفة المحلية (JDK 21 + Android SDK + Gradle + Electron + pnpm store)
+deliverables/       حزم ويندوز وأندرويد + حزمة التفعيل + البصمات
 ```
 
 ## ملاحظات ويندوز الحرجة (دروس مستفادة)
@@ -70,12 +76,10 @@ scripts/          الاستيراد (Excel/Equipment)، إصدار التراخ
 
 ---
 
-## الإصدار 5.0.3
+## الإصدار 5.0.5
 
 يحتوي هذا الإصدار مراحل التطوير الكاملة: الحاكمية والصلاحيات · الكتالوج والوحدات المعيارية ·
 حاكمية الاستيراد · مركز المخزون والترصيد · نموذج المستودعات · دورة التحويل · إدارة المزامنة ·
-التقارير الموحّدة والطباعة.
+التقارير الموحّدة والطباعة، إضافةً إلى **توحيد استيراد المواد والتجهيزات** واستيراد **الأرصدة الافتتاحية لكل مستودع**.
 
-- الدليل الكامل: `docs/user-guide-ar.md`
-- دليل تشغيل المواقع المتعددة: `docs/phase7-multisite-sync-ar.md`
-- تقرير التحقق الكامل: `docs/phase*/` و`CHANGELOG.md`
+- الدليل التفصيلي: `README.md` (والملاحظات في `CHANGELOG.md`)

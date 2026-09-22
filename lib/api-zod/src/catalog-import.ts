@@ -38,6 +38,8 @@ export const CATALOG_EQUIPMENT_COLUMNS = [
   "model",
   "serialNumber",
   "unit",
+  "quantity",
+  "warehouse",
   "minQuantity",
   "requiresSerial",
   "notes",
@@ -67,6 +69,8 @@ export const CATALOG_EQUIPMENT_HEADERS: Record<(typeof CATALOG_EQUIPMENT_COLUMNS
   model: "الموديل",
   serialNumber: "الرقم التسلسلي",
   unit: "الوحدة",
+  quantity: "الكمية",
+  warehouse: "المستودع",
   minQuantity: "الحد الأدنى",
   requiresSerial: "يتطلب رقم تسلسلي",
   notes: "ملاحظات",
@@ -83,7 +87,9 @@ export type CatalogIssueCode =
   | "SERIAL_WITH_QUANTITY"
   | "INVALID_ACTIVE_FLAG"
   | "INVALID_NUMBER"
-  | "SERIAL_WITH_QTY_COLUMN";
+  | "SERIAL_WITH_QTY_COLUMN"
+  | "WAREHOUSE_REQUIRED"
+  | "WAREHOUSE_UNKNOWN";
 
 export type CatalogIssue = {
   sheet: "items" | "equipment";
@@ -129,6 +135,8 @@ export type CatalogEquipmentRow = {
   model: string | null;
   serialNumber: string | null;
   unit: string | null;
+  quantity: number;
+  warehouse: string | null;
   minQuantity: number;
   requiresSerial: boolean;
   notes: string | null;
@@ -140,6 +148,7 @@ export type CatalogImportMode = "add-only" | "add-and-update";
 export type CatalogValidationContext = {
   knownUnits: ReadonlySet<string>;
   knownCategories: ReadonlySet<string>;
+  knownWarehouseCodes: ReadonlySet<string>;
   existingItemKeys: ReadonlySet<string>;
   existingEquipmentKeys: ReadonlySet<string>;
   mode: CatalogImportMode;
@@ -276,11 +285,25 @@ export function validateCatalogEquipmentRows(
     if (!name) push("NAME_REQUIRED", "اسم التجهيز مطلوب.", "name");
 
     const quantityRaw = parseInteger(raw.quantity ?? raw["الكمية"]);
-    if (quantityRaw !== null && quantityRaw !== 1) {
-      push("SERIAL_WITH_QUANTITY", "قالب الكتالوج لا يقبل كميات للتجهيزات؛ الكمية = 1 عند وجود رقم تسلسلي.", "quantity");
+    if (quantityRaw === null && norm(raw.quantity ?? raw["الكمية"]) !== "") {
+      push("INVALID_NUMBER", "الكمية يجب أن تكون عددًا صحيحًا.", "quantity");
+    }
+    if (quantityRaw !== null && quantityRaw < 1) {
+      push("INVALID_NUMBER", "الكمية يجب أن تكون 1 على الأقل.", "quantity");
     }
 
     const serialNumber = norm(raw.serialNumber ?? raw["الرقم التسلسلي"]) || null;
+    if (serialNumber && quantityRaw !== null && quantityRaw !== 1) {
+      push("SERIAL_WITH_QUANTITY", "التجهيز ذو الرقم التسلسلي كميته = 1 دائماً.", "quantity");
+    }
+
+    const warehouse = norm(raw.warehouse ?? raw["المستودع"]) || null;
+    if (!warehouse) {
+      push("WAREHOUSE_REQUIRED", "المستودع مطلوب للتجهيز.", "warehouse");
+    } else if (!ctx.knownWarehouseCodes.has(warehouse)) {
+      push("WAREHOUSE_UNKNOWN", `المستودع «${warehouse}» غير معرّف.`, "warehouse");
+    }
+
     const minQuantityRaw = parseInteger(raw.minQuantity ?? raw["الحد الأدنى"]);
     if (minQuantityRaw === null && norm(raw.minQuantity ?? raw["الحد الأدنى"]) !== "") {
       push("INVALID_NUMBER", "الحد الأدنى يجب أن يكون عددًا صحيحًا.", "minQuantity");
@@ -302,6 +325,8 @@ export function validateCatalogEquipmentRows(
       model: norm(raw.model ?? raw["الموديل"]) || null,
       serialNumber,
       unit: unitRaw,
+      quantity: serialNumber ? 1 : quantityRaw ?? 1,
+      warehouse,
       minQuantity: minQuantityRaw ?? 0,
       requiresSerial: parseBooleanFlag(raw.requiresSerial ?? raw["يتطلب رقم تسلسلي"], Boolean(serialNumber)) ?? Boolean(serialNumber),
       notes: norm(raw.notes ?? raw["ملاحظات"]) || null,

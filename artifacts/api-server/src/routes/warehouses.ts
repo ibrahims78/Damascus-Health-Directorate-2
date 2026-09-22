@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, warehousesTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { auditLog } from "../middlewares/audit";
 import {
@@ -106,6 +106,17 @@ router.post("/", requireAuth, requireRole("admin"), async (req, res) => {
       res.status(409).json({ error: "رمز المستودع مستخدم مسبقًا.", code: "WAREHOUSE_CODE_DUPLICATE" });
       return;
     }
+    if (type === "central") {
+      const [otherCentral] = await db
+        .select({ id: warehousesTable.id })
+        .from(warehousesTable)
+        .where(and(eq(warehousesTable.type, "central"), eq(warehousesTable.isActive, true)))
+        .limit(1);
+      if (otherCentral) {
+        res.status(409).json({ error: "يوجد مستودع مركزي فعّال بالفعل. لا يُسمح بأكثر من مستودع مركزي واحد.", code: "SINGLE_CENTRAL_ONLY" });
+        return;
+      }
+    }
     const [created] = await db
       .insert(warehousesTable)
       .values({ code, name, type, notes: req.body?.notes ? String(req.body.notes).trim() : null })
@@ -136,7 +147,21 @@ router.put("/:id", requireAuth, requireRole("admin"), async (req, res) => {
       updates.notes = req.body.notes ? String(req.body.notes).trim() : null;
     }
     if (req.body?.isActive !== undefined) updates.isActive = Boolean(req.body.isActive);
-    if (req.body?.type !== undefined) updates.type = String(req.body.type) === "central" ? "central" : "branch";
+    if (req.body?.type !== undefined) {
+      const nextType = String(req.body.type) === "central" ? "central" : "branch";
+      if (nextType === "central") {
+        const [otherCentral] = await db
+          .select({ id: warehousesTable.id })
+          .from(warehousesTable)
+          .where(and(eq(warehousesTable.type, "central"), eq(warehousesTable.isActive, true)))
+          .limit(1);
+        if (otherCentral && otherCentral.id !== id) {
+          res.status(409).json({ error: "يوجد مستودع مركزي فعّال بالفعل.", code: "SINGLE_CENTRAL_ONLY" });
+          return;
+        }
+      }
+      updates.type = nextType;
+    }
     const [updated] = await db
       .update(warehousesTable)
       .set(updates as never)

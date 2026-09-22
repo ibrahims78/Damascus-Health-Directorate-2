@@ -59,7 +59,7 @@ const troubleshootingItems: Array<{ problem: string; solution: string }> = [
   {
     problem: 'الاستيراد رفض الملف',
     solution:
-      'الوحدة والتصنيف يجب أن يطابقا ورقة «القيم المرجعية»، ولا يُسمح بأعمدة كمية في قالب الكتالوج، والسطر المكرر داخل الملف يُرفض. نزّل تقرير الأخطاء CSV وصحّح الأسطر المذكورة ثم أعد الرفع.',
+      'الوحدة والتصنيف والمستودع يجب أن تطابق ورقة «القيم المرجعية». في قالب الكتالوج لا تُقبل أعمدة كمية للمواد، بينما تقبل التجهيزات عمود كمية ومستودعاً؛ رصيد افتتاح المواد يُدار من قالب «الأرصدة الافتتاحية». السطر المكرر داخل الملف يُرفض. نزّل تقرير الأخطاء CSV وصحّح الأسطر المذكورة ثم أعد الرفع.',
   },
   {
     problem: 'رمز المصادقة الثنائية مرفوض',
@@ -1024,15 +1024,142 @@ export function HelpPage() {
         </div>
       </section>
 
+      <section id="warehouse-setup" className="scroll-mt-6">
+        <SectionHeading
+          eyebrow="12 / إعداد المستودع"
+          title="مركزي أم فرعي؟ وكيف يُهيّأ كل وضع"
+          description="التطبيق واحد، لكن سلوكه يتغيّر حسب نوع مستودع هذا الجهاز. اختر النوع بدقة قبل التشغيل الفعلي."
+          icon={MapPin}
+        />
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="rounded-xl border bg-card p-4 shadow-sm">
+            <div className="mb-2 flex items-center gap-2 text-sm font-bold"><Badge>مركزي</Badge> المستودع الرئيسي</div>
+            <ul className="list-inside list-disc space-y-1 text-sm leading-6 text-muted-foreground">
+              <li>يُنشأ تلقائياً عند أول تشغيل باسم <span className="font-mono">C</span> (واحد فقط في النظام).</li>
+              <li>يستقبل من المورّدين (سند استلام)، ويوزّع على الفروع عبر التحويلات، ويسجّل الإدخال المباشر.</li>
+              <li>يرى كل المواقع في التقارير الموحّدة.</li>
+            </ul>
+          </div>
+          <div className="rounded-xl border bg-card p-4 shadow-sm">
+            <div className="mb-2 flex items-center gap-2 text-sm font-bold"><Badge variant="secondary">فرعي</Badge> مستودع موقع</div>
+            <ul className="list-inside list-disc space-y-1 text-sm leading-6 text-muted-foreground">
+              <li>لا ينشئ سند استلام من مورّد، ولا يسجّل إدخالاً مباشراً.</li>
+              <li>يستقبل حصراً عبر «استلام تحويل من المركزي»، ويعيد عبر «مرتجع إلى المركزي».</li>
+              <li>يعمل على بياناته ويزامنها مع باقي المواقع.</li>
+            </ul>
+          </div>
+        </div>
+        <div className="mt-3 rounded-xl border bg-card p-4 text-sm leading-6 text-muted-foreground shadow-sm">
+          <div className="mb-1 font-bold text-foreground">خطوات ضبط المستودع</div>
+          <ol className="list-inside list-decimal space-y-1">
+            <li>من الكتالوج ← تبويب «المستودعات»: أنشئ المستودعات (الرمز، الاسم، النوع: مركزي/فرعي).</li>
+            <li>لا يمكن إنشاء أكثر من مستودع مركزي واحد (<span className="font-mono">SINGLE_CENTRAL_ONLY</span>).</li>
+            <li>عيّن «مستودع هذا الجهاز» بالضغط على الزر المقابل في نفس التبويب.</li>
+            <li>لنظام تثبيت-لكل-موقع: ثبّت نسخة لكل موقع واربطها بمستودعها، ثم زامن بينها.</li>
+          </ol>
+        </div>
+      </section>
+
+      <section id="whats-new-506" className="scroll-mt-6">
+        <SectionHeading
+          eyebrow="13 / ميزات 5.0.6"
+          title="قواعد تعدد المستودعات الجديدة"
+          description="قواعد مفروضة على الخادم؛ أي تجاوز يُرفض حتى لو تجاوز المستخدم الواجهة."
+          icon={ShieldCheck}
+        />
+        <div className="overflow-x-auto rounded-xl border bg-card shadow-sm">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50 text-right">
+              <tr><th className="p-3">القاعدة</th><th className="p-3">السلوك</th><th className="p-3">الرمز عند الرفض</th></tr>
+            </thead>
+            <tbody>
+              <tr className="border-t"><td className="p-3 font-semibold">التحويل</td><td className="p-3">مسموح من مركزي إلى فرعي فقط</td><td className="p-3 font-mono text-xs">TRANSFER_NOT_ALLOWED</td></tr>
+              <tr className="border-t"><td className="p-3 font-semibold">المركزية</td><td className="p-3">مستودع مركزي واحد فقط</td><td className="p-3 font-mono text-xs">SINGLE_CENTRAL_ONLY</td></tr>
+              <tr className="border-t"><td className="p-3 font-semibold">سند الاستلام</td><td className="p-3">الفرع لا ينشئه</td><td className="p-3 font-mono text-xs">BRANCH_NO_SUPPLIER_RECEIPT</td></tr>
+              <tr className="border-t"><td className="p-3 font-semibold">الإدخال المباشر</td><td className="p-3">الفرع لا يسجّله</td><td className="p-3 font-mono text-xs">BRANCH_INBOUND_VIA_TRANSFER_ONLY</td></tr>
+              <tr className="border-t"><td className="p-3 font-semibold">فرق الاستلام</td><td className="p-3">سبب إلزامي لكل فرق</td><td className="p-3 font-mono text-xs">VARIANCE_REASON_REQUIRED</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          <div className="rounded-xl border bg-card p-4 text-sm leading-6 text-muted-foreground shadow-sm"><span className="font-bold text-foreground">تقرير المقارنة بين المواقع:</span> من التقارير ← «مقارنة المواقع»: عدد التحويلات، الكميات، صافي الفروق، الأسطر المخالفة، ومتوسط زمن العبور.</div>
+          <div className="rounded-xl border bg-card p-4 text-sm leading-6 text-muted-foreground shadow-sm"><span className="font-bold text-foreground">رسائل أوضح:</span> أخطاء الحركات (مثل دفعة منتهية) تُظهر رمزاً ورسالة واضحة بدل خطأ عام.</div>
+        </div>
+      </section>
+
+      <section id="roles-tasks" className="scroll-mt-6">
+        <SectionHeading
+          eyebrow="14 / حسب دورك"
+          title="ماذا تستطيع أن تفعل؟"
+          description="الأدوار الثلاثة مفروضة على الخادم؛ هذه خلاصة صلاحيات كل دور."
+          icon={Users}
+        />
+        <div className="overflow-x-auto rounded-xl border bg-card shadow-sm">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50 text-right">
+              <tr><th className="p-3">الإجراء</th><th className="p-3">مدير</th><th className="p-3">أمين مستودع</th><th className="p-3">مراقب</th></tr>
+            </thead>
+            <tbody>
+              <tr className="border-t"><td className="p-3">إدارة المستخدمين والإعدادات والقوائم المنسدلة</td><td className="p-3 text-center">✅</td><td className="p-3 text-center">—</td><td className="p-3 text-center">—</td></tr>
+              <tr className="border-t"><td className="p-3">إنشاء/تعديل المستودعات وتعيين مستودع الجهاز</td><td className="p-3 text-center">✅</td><td className="p-3 text-center">—</td><td className="p-3 text-center">—</td></tr>
+              <tr className="border-t"><td className="p-3">استيراد الكتالوج والأرصدة الافتتاحية</td><td className="p-3 text-center">✅</td><td className="p-3 text-center">—</td><td className="p-3 text-center">—</td></tr>
+              <tr className="border-t"><td className="p-3">إدخال/إخراج/تلف/عهدة/تسوية، واستلام التحويلات</td><td className="p-3 text-center">✅</td><td className="p-3 text-center">✅</td><td className="p-3 text-center">—</td></tr>
+              <tr className="border-t"><td className="p-3">إرسال التحويلات</td><td className="p-3 text-center">✅</td><td className="p-3 text-center">✅ (على المركزي)</td><td className="p-3 text-center">—</td></tr>
+              <tr className="border-t"><td className="p-3">اعتماد الجرد، والاستعادة، والتدقيق، والتقارير الإدارية</td><td className="p-3 text-center">✅</td><td className="p-3 text-center">جزئي</td><td className="p-3 text-center">قراءة</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="buttons-map" className="scroll-mt-6">
+        <SectionHeading
+          eyebrow="15 / خريطة الأزرار"
+          title="كل زر وتشير إلى ماذا"
+          description="تأكّد من أن الزر الذي تضغطه يخصّ العملية المطلوبة."
+          icon={LayoutDashboard}
+        />
+        <div className="overflow-x-auto rounded-xl border bg-card shadow-sm">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50 text-right">
+              <tr><th className="p-3">الزر</th><th className="p-3">الوظيفة</th><th className="p-3">الصفحة</th></tr>
+            </thead>
+            <tbody>
+              <tr className="border-t"><td className="p-3">استيراد الكتالوج (قالب التعريفات)</td><td className="p-3">إنشاء/تحديث المواد والتجهيزات مع معاينة</td><td className="p-3">الكتالوج ← استيراد الكتالوج</td></tr>
+              <tr className="border-t"><td className="p-3">قالب الأرصدة الافتتاحية</td><td className="p-3">إنشاء حركات إدخال افتتاحية لكل مستودع</td><td className="p-3">الكتالوج ← استيراد الكتالوج</td></tr>
+              <tr className="border-t"><td className="p-3">طلب تحويل / إرسال / استلام</td><td className="p-3">دورة التحويل بين المركزي والفرع</td><td className="p-3">التحويلات</td></tr>
+              <tr className="border-t"><td className="p-3">سند جديد (GRN)</td><td className="p-3">استلام من مورّد (المركزي فقط)</td><td className="p-3">سندات الاستلام</td></tr>
+              <tr className="border-t"><td className="p-3">إدخال / إخراج / تلف / عهدة / مرتجع</td><td className="p-3">الحركات المخزنية</td><td className="p-3">العمليات / المخزون</td></tr>
+              <tr className="border-t"><td className="p-3">جرد جديد + اعتماد</td><td className="p-3">تسوية الجرد بعد تسجيل أسباب الفروق</td><td className="p-3">الجرد</td></tr>
+              <tr className="border-t"><td className="p-3">طباعة</td><td className="p-3">سند A4 للسند/الحركة/التحويل</td><td className="p-3">داخل كل سجل</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="reports-export" className="scroll-mt-6">
+        <SectionHeading
+          eyebrow="16 / التقارير والطباعة والتصدير"
+          title="من أين تقرأ وتصدّر؟"
+          description="كل المخرجات في مكان واحد، مع تصدير Excel وطباعة A4."
+          icon={BarChart3}
+        />
+        <ul className="list-inside list-disc space-y-1 rounded-xl border bg-card p-4 text-sm leading-6 text-muted-foreground shadow-sm">
+          <li><span className="font-semibold text-foreground">التقارير:</span> المخزون، الحركات، العهد، انتهاء الصلاحية، قريب الانتهاء، الراكد، أقل من الحد، الرصيد حسب المستودع، الموحّد، مقارنة المواقع، فروق التحويل، اقتراحات الشراء، KPI، ABC، التقييم (FIFO)، COGS، المطابقة.</li>
+          <li><span className="font-semibold text-foreground">الطباعة:</span> سندات الإدخال/الإخراج والتحويل بصيغة A4 من داخل السجل.</li>
+          <li><span className="font-semibold text-foreground">التصدير:</span> تصدير Excel من شاشات التقارير/الكتالوج.</li>
+          <li><span className="font-semibold text-foreground">النسخ والمزامنة:</span> حزمة مشفّرة (.dme-sync) بكلمة سر؛ تُستخدم للنقل بين الأجهزة أو النسخ الاحتياطي والاستعادة.</li>
+        </ul>
+      </section>
+
       <footer className="rounded-xl border bg-card p-5 text-sm text-muted-foreground shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="space-y-1">
             <div className="font-semibold text-foreground">نظام مستودعات مديرية صحة دمشق</div>
             <div>
               الإصدار:{' '}
-              {String((import.meta as unknown as { env?: Record<string, string> }).env?.VITE_APP_VERSION ?? '5.0.4')}
+              {String((import.meta as unknown as { env?: Record<string, string> }).env?.VITE_APP_VERSION ?? '5.0.6')}
             </div>
-            <div>الدعم: مسؤول النظام المؤسسي</div>
+            <div>تصميم: إبراهيم الصيداوي · 0933706403</div>
           </div>
           <button
             type="button"

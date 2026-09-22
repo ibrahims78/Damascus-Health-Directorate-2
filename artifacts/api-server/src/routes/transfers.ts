@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, transfersTable, transferLinesTable, itemsTable, recipientsTable, exitReasonsTable } from "@workspace/db";
+import { db, transfersTable, transferLinesTable, itemsTable, recipientsTable, exitReasonsTable, warehousesTable } from "@workspace/db";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { auditLog } from "../middlewares/audit";
@@ -87,6 +87,24 @@ router.post("/", requireAuth, requireRole("admin", "warehouse_manager"), async (
     const fromWarehouseId = Number(req.body?.fromWarehouseId ?? current.id);
     if (toWarehouseId === fromWarehouseId) {
       res.status(400).json({ error: "لا يمكن التحويل إلى المستودع نفسه." });
+      return;
+    }
+    const [fromWh] = await db
+      .select({ id: warehousesTable.id, type: warehousesTable.type, code: warehousesTable.code })
+      .from(warehousesTable)
+      .where(eq(warehousesTable.id, fromWarehouseId))
+      .limit(1);
+    const [toWh] = await db
+      .select({ id: warehousesTable.id, type: warehousesTable.type, code: warehousesTable.code })
+      .from(warehousesTable)
+      .where(eq(warehousesTable.id, toWarehouseId))
+      .limit(1);
+    if (!fromWh || !toWh) {
+      res.status(400).json({ error: "مستودع المصدر أو الهدف غير موجود.", code: "WAREHOUSE_NOT_FOUND" });
+      return;
+    }
+    if (!(fromWh.type === "central" && toWh.type === "branch")) {
+      res.status(400).json({ error: "التحويل مسموح من المستودع المركزي إلى المستودع الفرعي فقط.", code: "TRANSFER_NOT_ALLOWED" });
       return;
     }
     const code = (await nextDocumentNumber("TRF")) ?? `TRF-${Date.now()}`;
@@ -217,6 +235,14 @@ router.post("/:id/receive", requireAuth, requireRole("admin", "warehouse_manager
         quantity,
         reason: entry?.varianceReason ? String(entry.varianceReason).trim() : null,
       });
+    }
+
+    for (const line of loaded.lines) {
+      const counted = receivedByLine.get(line.id);
+      if (counted && counted.quantity !== Number(line.quantity) && !counted.reason) {
+        res.status(400).json({ error: "يجب تسجيل سبب لكل فرق في كمية الاستلام.", code: "VARIANCE_REASON_REQUIRED" });
+        return;
+      }
     }
 
     await db.transaction(async (tx) => {

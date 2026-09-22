@@ -78,6 +78,10 @@ router.post("/", requireAuth, requireRole("admin", "warehouse_manager"), async (
       res.status(409).json({ error: "لا يوجد مستودع حالي معرّف.", code: "NO_WAREHOUSE" });
       return;
     }
+    if (current.type === "branch") {
+      res.status(403).json({ error: "إنشاء سند استلام من مورد متاح للمستودع المركزي فقط؛ استخدم استلام تحويل من المركزي.", code: "BRANCH_NO_SUPPLIER_RECEIPT" });
+      return;
+    }
     const requested = Number(req.body?.warehouseId ?? current.id);
     const receipt = await createReceipt({
       warehouseId: resolveScopedWarehouse(res.locals.user, requested, current.id),

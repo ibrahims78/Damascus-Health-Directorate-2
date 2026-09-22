@@ -782,7 +782,7 @@ function catalogContext(state: OfflineState, mode: CatalogImportMode): CatalogVa
     else existingEquipmentKeys.add(`name:${text(entry.name)}|model:${text(entry.model)}`);
   }
 
-  return { knownUnits, knownCategories, existingItemKeys, existingEquipmentKeys, mode };
+  return { knownUnits, knownCategories, knownWarehouseCodes: offlineWarehouseCodes(state), existingItemKeys, existingEquipmentKeys, mode };
 }
 
 function catalogSummary(
@@ -905,6 +905,28 @@ function offlineCurrentWarehouse(state: OfflineState) {
 
 function offlineWarehouseId(state: OfflineState): number {
   return offlineCurrentWarehouse(state)?.id ?? numberValue(state.currentWarehouseId, 1);
+}
+
+/** Resolves a warehouse id from its code; falls back to the current site when blank. */
+function offlineWarehouseIdByCode(state: OfflineState, code: string | null | undefined): number | null {
+  const wanted = text(code).trim().toLowerCase();
+  if (!wanted) return offlineWarehouseId(state);
+  const match = state.warehouses.find(
+    (warehouse) =>
+      text(warehouse.code).trim().toLowerCase() === wanted && warehouse.isActive !== false,
+  );
+  return match ? numberValue(match.id) : null;
+}
+
+/** Active warehouse codes, for opening-balance validation. */
+function offlineWarehouseCodes(state: OfflineState): Set<string> {
+  const codes = new Set<string>();
+  for (const warehouse of state.warehouses) {
+    if (warehouse.isActive === false) continue;
+    const code = text(warehouse.code);
+    if (code) codes.add(code);
+  }
+  return codes;
 }
 
 /** `CODE-TYPE-YEAR-NNNNNN` per warehouse, mirroring the server counter. */
@@ -1667,7 +1689,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
       }
       const openingBatchRows = validateInventoryOpeningBatchRows(
         rawBatches.filter((entry: unknown): entry is Record<string, unknown> => Boolean(entry) && typeof entry === 'object'),
-        { existingByCode: projectedByCode },
+        { existingByCode: projectedByCode, knownWarehouseCodes: offlineWarehouseCodes(state) },
       );
       const all = [...itemRows, ...openingBatchRows];
       const errors = all.filter((decision) => decision.state === 'error');
@@ -1742,7 +1764,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
       }
       const batchDecisions = validateInventoryOpeningBatchRows(
         openingInput.filter((entry): entry is Record<string, unknown> => Boolean(entry) && typeof entry === 'object'),
-        { existingByCode: projectedByCode },
+        { existingByCode: projectedByCode, knownWarehouseCodes: offlineWarehouseCodes(state) },
       );
       const preflightErrors = [...decisions, ...batchDecisions]
         .filter((decision) => decision.state === 'error');
@@ -1838,6 +1860,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
         const item = state.items.find((entry) => text(entry.code) === decision.row.code);
         if (!item) return failure(400, `المادة ذات الرمز ${decision.row.code} غير موجودة`);
         const quantity = numberValue(decision.row.quantity);
+        const warehouseId = offlineWarehouseIdByCode(state, decision.row.warehouseCode) ?? offlineWarehouseId(state);
         const batch = {
           id: nextId(state),
           itemId: item.id,
@@ -1846,6 +1869,7 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
           remainingQuantity: quantity,
           expiryDate: decision.row.expiryDate,
           supplier: decision.row.supplier,
+          warehouseId,
           deliveryNoteNumber: decision.row.deliveryNoteNumber ?? `استيراد-دفعة-${item.id}-${decision.row.rowNumber}`,
           deliveryNoteDate: decision.row.deliveryNoteDate ?? now().slice(0, 10),
         };
@@ -2068,6 +2092,9 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
             equipmentType: row.equipmentType,
             model: row.model,
             serialNumber: row.serialNumber,
+            unit: row.unit,
+            quantity: row.quantity,
+            warehouseId: offlineWarehouseIdByCode(state, row.warehouse) ?? offlineWarehouseId(state),
             minQuantity: row.minQuantity,
             notes,
             isActive: row.active,
@@ -2087,7 +2114,8 @@ async function route(pathname: string, searchParams: URLSearchParams, method: st
             unit: row.unit,
             condition: 'good',
             currentHolder: null,
-            quantity: 1,
+            quantity: row.quantity,
+            warehouseId: offlineWarehouseIdByCode(state, row.warehouse) ?? offlineWarehouseId(state),
             minQuantity: row.minQuantity,
             notes,
             isActive: row.active,

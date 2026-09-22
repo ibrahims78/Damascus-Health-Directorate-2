@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BookOpen, Plus, Ruler, Sparkles, Trash2, Wand2, Warehouse } from 'lucide-react';
 import { CatalogImportPanel } from '@/components/catalog-import-panel';
+import { CatalogBalancesPanel } from '@/components/catalog-balances-panel';
 import { BinsPanel } from '@/components/bins-panel';
 
 type Unit = { id: number; name: string; symbol: string | null; isActive: boolean; isSystem: boolean; sortOrder: number };
@@ -190,9 +191,6 @@ export function CatalogPage() {
             <Button variant="outline" className="gap-2" onClick={() => setLocation('/equipment/new')}>
               <Plus className="w-4 h-4" /> تجهيز جديد
             </Button>
-            <Button variant="ghost" className="gap-2" onClick={() => setLocation('/items')}>
-              <Sparkles className="w-4 h-4" /> استيراد Excel
-            </Button>
           </div>
         )}
       </div>
@@ -206,7 +204,7 @@ export function CatalogPage() {
       <Tabs defaultValue="units" className="space-y-4">
         <TabsList>
           <TabsTrigger value="units" className="gap-2"><Ruler className="w-4 h-4" /> الوحدات</TabsTrigger>
-          <TabsTrigger value="import" className="gap-2">استيراد الكتالوج</TabsTrigger>
+          {isAdmin && <TabsTrigger value="import" className="gap-2">استيراد الكتالوج</TabsTrigger>}
           <TabsTrigger value="bins" className="gap-2">المواقع</TabsTrigger>
           <TabsTrigger value="warehouses" className="gap-2"><Warehouse className="w-4 h-4" /> المستودعات</TabsTrigger>
           <TabsTrigger value="items" className="gap-2">المواد</TabsTrigger>
@@ -320,11 +318,20 @@ export function CatalogPage() {
         </TabsContent>
 
         <TabsContent value="import" className="space-y-4">
-          <CatalogImportPanel
-            knownUnits={units.filter((u) => u.isActive).map((u) => u.name)}
-            knownCategories={categories}
-            onDone={() => void load()}
-          />
+          {isAdmin && (
+            <>
+              <CatalogImportPanel
+                knownUnits={units.filter((u) => u.isActive).map((u) => u.name)}
+                knownCategories={categories}
+                knownWarehouseCodes={warehouses.filter((w) => w.isActive).map((w) => w.code)}
+                onDone={() => void load()}
+              />
+              <CatalogBalancesPanel
+                knownWarehouseCodes={warehouses.filter((w) => w.isActive).map((w) => w.code)}
+                onDone={() => void load()}
+              />
+            </>
+          )}
         </TabsContent>
 
         <TabsContent value="bins" className="space-y-4">

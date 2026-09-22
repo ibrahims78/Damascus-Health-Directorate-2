@@ -24,7 +24,6 @@ import { UnitsTab } from './units';
 import { TechnicalConditionsTab } from './technical';
 import { BackupTab } from './backup';
 import { CategoriesTab, RecipientsTab, ExitReasonsTab } from './catalog';
-import { ImportTab, ImportEquipmentTab } from './import';
 
 export function SettingsPage() {
   const { data: currentUser } = useGetCurrentUser();
@@ -59,8 +58,6 @@ export function SettingsPage() {
     {
       label: 'البيانات',
       tabs: [
-        ['import', 'استيراد مواد', FileSpreadsheet],
-        ['import-equipment', 'استيراد تجهيزات', FileSpreadsheet],
         ['backup', 'النسخ والاستعادة', DatabaseBackup],
       ] as const,
     },
@@ -93,8 +90,6 @@ export function SettingsPage() {
     categories: 'نظّم المواد والتجهيزات ضمن تصنيفات واضحة قابلة للبحث.',
     recipients: 'أدر الجهات المستلمة التي تظهر في سندات الإخراج.',
     'exit-reasons': 'وحّد أسباب الإخراج حتى تكون التقارير قابلة للمقارنة.',
-    import: 'استورد المواد عبر قالب، معاينة، وملخص أخطاء قابل للتصرف.',
-    'import-equipment': 'استورد التجهيزات مع التحقق من التسلسلي والحالة والكمية.',
     backup: 'أنشئ نسخة مشفرة أو افحص واستعد حزمة مع نقطة تراجع.',
   };
   const tabLabels: Record<string, string> = {
@@ -107,8 +102,6 @@ export function SettingsPage() {
     categories: 'التصنيفات',
     recipients: 'الجهات المستلمة',
     'exit-reasons': 'أسباب الإخراج',
-    import: 'استيراد مواد',
-    'import-equipment': 'استيراد تجهيزات',
     backup: 'النسخ والاستعادة',
   };
 
@@ -200,16 +193,6 @@ export function SettingsPage() {
         {isAdmin && (
           <TabsContent value="backup">
             <BackupTab />
-          </TabsContent>
-        )}
-        {isAdmin && (
-          <TabsContent value="import">
-            <ImportTab />
-          </TabsContent>
-        )}
-        {isAdmin && (
-          <TabsContent value="import-equipment">
-            <ImportEquipmentTab />
           </TabsContent>
         )}
       </Tabs>

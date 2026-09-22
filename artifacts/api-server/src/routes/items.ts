@@ -6,6 +6,7 @@ import {
   categoriesTable,
   systemSettingsTable,
   transactionsTable,
+  warehousesTable,
 } from "@workspace/db";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { auditLog } from "../middlewares/audit";
@@ -86,6 +87,7 @@ type ImportAnalysis = {
   };
   itemRows: ReturnType<typeof validateInventoryImportRows>;
   openingBatchRows: ReturnType<typeof validateInventoryOpeningBatchRows>;
+  warehouseByCode: Map<string, number>;
 };
 
 function importArrays(body: unknown) {
@@ -108,7 +110,7 @@ function isImportInput(value: unknown): value is ImportInput {
 async function analyzeImport(body: unknown, mode: "insert" | "upsert"): Promise<ImportAnalysis> {
   const {
  items, openingBatches } = importArrays(body);
-  const [allCategories, existing, existingBatches] = await Promise.all([
+  const [allCategories, existing, existingBatches, warehouseRows] = await Promise.all([
     db.select({ id: categoriesTable.id, name: categoriesTable.name }).from(categoriesTable),
     db
       .select({
@@ -130,6 +132,10 @@ async function analyzeImport(body: unknown, mode: "insert" | "upsert"): Promise<
       .from(inventoryBatchesTable)
       .innerJoin(itemsTable, eq(inventoryBatchesTable.itemId, itemsTable.id))
       .where(isNotNull(itemsTable.code)),
+    db
+      .select({ id: warehousesTable.id, code: warehousesTable.code })
+      .from(warehousesTable)
+      .where(eq(warehousesTable.isActive, true)),
   ]);
   const existingByCode = new Map(
     existing
@@ -137,6 +143,11 @@ async function analyzeImport(body: unknown, mode: "insert" | "upsert"): Promise<
       .map((item) => [item.code!.trim(), item]),
   );
   const categories = createCategoryLookup(allCategories);
+  const warehouseByCode = new Map(
+    warehouseRows
+      .filter((warehouse) => warehouse.code)
+      .map((warehouse) => [warehouse.code!.trim(), warehouse.id]),
+  );
   const itemRows = validateInventoryImportRows(items, {
     mode,
     categories,
@@ -164,6 +175,7 @@ async function analyzeImport(body: unknown, mode: "insert" | "upsert"): Promise<
   }
   const openingBatchRows = validateInventoryOpeningBatchRows(openingBatches, {
     existingByCode: projectedByCode,
+    knownWarehouseCodes: new Set(warehouseByCode.keys()),
     existingBatchKeys: new Set(existingBatches.map((batch) => [
       batch.code ?? "",
       batch.batchNumber ?? "",
@@ -194,6 +206,7 @@ async function analyzeImport(body: unknown, mode: "insert" | "upsert"): Promise<
     },
     itemRows,
     openingBatchRows,
+    warehouseByCode,
   };
 }
 
@@ -499,8 +512,8 @@ router.post(
         res.status(400).json({ error: "يجب إرسال صفوف استيراد صالحة" });
         return;
       }
-      if (items.length + openingBatches.length > 1000) {
-        res.status(400).json({ error: "الحد الأقصى للاستيراد 1000 صف في المرة الواحدة" });
+      if (items.length + openingBatches.length > 2000) {
+        res.status(400).json({ error: "الحد الأقصى للاستيراد 2000 صف في المرة الواحدة" });
         return;
       }
       const mode = req.query.mode === "upsert" ? "upsert" : "insert";
@@ -524,8 +537,8 @@ router.post(
         res.status(400).json({ error: "يجب إرسال صفوف استيراد صالحة" });
         return;
       }
-      if (items.length + openingBatches.length > 1000) {
-        res.status(400).json({ error: "الحد الأقصى للاستيراد 1000 صف في المرة الواحدة" });
+      if (items.length + openingBatches.length > 2000) {
+        res.status(400).json({ error: "الحد الأقصى للاستيراد 2000 صف في المرة الواحدة" });
         return;
       }
       const mode = req.query.mode === "upsert" ? "upsert" : "insert";
@@ -648,17 +661,35 @@ router.post(
         for (const decision of analysis.openingBatchRows) {
           if (decision.state === "empty") continue;
           if (decision.skipExistingBatch || decision.action === "skip-existing-batch") continue;
-          const itemId = decision.row.code ? itemIdsByCode.get(decision.row.code) : undefined;
+          let itemId = decision.row.code ? itemIdsByCode.get(decision.row.code) : undefined;
+          // Opening balances may reference items that already exist and are not
+          // part of this file; resolve them from the catalog when needed.
+          if (!itemId && decision.row.code) {
+            const [existingItem] = await tx
+              .select({ id: itemsTable.id })
+              .from(itemsTable)
+              .where(eq(itemsTable.code, decision.row.code))
+              .limit(1);
+            itemId = existingItem?.id;
+            if (itemId) itemIdsByCode.set(decision.row.code, itemId);
+          }
           if (!itemId) throw new Error("IMPORT_ITEM_NOT_FOUND_AFTER_PREFLIGHT");
+          const warehouseId = decision.row.warehouseCode
+            ? analysis.warehouseByCode.get(decision.row.warehouseCode)
+            : undefined;
+          if (decision.row.warehouseCode && !warehouseId) {
+            throw new Error(`WAREHOUSE_NOT_FOUND:${decision.row.warehouseCode}`);
+          }
           await createInventoryMovementInTransaction(tx, {
             kind: "in",
             itemType: "item",
             itemId,
             quantity: decision.row.quantity,
-            deliveryNoteNumber: decision.row.deliveryNoteNumber ?? `استيراد-دفعة-${itemId}-${decision.row.rowNumber}`,
+            deliveryNoteNumber: decision.row.deliveryNoteNumber ?? `استيراد-افتتاحي-${decision.row.warehouseCode ?? "WH"}-${itemId}-${decision.row.rowNumber}`,
             deliveryNoteDate: decision.row.deliveryNoteDate ?? openingDate,
             documentDate: decision.row.deliveryNoteDate ?? openingDate,
             supplySource: "central_warehouses",
+            warehouseId,
             expiryDate: decision.row.expiryDate,
             batchNumber: decision.row.batchNumber,
             supplier: decision.row.supplier,

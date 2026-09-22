@@ -40,7 +40,9 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 
-const APP_VERSION = import.meta.env.VITE_APP_VERSION ?? "v5.0.4";
+const APP_VERSION = import.meta.env.VITE_APP_VERSION ?? "v5.0.6";
+const DESIGNER_NAME = 'إبراهيم الصيداوي';
+const DESIGNER_PHONE = '0933706403';
 
 const navItems = [
   { href: '/',               label: 'لوحة المعلومات',  icon: LayoutDashboard },
@@ -361,7 +363,8 @@ export function Sidebar() {
               <TooltipContent side="left">
                 <div className="text-center leading-relaxed">
                   <div>{APP_VERSION}</div>
-                  <div className="opacity-80">الدعم: مسؤول النظام المؤسسي</div>
+                  <div className="opacity-80">تصميم: {DESIGNER_NAME}</div>
+                  <div className="opacity-60 font-mono">{DESIGNER_PHONE}</div>
                 </div>
               </TooltipContent>
             </Tooltip>
@@ -379,11 +382,15 @@ export function Sidebar() {
                   <Code2 className="w-3 h-3 text-muted-foreground/30 flex-shrink-0" />
                 <div className="min-w-0">
                   <div className="text-[10px] text-muted-foreground/50 leading-tight truncate">
-                      الدعم: مسؤول النظام المؤسسي
+                    تصميم: {DESIGNER_NAME}
                   </div>
-                    <div className="text-[10px] text-muted-foreground/40 leading-tight">
-                      قناة الدعم الداخلية المعتمدة
-                    </div>
+                  <a
+                    href={`tel:${DESIGNER_PHONE}`}
+                    className="text-[10px] font-mono text-muted-foreground/40 hover:text-muted-foreground/70 transition-colors leading-tight block"
+                    dir="ltr"
+                  >
+                    {DESIGNER_PHONE}
+                  </a>
                 </div>
               </div>
             </div>

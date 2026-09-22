@@ -17,7 +17,7 @@ import {
   transactionBatchAllocationsTable,
 } from "@workspace/db";
 import { requireAuth, requireRole } from "../middlewares/auth";
-import { eq, and, lte, gte, sql, desc, asc } from "drizzle-orm";
+import { eq, and, lte, gte, gt, lt, sql, desc, asc } from "drizzle-orm";
 
 const router = Router();
 
@@ -503,7 +503,9 @@ router.get("/below-min", requireAuth, async (_req, res) => {
       .where(
         and(
           eq(itemsTable.isActive, true),
-          lte(itemsTable.currentStock, itemsTable.minStock)
+          gt(itemsTable.minStock, 0),
+          gt(itemsTable.currentStock, 0),
+          lt(itemsTable.currentStock, itemsTable.minStock)
         )
       )
       .orderBy(itemsTable.currentStock);
@@ -1025,6 +1027,40 @@ router.get("/cogs", requireAuth, requireRole("admin"), async (req, res) => {
       items: [...byItem.values()]
         .map((row) => ({ ...row, value: Math.round(row.value * 100) / 100 }))
         .sort((a, b) => b.value - a.value),
+      generatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
+  }
+});
+
+// GET /api/reports/inter-site — comparison of transfer activity between warehouses
+router.get("/inter-site", requireAuth, requireRole("admin"), async (_req, res) => {
+  try {
+    const result = await db.execute(sql`
+      SELECT
+        fw.code AS from_code, fw.name AS from_name, fw.type AS from_type,
+        tw.code AS to_code, tw.name AS to_name, tw.type AS to_type,
+        COUNT(DISTINCT t.id)::int AS transfers,
+        COALESCE(SUM(tl.quantity), 0)::int AS requested_qty,
+        COALESCE(SUM(tl.received_quantity), 0)::int AS received_qty,
+        COALESCE(SUM(tl.variance), 0)::int AS total_variance,
+        COUNT(*) FILTER (WHERE tl.variance IS NOT NULL AND tl.variance <> 0)::int AS flagged_lines,
+        AVG(EXTRACT(EPOCH FROM (t.received_at - t.issued_at)) / 3600.0) AS avg_transit_hours
+      FROM transfers t
+      JOIN warehouses fw ON fw.id = t.from_warehouse_id
+      JOIN warehouses tw ON tw.id = t.to_warehouse_id
+      LEFT JOIN transfer_lines tl ON tl.transfer_id = t.id
+      GROUP BY fw.code, fw.name, fw.type, tw.code, tw.name, tw.type
+      ORDER BY fw.code, tw.code
+    `);
+    const statusRows = await db.execute(sql`
+      SELECT t.status, COUNT(*)::int AS count FROM transfers t GROUP BY t.status ORDER BY t.status
+    `);
+    res.json({
+      rows: (result.rows ?? result),
+      byStatus: (statusRows.rows ?? statusRows),
       generatedAt: new Date().toISOString(),
     });
   } catch (err) {

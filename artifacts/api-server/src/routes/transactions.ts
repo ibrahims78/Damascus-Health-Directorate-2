@@ -11,6 +11,7 @@ import {
 import { and, eq, gte, ilike, lte, or, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { scopedWarehouseId } from "../lib/scope";
+import { getCurrentWarehouse } from "../lib/warehouse-service";
 import { auditLog } from "../middlewares/audit";
 import { runAlertWorker } from "../lib/alert-worker";
 import {
@@ -142,7 +143,14 @@ router.post(
   "/in",
   requireAuth,
   requireRole("admin", "warehouse_manager"),
-  async (req, res) => executeMovement(req, res, { ...req.body, kind: "in" }),
+  async (req, res) => {
+    const current = await getCurrentWarehouse();
+    if (current && current.type === "branch") {
+      res.status(403).json({ error: "الإدخال المباشر غير متاح للمستودعات الفرعية؛ استخدم استلام تحويل من المركزي.", code: "BRANCH_INBOUND_VIA_TRANSFER_ONLY" });
+      return;
+    }
+    return executeMovement(req, res, { ...req.body, kind: "in" });
+  },
 );
 
 router.post(

@@ -26,6 +26,15 @@ function countFailure(res: import("express").Response, error: unknown) {
     res.status(error.status).json({ error: error.message, code: error.code });
     return;
   }
+  const status = (error as { status?: unknown } | null)?.status;
+  const code = (error as { code?: unknown } | null)?.code;
+  if (typeof status === "number" && status >= 400 && status < 600) {
+    res.status(status).json({
+      error: error instanceof Error ? error.message : "تعذّر إكمال العملية.",
+      ...(typeof code === "string" ? { code } : {}),
+    });
+    return;
+  }
   console.error(error);
   res.status(500).json({ error: "حدث خطأ غير متوقع في الخادم." });
 }
@@ -134,7 +143,7 @@ router.post("/:id/approve", requireAuth, requireRole("admin"), async (req, res) 
       action: "approve",
       entityType: "count_session",
       entityId: id,
-      details: { posted: result.posted.length, session: result.session.code },
+      details: { posted: result.posted.length, sessionCode: result.session.code },
     });
     res.json({
       ok: true,

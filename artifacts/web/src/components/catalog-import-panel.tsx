@@ -16,7 +16,7 @@ type Preview = {
 };
 
 const ITEM_HEADERS = ['الرمز', 'الاسم', 'التصنيف', 'الوحدة', 'الحد الأدنى', 'يتطلب دفعة', 'يتطلب صلاحية', 'الموقع', 'المورد', 'ملاحظات', 'فعّال'];
-const EQUIPMENT_HEADERS = ['الرمز', 'الاسم', 'النوع', 'الشركة', 'الموديل', 'الرقم التسلسلي', 'الوحدة', 'الحد الأدنى', 'يتطلب رقم تسلسلي', 'ملاحظات', 'فعّال'];
+const EQUIPMENT_HEADERS = ['الرمز', 'الاسم', 'النوع', 'الشركة', 'الموديل', 'الرقم التسلسلي', 'الوحدة', 'الكمية', 'المستودع', 'الحد الأدنى', 'يتطلب رقم تسلسلي', 'ملاحظات', 'فعّال'];
 
 const ACTION_LABEL: Record<Decision['action'], string> = {
   create: 'إضافة', update: 'تحديث', skip: 'تخطٍّ', error: 'خطأ',
@@ -31,10 +31,12 @@ const ACTION_LABEL: Record<Decision['action'], string> = {
 export function CatalogImportPanel({
   knownUnits,
   knownCategories,
+  knownWarehouseCodes,
   onDone,
 }: {
   knownUnits: string[];
   knownCategories: string[];
+  knownWarehouseCodes: string[];
   onDone?: () => void;
 }) {
   const [mode, setMode] = useState<'add-only' | 'add-and-update'>('add-and-update');
@@ -55,11 +57,13 @@ export function CatalogImportPanel({
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
         ['الوحدات المعتمدة', ...knownUnits],
         ['التصنيفات المعتمدة', ...knownCategories],
+        ['المستودعات المعتمدة', ...knownWarehouseCodes],
       ]), 'القيم المرجعية');
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
-        ['قالب الكتالوج — تعريفات المواد والتجهيزات فقط'],
-        ['لا تضف أي أعمدة كمية؛ الأرصدة تُدار بالحركات (إدخال/إخراج/تحويل).'],
-        ['الوحدة والتصنيف يجب أن يكونا من ورقة «القيم المرجعية» كما هي.'],
+        ['قالب الكتالوج — تعريفات المواد والتجهيزات'],
+        ['المواد: بلا أي أعمدة كمية؛ رصيد الافتتاح يُدار من قالب «الأرصدة الافتتاحية» أو بالحركات.'],
+        ['التجهيزات: عمود «الكمية» اختياري (افتراضي 1)، وعمود «المستودع» إلزامي من ورقة «القيم المرجعية».'],
+        ['الوحدة والتصنيف والمستودع يجب أن تكون من ورقة «القيم المرجعية» كما هي.'],
       ]), 'التعليمات');
       const bytes = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
       const url = URL.createObjectURL(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
@@ -182,7 +186,7 @@ export function CatalogImportPanel({
             <FileSpreadsheet className="h-5 w-5 text-primary" aria-hidden="true" /> استيراد الكتالوج من Excel
           </CardTitle>
           <CardDescription>
-            قالب التعريفات (مواد + تجهيزات) — بلا أي أعمدة كمية. المعاينة لا تكتب شيئًا، والتنفيذ ذرّي وللمدير فقط.
+            قالب التعريفات (مواد + تجهيزات). المواد بلا أعمدة كمية، والتجهيزات تقبل عمود كمية ومستودعًا. المعاينة لا تكتب شيئًا، والتنفيذ ذرّي وللمدير فقط.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -320,8 +324,8 @@ export function CatalogImportPanel({
         </CardHeader>
         <CardContent className="text-xs text-muted-foreground space-y-1">
           <p>• الوحدة والتصنيف يجب أن يطابقا ورقة «القيم المرجعية» حرفيًا.</p>
-          <p>• للتجهيزات: الرقم التسلسلي هو المفتاح الأساسي، والكمية تُثبَّت على 1.</p>
-          <p>• لا توجد أعمدة كمية في قالب الكتالوج؛ رصيد الافتتاح يُدار من قالب الرصيد الافتتاحي أو الحركات.</p>
+          <p>• للتجهيزات: الرقم التسلسلي مفتاح أساسي (وإن وُجد فالكمية = 1)، وإلا فالكمية حرّة والمستودع إلزامي.</p>
+          <p>• لا توجد أعمدة كمية للمواد في قالب الكتالوج؛ رصيد الافتتاح يُدار من قالب «الأرصدة الافتتاحية».</p>
           <p>• يُقبل Excel (.xlsx/.xls) وCSV: في CSV يُقرأ جدول المواد بعناوينه العربية نفسها (بورقة واحدة).</p>
         </CardContent>
       </Card>

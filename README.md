@@ -2,7 +2,7 @@
 
 # مستودعات مديرية صحة دمشق
 
-### Damascus Health Directorate Warehouses — v5.0.4
+### Damascus Health Directorate Warehouses — v5.0.5
 
 [![Release](https://img.shields.io/github/v/release/ibrahims78/Damascus-Health-Directorate-2?label=%D8%A7%D9%84%D8%A5%D8%B5%D8%AF%D8%A7%D8%B1&logo=github)](https://github.com/ibrahims78/Damascus-Health-Directorate-2/releases/latest)
 [![CI](https://github.com/ibrahims78/Damascus-Health-Directorate-2/actions/workflows/ci.yml/badge.svg)](https://github.com/ibrahims78/Damascus-Health-Directorate-2/actions/workflows/ci.yml)
@@ -17,7 +17,7 @@
 
 ## 📥 التنزيلات
 
-كل الإصدارات الجاهزة من صفحة [**Releases → v5.0.4**](https://github.com/ibrahims78/Damascus-Health-Directorate-2/releases/tag/v5.0.4):
+كل الإصدارات الجاهزة من صفحة [**Releases → v5.0.5**](https://github.com/ibrahims78/Damascus-Health-Directorate-2/releases/tag/v5.0.5):
 
 | الحزمة | المنصة | الوصف |
 |---|---|---|
@@ -121,17 +121,19 @@ Recharts            Capacitor (أندرويد)
 
 ```
 ├── artifacts/
-│   ├── api-server/         # خادم API (يتضمن build:standard و build:protected)
-│   └── web/                # واجهة React (dist/protected-windows و dist/protected-android)
+│   ├── api-server/         # خادم API (يتضمن build:protected)
+│   └── web/                # واجهة React (dist/public + protected-windows + protected-android + android-offline)
 ├── lib/
 │   ├── db/                 # مخطط Drizzle + desktop-schema.sql + الترميم الذاتي
 │   ├── license-core/       # التحقق Ed25519 (WebCrypto + مسار noble الاحتياطي)
 │   ├── backup-format/      # صيغة حزم النسخ والمزامنة المشفرة
 │   └── api-spec/           # مواصفة OpenAPI (مصدر الحقيقة)
 ├── android/                # مشروع أندرويد
-├── release-artifacts/               # ملاحظات الإصدار ومخرجات الإصدار خارج Git
-├── docs/                   # أدلة التشغيل والمستخدم وقواعد المجال
-└── scripts/                # أدوات الاستيراد وإصدار التراخيص + CI
+├── scripts/                # أدوات البناء وإصدار التراخيص
+├── release-artifacts/      # ملاحظات الإصدار + سكربتات تجميع ويندوز + مفاتيح التحقق
+├── release-secrets/android # مفتاح توقيع الإنتاج (keystore) — سري
+├── offline-build-tools/    # التوليفة المحلية: JDK 21 + Android SDK + Gradle + Electron + pnpm store
+└── deliverables/           # حزم ويندوز وأندرويد + حزمة التفعيل + البصمات
 ```
 
 ---
@@ -141,25 +143,22 @@ Recharts            Capacitor (أندرويد)
 ```bash
 pnpm install --ignore-scripts   # (Windows: تجاوز سكربت preinstall)
 pnpm run typecheck              # كل الحزم
-pnpm run build                  # بناء كامل
-pnpm test
-pnpm lint
-pnpm test:e2e
+pnpm run build                  # بناء كامل (API + واجهة)
+pnpm run lint
 
-# PostgreSQL المستضاف — قبل تشغيل API
-pnpm db:migrate
-pnpm db:readiness
-
-# تطوير يومي (أدلة ضمن المستودع)
-./start-dev.ps1                 # API + واجهة التطوير
-./stop-dev.ps1
+# تشغيل التطبيق محلياً (Windows)
+./run-local.ps1                 # API 8080 + واجهة 22333
+./Start-App.ps1                 # تشغيل + فتح المتصفح
+./Stop-App.ps1                  # إيقاف
 
 # بناء حزم الإصدار
-node scripts/build-protected-web.mjs windows          # واجهة النسخة المحمية
+node scripts/build-protected-web.mjs windows          # واجهة النسخة المحمية (Windows)
 pnpm --filter @workspace/api-server run build:protected
-node scripts/release-dry-run.mjs                         # تحقق إصدار قابل للتتبع + checksums
-./android/gradlew assembleRelease                         # بناء Android (يتطلب Android SDK/JDK)
+./Build-Android-Apk.ps1                                  # بناء APK (Offline + Protected) بالتوليفة والمفتاح المحليين
+./release-artifacts/scripts/reassemble-electron.ps1      # إعادة تجميع حزمة ويندوز (يحتاج runtime Electron)
 ```
+
+> في هذه النسخة المحلية: التوليفة الكاملة (JDK 21 + Android SDK + Gradle + Electron runtime + pnpm store) موجودة في `offline-build-tools/`، ومفتاح توقيع الإنتاج في `release-secrets/android/`، وحزمة التفعيل في `deliverables/`. راجع `BUILD-AND-TOOLS-AR.md`.
 
 اختبارات CI تعمل تلقائياً عبر `.github/workflows/ci.yml`، وتوقف الدمج عند
 فشل النوع أو البناء أو الاختبار أو lint أو E2E. راجع
@@ -184,6 +183,8 @@ node scripts/release-dry-run.mjs                         # تحقق إصدار �
 | | |
 |---|---|
 | **المالك** | مديرية صحة دمشق |
+| **المصمم والمطوّر** | إبراهيم الصيداوي (ibrahims78) |
+| **موبايل** | 00963933706403 |
 | **الدعم** | قناة الدعم المؤسسية المعتمدة لدى مديرية صحة دمشق |
 ---
 
@@ -218,8 +219,10 @@ node scripts/release-dry-run.mjs                         # تحقق إصدار �
 - رصيد لكل **(صنف × مستودع)** + **إجمالي موحّد** للمدير.
 
 ### الاستيراد والتصدير
-- قالب كتالوج + قالب رصيد افتتاحي · معاينة بأثر كل صف · اعتماد · **تراجع عن دفعة**.
-- سجل دفعات استيراد مع تدقيق كامل.
+- **مدخل واحد «استيراد الكتالوج»** (للمدير فقط): قالب التعريفات (مواد + تجهيزات بعمود كمية ومستودع إلزامي).
+- قالب **الأرصدة الافتتاحية لكل مستودع**: كل صف يُنشئ **حركة إدخال** تظهر في «الرصيد حسب المستودع».
+- معاينة بأثر كل صف · اعتماد · **تراجع عن دفعة** · حد 2000 صف لكل عملية.
+- أُزيلت المداخل المتفرقة السابقة (صفحة المواد، صفحة التجهيزات، تبويبا الإعدادات) والزر المضلّل في رأس الكتالوج.
 
 ### المزامنة (بلا سيرفر مركزي)
 - حزم `.dme-sync` **مشفّرة** (AES-256-GCM) تُنقل بـUSB/مجلد شبكة.

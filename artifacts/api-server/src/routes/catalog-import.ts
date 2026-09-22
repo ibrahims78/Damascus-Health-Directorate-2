@@ -5,6 +5,7 @@ import {
   equipmentTable,
   unitsTable,
   categoriesTable,
+  warehousesTable,
 } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
@@ -54,6 +55,10 @@ async function buildContext(mode: CatalogImportMode): Promise<CatalogValidationC
   const equipmentRows = await db
     .select({ serialNumber: equipmentTable.serialNumber, name: equipmentTable.name, model: equipmentTable.model })
     .from(equipmentTable);
+  const warehouseRows = await db
+    .select({ code: warehousesTable.code })
+    .from(warehousesTable)
+    .where(eq(warehousesTable.isActive, true));
 
   const existingItemKeys = new Set<string>();
   for (const row of itemRows) {
@@ -69,6 +74,7 @@ async function buildContext(mode: CatalogImportMode): Promise<CatalogValidationC
   return {
     knownUnits: new Set(unitRows.map((u) => u.name)),
     knownCategories: new Set(categoryRows.map((c) => c.name)),
+    knownWarehouseCodes: new Set(warehouseRows.map((w) => (w.code ?? "").trim())),
     existingItemKeys,
     existingEquipmentKeys,
     mode,
@@ -127,6 +133,9 @@ router.post("/import", requireAuth, requireRole("admin"), async (req, res) => {
 
     const categoryRows = await db.select({ id: categoriesTable.id, name: categoriesTable.name }).from(categoriesTable);
     const categoryByName = new Map(categoryRows.map((c) => [c.name, c.id]));
+    const warehouseRows = await db.select({ id: warehousesTable.id, code: warehousesTable.code }).from(warehousesTable);
+    const warehouseByCode = new Map(warehouseRows.filter((w) => w.code).map((w) => [w.code!.trim(), w.id]));
+    const resolveWarehouseId = (code: string | null) => (code ? warehouseByCode.get(code.trim()) ?? null : null);
     const node = await ensureNodeIdentity("web");
 
     let createdItems = 0;
@@ -224,7 +233,8 @@ router.post("/import", requireAuth, requireRole("admin"), async (req, res) => {
               condition: "good",
               currentHolder: null,
               notes: [row.company ? `الشركة: ${row.company}` : null, row.notes].filter(Boolean).join(" | ") || null,
-              quantity: 1,
+              quantity: row.quantity,
+              warehouseId: resolveWarehouseId(row.warehouse),
               minQuantity: row.minQuantity,
               isActive: row.active,
             })
@@ -256,6 +266,8 @@ router.post("/import", requireAuth, requireRole("admin"), async (req, res) => {
               equipmentType: row.equipmentType,
               model: row.model,
               serialNumber: row.serialNumber,
+              quantity: row.quantity,
+              warehouseId: resolveWarehouseId(row.warehouse),
               minQuantity: row.minQuantity,
               isActive: row.active,
               updatedAt: new Date(),
