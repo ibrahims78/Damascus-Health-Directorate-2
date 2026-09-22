@@ -133,7 +133,7 @@ Recharts            Capacitor (أندرويد)
 ├── release-artifacts/      # ملاحظات الإصدار + سكربتات تجميع ويندوز + مفاتيح التحقق
 ├── release-secrets/android # مفتاح توقيع الإنتاج (keystore) — سري
 ├── offline-build-tools/    # التوليفة المحلية: JDK 21 + Android SDK + Gradle + Electron + pnpm store
-└── deliverables/           # حزم ويندوز وأندرويد + حزمة التفعيل + البصمات
+└── مخرجات الإصدار           # حزم ويندوز وأندرويد + حزمة التفعيل + البصمات
 ```
 
 ---
@@ -158,7 +158,7 @@ pnpm --filter @workspace/api-server run build:protected
 ./release-artifacts/scripts/reassemble-electron.ps1      # إعادة تجميع حزمة ويندوز (يحتاج runtime Electron)
 ```
 
-> في هذه النسخة المحلية: التوليفة الكاملة (JDK 21 + Android SDK + Gradle + Electron runtime + pnpm store) موجودة في `offline-build-tools/`، ومفتاح توقيع الإنتاج في `release-secrets/android/`، وحزمة التفعيل في `deliverables/`. راجع `BUILD-AND-TOOLS-AR.md`.
+> في هذه النسخة المحلية: التوليفة الكاملة (JDK 21 + Android SDK + Gradle + Electron runtime + pnpm store) موجودة في `offline-build-tools/`، ومفتاح توقيع الإنتاج في `release-secrets/android/`، وحزمة التفعيل في مخرجات الإصدار. راجع `BUILD-AND-TOOLS-AR.md`.
 
 اختبارات CI تعمل تلقائياً عبر `.github/workflows/ci.yml`، وتوقف الدمج عند
 فشل النوع أو البناء أو الاختبار أو lint أو E2E. راجع

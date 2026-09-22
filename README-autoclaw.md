@@ -35,7 +35,7 @@ pnpm --filter @workspace/api-server run build:protected
 .\release-artifacts\scripts\reassemble-electron.ps1
 ```
 
-> **التوليفة المحلية في هذه النسخة:** `offline-build-tools/` (JDK 21 + Android SDK + Gradle + Electron runtime + pnpm store)، ومفتاح التوقيع في `release-secrets/android/`، وحزمة التفعيل في `deliverables/`. راجع `BUILD-AND-TOOLS-AR.md`.
+> **التوليفة المحلية في هذه النسخة:** `offline-build-tools/` (JDK 21 + Android SDK + Gradle + Electron runtime + pnpm store)، ومفتاح التوقيع في `release-secrets/android/`، وحزمة التفعيل في مخرجات الإصدار. راجع `BUILD-AND-TOOLS-AR.md`.
 
 **مهم**: عند تعديل `lib/api-spec/openapi.yaml` نفّذ codegen ثم `tsc --build` قبل typecheck (حزم lib تعتمد على مخرجات TS المترجمة).
 
@@ -64,7 +64,7 @@ scripts/            البناء، إصدار التراخيص، الاستير�
 release-artifacts/  ملاحظات الإصدار + سكربتات تجميع ويندوز + مفاتيح التحقق
 release-secrets/    مفتاح توقيع الإنتاج (keystore) — سري
 offline-build-tools/  التوليفة المحلية (JDK 21 + Android SDK + Gradle + Electron + pnpm store)
-deliverables/       حزم ويندوز وأندرويد + حزمة التفعيل + البصمات
+مخرجات الإصدار       حزم ويندوز وأندرويد + حزمة التفعيل + البصمات
 ```
 
 ## ملاحظات ويندوز الحرجة (دروس مستفادة)
