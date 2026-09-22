@@ -1159,7 +1159,7 @@ export function HelpPage() {
               الإصدار:{' '}
               {String((import.meta as unknown as { env?: Record<string, string> }).env?.VITE_APP_VERSION ?? '5.0.6')}
             </div>
-            <div>تصميم: إبراهيم الصيداوي · 0933706403</div>
+            <div>تصميم: إبراهيم الصيداوي</div>
           </div>
           <button
             type="button"
