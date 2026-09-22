@@ -68,6 +68,7 @@ describe("shared inventory import contract", () => {
   it("normalizes the opening-batch sheet and the shared input movement model", () => {
     const row = normalizeOpeningBatchRow({
       "رمز المادة": "0007",
+      "المستودع": "C",
       "الكمية الافتتاحية": "12",
       "رقم الدفعة": "B-01",
       "تاريخ الصلاحية": "2027-01-31",
@@ -77,6 +78,7 @@ describe("shared inventory import contract", () => {
 
     expect(row).toMatchObject({
       code: "0007",
+      warehouseCode: "C",
       quantity: 12,
       expiryDate: "2027-01-31",
       deliveryNoteNumber: "GRN-7",
@@ -97,10 +99,11 @@ describe("shared inventory import contract", () => {
 
   it("produces a create-batch decision and rejects repeated opening batches", () => {
     const decisions = validateInventoryOpeningBatchRows([
-      { "رمز المادة": "0007", "الكمية الافتتاحية": 4, "رقم الدفعة": "B-01", "تاريخ الصلاحية": "2027-01-31" },
-      { "رمز المادة": "0007", "الكمية الافتتاحية": 3, "رقم الدفعة": "B-01", "تاريخ الصلاحية": "2027-01-31" },
+      { "رمز المادة": "0007", "المستودع": "C", "الكمية الافتتاحية": 4, "رقم الدفعة": "B-01", "تاريخ الصلاحية": "2027-01-31" },
+      { "رمز المادة": "0007", "المستودع": "C", "الكمية الافتتاحية": 3, "رقم الدفعة": "B-01", "تاريخ الصلاحية": "2027-01-31" },
     ], {
       existingByCode: context.existingByCode,
+      knownWarehouseCodes: new Set(["C"]),
     });
 
     expect(decisions[0].action).toBe("create-opening-batch");
@@ -166,6 +169,7 @@ describe("shared inventory import contract", () => {
     const [decision] = validateInventoryOpeningBatchRows([
       {
         "رمز المادة": "0007",
+        "المستودع": "C",
         "الكمية الافتتاحية": 12,
         "رقم الدفعة": "B-01",
         "تاريخ الصلاحية": "2027-01-31",
@@ -173,6 +177,7 @@ describe("shared inventory import contract", () => {
       },
     ], {
       existingByCode: context.existingByCode,
+      knownWarehouseCodes: new Set(["C"]),
       existingBatchKeys: new Set(["0007|B-01|2027-01-31|GRN-7"]),
     });
 

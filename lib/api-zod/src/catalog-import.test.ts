@@ -11,6 +11,7 @@ import {
 const ctx = {
   knownUnits: new Set(["قطعة", "علبة"]),
   knownCategories: new Set(["مستهلكات"]),
+  knownWarehouseCodes: new Set(["C", "WH-2"]),
   existingItemKeys: new Set(["code:ITM-1"]),
   existingEquipmentKeys: new Set<string>(),
   mode: "add-and-update" as const,
@@ -60,15 +61,22 @@ describe("catalog import contract", () => {
 
   it("validates equipment rows and serial keys", () => {
     const analysis = validateCatalogEquipmentRows(
-      [{ "الاسم": "جهاز", "الرقم التسلسلي": "SN-9", "الحد الأدنى": "1" }],
+      [{ "الاسم": "جهاز", "الرقم التسلسلي": "SN-9", "الحد الأدنى": "1", "المستودع": "C" }],
       ctx,
     );
     expect(analysis.summary.create).toBe(1);
     expect(analysis.rows[0].data.requiresSerial).toBe(true);
     expect(equipmentKey(analysis.rows[0].data)).toBe("serial:SN-9");
 
-    const withQty = validateCatalogEquipmentRows([{ "الاسم": "جهاز", "الكمية": 4 }], ctx);
-    expect(withQty.rows[0].issues.map((i) => i.code)).toContain("SERIAL_WITH_QUANTITY");
+    const withQty = validateCatalogEquipmentRows([{ "الاسم": "جهاز", "الكمية": 4, "المستودع": "C" }], ctx);
+    expect(withQty.summary.create).toBe(1);
+    expect(withQty.rows[0].data.quantity).toBe(4);
+
+    const noWarehouse = validateCatalogEquipmentRows([{ "الاسم": "جهاز ب" }], ctx);
+    expect(noWarehouse.rows[0].issues.map((i) => i.code)).toContain("WAREHOUSE_REQUIRED");
+
+    const badWarehouse = validateCatalogEquipmentRows([{ "الاسم": "جهاز ج", "المستودع": "X" }], ctx);
+    expect(badWarehouse.rows[0].issues.map((i) => i.code)).toContain("WAREHOUSE_UNKNOWN");
   });
 
   it("builds stable keys", () => {
